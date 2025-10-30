@@ -7,7 +7,7 @@ import { RingBuffer, MovingAvg, normalizedCrossCorrelation, angleBetween, diffSe
 const CFG = {
   inputTargetSize: 320, // 処理落ち時は 256 に下げる
   minFPSForHighRes: 26,
-  windowSec: 0.6, // RUN 相関窓
+  windowSec: 0.7, // RUN 相関窓
   debounceSec: 0.3,
   hysteresis: { on: 0.65, off: 0.45 },
   run: {
@@ -16,28 +16,32 @@ const CFG = {
     // 代替: 手首の上下速度のゼロ交差から走動作（周期運動）を検出
     freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
     zeroXMinAmp: 80,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
-    minTipSpeedPxPerSec: 400, // 甲から離れた領域での指先速度の下限（RUN 用）
+    minTipSpeedPxPerSec: 200, // 甲から離れた領域での指先速度の下限（RUN 用）
   },
   kick: {
     minAngVel: 10.0, // rad/s
     minWristSpeed: 500.0, // px/s （10 px/frame @30fps 相当）
     // KICK は指先速度ピークのみで判定
-    minTipSpeedPxPerSec: 3000, // 指先速度による KICK しきい値
+    minTipSpeedPxPerSec: 1800, // 指先速度による KICK しきい値
+    // 前方向（カメラ方向）への z 速度の最小値 (normalized z units per sec)
+    // MediaPipe の z はカメラに近づくと通常負の値になるため、
+    // ここでは負方向の速度（値が小さくなる＝より負）を期待する。
+    minTipForwardZ: 0.5,
   },
-  joystick: {
-    // グーの手をジョイスティック化（左右）
-    deadzonePalmRatio: 0.5,  // デッドゾーン = palmSize * ratio
-    maxRangePalmRatio: 2.0,  // フルレンジ = palmSize * ratio（これ以上は±1にクランプ）
-    smoothAlpha: 0.25,       // 値のローパス係数（0..1）
-    resetDelaySec: 0.5,      // こぶし未検出になってから原点をリセットする遅延
-  },
-  fist: {
-    // グー判定: 指先(4,8,12,16,20)が掌中心に近い（palmSize 比）
-    // 緩め設定: 指先が掌中心からやや離れていてもグーとみなす
-    maxTipPalmRatio: 1.6, // 平均距離/掌サイズ がこの値以下ならグー寄り
-    minTipsClose: 3,      // 近いとみなす指の最小本数
+  charge: {
+    // PIP 関節の角度しきい値 (rad)。angleBetween(PIP->MCP, PIP->DIP) がこの値未満なら曲がっていると判定
+    angleThresholdRad: 1.5,
+    // CHARGE を開始するまでのホールド時間（秒）
+    holdSec: 0.1,
+    // MCP（第1関節）の角度もしきい値として考慮する（angle at MCP between wrist->MCP and PIP->MCP）
+    mcpAngleThresholdRad: 1.5,
+    // KICK を抑止するための「わずかな曲がり」検出用しきい値（CHARGE の閾値は変更しない）
+    // 直立（約 pi rad = 3.14）に近い値で小さな曲がりを検出する。デフォルトは 2.9rad（約166°）。
+    anyBendAngleRad: 2.9,
+    anyBendMcpAngleRad: 2.9,
   },
 };
+
 
 async function loadTasksVision() {
   const candidates = [
@@ -68,11 +72,40 @@ export class HandTracker {
     this.running = false;
     this.lastTs = performance.now();
     this.fps = 0;
+  // 検出スロットル: ミリ秒単位。デフォルトは 15 FPS 相当
+  this.detectIntervalMs = 1000 / 15;
+  this.lastDetectTime = 0;
+  this.lastDetectResult = null;
 
     // 時系列バッファ
     this.landmarksBuf = new RingBuffer(90); // 約3秒分@30fps
     this.state = 'NONE';
     this.stateConf = 0;
+    // ゲーム側へ渡す統一されたアクション状態オブジェクト
+    this.actionState = {
+      state: this.state,
+      confidence: this.stateConf,
+      charge: false,
+      fps: 0,
+      ts: this.lastTs / 1000,
+      tipSpeedPeak: 0,
+      tipForwardMin: 0,
+      runConf: 0,
+      palmSize: 0,
+      lastSeenTime: 0,
+      chargeHeld: false,
+      chargePending: false,
+    };
+    // CHARGE ホールド開始時刻（秒）。null の場合は未ホールド
+    this.chargeStartTime = null;
+  // CHARGE 後に次の非 NONE を KICK に変換するフラグ
+  this.chargePending = false;
+  // chargePending が有効な最終時刻（秒）
+  this.chargePendingUntil = 0;
+  // CHARGE が holdSec を満たして確定したかを表す内部フラグ
+  this.chargeHeld = false;
+  // KICK を最低限保持するための有効期限（秒）
+  this.kickHoldUntil = 0;
   this.lastTriggerTime = 0;
   this.lastSeenTime = 0; // 最後に手を検出した時刻（sec）
   this.noHandCount = 0;  // 連続で検出できなかったフレーム数
@@ -81,11 +114,7 @@ export class HandTracker {
     this.procCanvas = document.createElement('canvas');
     this.procCtx = this.procCanvas.getContext('2d', { willReadFrequently: true });
 
-    // ジョイスティック（グーの手）用状態
-    this.fistOrigin = null;     // {x,y} ピクセル座標
-    this.joystickX = 0;         // -1..1 左右
-    this.joystickActive = false;
-  this.lastFistSeenTs = 0;    // 最後にグーを検出した時刻（sec）
+    // ジョイスティック機能を削除して片手検出に簡素化
   }
 
   async init() {
@@ -117,12 +146,13 @@ export class HandTracker {
           } catch (_) { /* try next */ }
         }
         if (!modelPath) throw new Error('No accessible hand_landmarker.task');
+        // 軽量化: デフォルトで numHands=1 にして負荷を抑える
         this.handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
           baseOptions: { modelAssetPath: modelPath },
-          numHands: 2,
+          numHands: 1,
           runningMode: 'VIDEO',
-          minHandDetectionConfidence: 0.3,
-          minHandPresenceConfidence: 0.3,
+          minHandDetectionConfidence: 0.35,
+          minHandPresenceConfidence: 0.35,
           minTrackingConfidence: 0.5,
         });
         console.info('[HandLandmarker] initialized with base:', base, 'model:', modelPath);
@@ -177,9 +207,22 @@ export class HandTracker {
       this.procCanvas.width = pw;
       this.procCanvas.height = ph;
       this.procCtx.drawImage(video, 0, 0, pw, ph);
-      try {
-        lmResult = await this.handLandmarker.detectForVideo(this.procCanvas, now);
-      } catch (_) { lmResult = null; }
+      // 検出はスロットルして実行。検出は遅延実行されるが、描画は直前の結果を使う。
+      const shouldDetect = (now - this.lastDetectTime) >= this.detectIntervalMs;
+      if (shouldDetect) {
+        try {
+          const res = await this.handLandmarker.detectForVideo(this.procCanvas, now);
+          this.lastDetectTime = now;
+          this.lastDetectResult = res;
+          lmResult = res;
+        } catch (e) {
+          // 検出失敗時は前回の結果を使用
+          lmResult = this.lastDetectResult;
+        }
+      } else {
+        // スロットル中はキャッシュされた結果を使う
+        lmResult = this.lastDetectResult;
+      }
     }
 
     const canvas = this.overlay;
@@ -195,60 +238,57 @@ export class HandTracker {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 以降は CSS ピクセル系で描く
     ctx.clearRect(0, 0, cssW, cssH);
 
-    let normalizedLandmarks = null;
+  let normalizedLandmarks = null;
+  let isCharge = false;
+  // isAnyBend: CHARGE より緩い閾値でわずかな曲がりを検出し、KICK を抑止するために使う
+  let isAnyBend = false;
   if (lmResult && lmResult.landmarks && lmResult.landmarks[0]) {
       // 0..1 正規化座標（鏡反転のみ適用、ピクセル変換は描画・分類時に行う）
       const hands = lmResult.landmarks.map(lm => this.normalizeLandmarks01(lm, this.mirror));
       normalizedLandmarks = hands[0];
       this.landmarksBuf.push({ t: now / 1000, lm: normalizedLandmarks });
       this.lastSeenTime = now / 1000;
-      // 2D 描画（1本目は通常、2本目があれば薄色）
+      // 2D 描画（片手のみ表示）
       this.drawLandmarks(ctx, normalizedLandmarks, cssW, cssH, video.videoWidth, video.videoHeight);
-      if (hands[1]) {
-        ctx.save(); ctx.globalAlpha = 0.6;
-        this.drawLandmarks(ctx, hands[1], cssW, cssH, video.videoWidth, video.videoHeight);
-        ctx.restore();
+      // CHARGE 判定: 人差し指の PIP(6) を基準に MCP(5) と DIP(7) との角度を測る
+      // さらに中指(PIP 10, MCP 9, DIP 11) も同様に CHARGE として扱う
+      try {
+  const pMCP = this.project01ToPx(normalizedLandmarks[5], cssW, cssH, video.videoWidth, video.videoHeight);
+  const pPIP = this.project01ToPx(normalizedLandmarks[6], cssW, cssH, video.videoWidth, video.videoHeight);
+  const pDIP = this.project01ToPx(normalizedLandmarks[7], cssW, cssH, video.videoWidth, video.videoHeight);
+  // PIP の角度 (PIP を中心に MCP->PIP と DIP->PIP の角度)
+  const ax = pMCP.x - pPIP.x; const ay = pMCP.y - pPIP.y;
+  const bx = pDIP.x - pPIP.x; const by = pDIP.y - pPIP.y;
+  const ang = angleBetween(ax, ay, bx, by);
+  if (ang < CFG.charge.angleThresholdRad) isCharge = true;
+  // anyBend: PIP の角度が CHARGE より緩い閾値を下回れば "わずかに曲がっている" とみなす
+  if (ang < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad)) isAnyBend = true;
+  // MCP の角度 (MCP を中心に 手首->MCP と PIP->MCP の角度)
+  const pWrist = this.project01ToPx(normalizedLandmarks[0], cssW, cssH, video.videoWidth, video.videoHeight);
+  const mx1 = pWrist.x - pMCP.x; const my1 = pWrist.y - pMCP.y;
+  const mx2 = pPIP.x - pMCP.x; const my2 = pPIP.y - pMCP.y;
+  const mcpAng = angleBetween(mx1, my1, mx2, my2);
+  if (mcpAng < (CFG.charge.mcpAngleThresholdRad || CFG.charge.angleThresholdRad)) isCharge = true;
+        // 中指もチェック
+  const mMCP = this.project01ToPx(normalizedLandmarks[9], cssW, cssH, video.videoWidth, video.videoHeight);
+  const mPIP = this.project01ToPx(normalizedLandmarks[10], cssW, cssH, video.videoWidth, video.videoHeight);
+  const mDIP = this.project01ToPx(normalizedLandmarks[11], cssW, cssH, video.videoWidth, video.videoHeight);
+  const mx = mMCP.x - mPIP.x; const my = mMCP.y - mPIP.y;
+  const bx2 = mDIP.x - mPIP.x; const by2 = mDIP.y - mPIP.y;
+  const mang = angleBetween(mx, my, bx2, by2);
+  if (mang < CFG.charge.angleThresholdRad) isCharge = true;
+  if (mang < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad)) isAnyBend = true;
+  // 中指の MCP 角度も評価
+  const mWrist = this.project01ToPx(normalizedLandmarks[0], cssW, cssH, video.videoWidth, video.videoHeight);
+  const mmx1 = mWrist.x - mMCP.x; const mmy1 = mWrist.y - mMCP.y;
+  const mmx2 = mPIP.x - mMCP.x; const mmy2 = mPIP.y - mMCP.y;
+  const mmcpAng = angleBetween(mmx1, mmy1, mmx2, mmy2);
+  if (mmcpAng < (CFG.charge.mcpAngleThresholdRad || CFG.charge.angleThresholdRad)) isCharge = true;
+  if (mmcpAng < (CFG.charge.anyBendMcpAngleRad || CFG.charge.mcpAngleThresholdRad || CFG.charge.angleThresholdRad)) isAnyBend = true;
+      } catch (e) {
+        // ignore errors in charge calc
+        isCharge = false;
       }
-
-      // グーの手を自動検出してジョイスティック値を更新（優先: 2本目、次点: 1本目）
-      let joyIdx = -1;
-      const candidates = hands[1] ? [1, 0] : [0];
-      for (const i of candidates) {
-        if (this.isFist(hands[i], cssW, cssH, video.videoWidth, video.videoHeight)) { joyIdx = i; break; }
-      }
-      if (joyIdx >= 0) {
-        const { center, palmSize } = this.getPalmCenterAndSize(hands[joyIdx], cssW, cssH, video.videoWidth, video.videoHeight);
-        // グー検出 → 最終検出時刻更新
-        this.lastFistSeenTs = now / 1000;
-        if (!this.fistOrigin) this.fistOrigin = { x: center.x, y: center.y };
-        const dx = center.x - this.fistOrigin.x;
-        const dead = CFG.joystick.deadzonePalmRatio * palmSize;
-        const full = CFG.joystick.maxRangePalmRatio * palmSize;
-        let xRaw = 0;
-        if (Math.abs(dx) > dead) {
-          const sign = Math.sign(dx);
-          const mag = Math.min(1, (Math.abs(dx) - dead) / Math.max(1, (full - dead)));
-          xRaw = sign * mag;
-        }
-        this.joystickX = lerp(this.joystickX, xRaw, CFG.joystick.smoothAlpha);
-        this.joystickActive = true;
-      } else {
-        // グー未検出 → ラベルは即座に通常表示へ。原点は 0.5s 経過でリセット。
-        const nowSec = now / 1000;
-        this.joystickActive = false; // HUD ラベルは非アクティブ
-        if (this.lastFistSeenTs > 0 && (nowSec - this.lastFistSeenTs) >= CFG.joystick.resetDelaySec) {
-          this.fistOrigin = null; // 原点リセット
-        }
-        // 値自体は徐々に 0 へ収束
-        this.joystickX = lerp(this.joystickX, 0, CFG.joystick.smoothAlpha);
-      }
-      // HUD に常時出す（FIST ラベルはアクティブ時）
-      ctx.save();
-      ctx.fillStyle = this.joystickActive ? 'rgba(255,200,0,0.95)' : 'rgba(255,255,255,0.75)';
-      ctx.font = '14px system-ui, sans-serif';
-      const label = this.joystickActive ? 'FIST JS' : 'JS';
-      ctx.fillText(`${label}: ${this.joystickX.toFixed(2)}`, cssW - 160, 24);
-      ctx.restore();
       this.noHandCount = 0;
     } else {
       // 手が見えない → NONE へ収束
@@ -256,33 +296,121 @@ export class HandTracker {
       this.noHandCount++;
     }
 
-  // ジェスチャ分類（最新のバッファから）
-  const { state, confidence } = this.classify(now / 1000);
-    this.state = state;
-    this.stateConf = confidence;
+  // ジェスチャ分類（最新のバッファから） -- classify はメトリクスも返す
+  // 引数 suppressKick を通じて、指が曲がっている場合は KICK 判定を抑止する
+  // suppressKick フラグには、CHARGE の閾値はそのままに「わずかな曲がり」を示す isAnyBend を渡す
+  const { state, confidence, tipSpeedPeak, tipForwardMin, runConf, palmSize } = this.classify(now / 1000, isAnyBend);
+    // CHARGE 表示フラグ (isCharge) は HUD/actionState 用であり，
+    // 直接 this.state を書き換えない（RUN/NONE/KICK の判定に影響を与えない）
+    // ただし，CHARGE が所定時間保持された（chargeHeld）あとに解除されたら
+    // 次の非 NONE を KICK に変換する既存の挙動は維持する。
+    const nowSecFloat = now / 1000;
+    if (isCharge) {
+      if (this.chargeStartTime === null) this.chargeStartTime = nowSecFloat;
+      const held = (nowSecFloat - this.chargeStartTime) >= (CFG.charge.holdSec || 0.5);
+      if (held) this.chargeHeld = true;
+    } else {
+      // CHARGE が解除されたとき、hold が成立していたら次の非 NONE を KICK にするフラグを立てる
+      if (this.chargeHeld) {
+        this.chargePending = true;
+  // 1.0 秒間だけ有効にする
+  this.chargePendingUntil = nowSecFloat + 1.0;
+      }
+      this.chargeHeld = false;
+      this.chargeStartTime = null;
+    }
 
-    this.onResult && this.onResult({ fps: this.fps, state, confidence });
+    // state は基本的には classify() の結果を使うが、
+    // CHARGE が確定（hold 成立）している間は HUD/状態として 'CHARGE' を優先表示する
+    const desiredState = this.chargeHeld ? 'CHARGE' : state;
+    const desiredConf = this.chargeHeld ? 1.0 : confidence;
 
+    // 既に KICK 中であれば、kickHoldUntil を尊重して一定時間は KICK を継続する
+    if (this.state === 'KICK' && nowSecFloat <= (this.kickHoldUntil || 0)) {
+      // 維持: 何もしない（ただし表示確度は最大にしておく）
+      this.state = 'KICK';
+      this.stateConf = 1.0;
+    } else if (desiredState === 'KICK' && this.state !== 'KICK') {
+      // 新たに KICK へ遷移した -> 保持期限を設定
+      this.state = 'KICK';
+      this.stateConf = desiredConf;
+      this.kickHoldUntil = nowSecFloat + 1.0;
+      window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+    } else {
+      this.state = desiredState;
+      this.stateConf = desiredConf;
+
+      // 状態が変化したときのみメッセージ送信
+      if (this.prevState !== this.state) {
+        if (this.state === 'KICK') {
+          window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+        } else if (this.state === 'RUN') {
+          window.parent.postMessage({ type: 'run', confidence: this.stateConf }, '*');
+        } else if (this.state === 'CHARGE') {
+          window.parent.postMessage({ type: 'charge', confidence: this.stateConf }, '*');
+        } else if (this.state === 'IDLE' || this.state === 'NONE') {
+          window.parent.postMessage({ type: 'idle', confidence: this.stateConf }, '*');
+        }
+      }
+      this.prevState = this.state;
+    }
+
+     // chargePending が立っていれば、次のフレームで必ず KICK に遷移
+    if (this.chargePending) {
+      if (nowSecFloat > (this.chargePendingUntil || 0)) {
+        // 期限切れ
+        this.chargePending = false;
+        this.chargePendingUntil = 0;
+      } else {
+        // 強制 KICK（chargePending）: KICK に上書きし、保持期限を設定
+        this.state = 'KICK';
+        this.stateConf = 1.0;
+        this.kickHoldUntil = nowSecFloat + 1.0;
+        this.chargePending = false;
+        this.chargePendingUntil = 0;
+      }
+    }
+// 更新されたアクション状態を組み立てて onResult に渡す
+  this.actionState.state = this.state;
+  this.actionState.confidence = this.stateConf;
+  this.actionState.charge = isCharge;
+  this.actionState.bent = !!isCharge;
+  this.actionState.fps = this.fps;
+  this.actionState.ts = now / 1000;
+  this.actionState.tipSpeedPeak = tipSpeedPeak || 0;
+  this.actionState.tipForwardMin = tipForwardMin || 0;
+  this.actionState.runConf = runConf || 0;
+  this.actionState.palmSize = palmSize || 0;
+  this.actionState.lastSeenTime = this.lastSeenTime;
+  this.actionState.chargeHeld = !!this.chargeHeld;
+  this.actionState.chargePending = !!(this.chargePending && nowSecFloat <= this.chargePendingUntil);
+
+  this.onResult && this.onResult({ fps: this.fps, state: this.state, confidence: this.stateConf, charge: isCharge, actionState: this.actionState });
   // デバッグ HUD 表示
-  this.drawHUD(this.ctx, this.overlay, this.fps, !!normalizedLandmarks);
+  this.drawHUD(this.ctx, this.overlay, this.fps, !!normalizedLandmarks, isCharge);
 
     // 次フレーム
     requestAnimationFrame(() => this.processLoop());
   }
 
-  drawHUD(ctx, canvas, fps, hasLm) {
+  drawHUD(ctx, canvas, fps, hasLm, charge) {
     const cssW = canvas.clientWidth || window.innerWidth;
     const cssH = canvas.clientHeight || window.innerHeight;
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.lineWidth = 1;
-    ctx.fillRect(8, 8, 140, 40);
-    ctx.strokeRect(8, 8, 140, 40);
+  ctx.fillRect(8, 8, 180, 56);
+  ctx.strokeRect(8, 8, 180, 56);
     ctx.fillStyle = '#fff';
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillText(`MP: ${this.handLandmarker ? 'OK' : 'NG'}`, 14, 25);
-    ctx.fillText(`FPS: ${Math.round(fps)}`, 14, 40);
+  ctx.fillText(`FPS: ${Math.round(fps)}`, 14, 40);
+  // current state
+  ctx.fillStyle = 'rgba(200,220,255,0.95)';
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.fillText(`STATE: ${this.state}`, 14, 54);
+    // CHARGE 表示は UI 側で削除：何も描かない
     if (!hasLm) {
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.fillText('No hand', 80, 25);
@@ -347,41 +475,7 @@ export class HandTracker {
     ctx.restore();
   }
 
-  // もう一方の手が "グー" かを判定
-  isFist(lm01, cssW, cssH, videoW, videoH) {
-    const { center, palmSize } = this.getPalmCenterAndSize(lm01, cssW, cssH, videoW, videoH);
-
-    // 指先
-    const P = (i) => this.project01ToPx(lm01[i], cssW, cssH, videoW, videoH);
-    const tips = [4, 8, 12, 16, 20].map(P);
-    const closeCount = tips.reduce((cnt, p) => cnt + (Math.hypot(p.x - center.x, p.y - center.y) <= CFG.fist.maxTipPalmRatio * palmSize ? 1 : 0), 0);
-    return closeCount >= CFG.fist.minTipsClose;
-  }
-
-  // 0..1 正規化座標を画面ピクセルへ投影（object-fit: cover 前提）
-  project01ToPx(pt01, cssW, cssH, videoW, videoH) {
-    const aspectV = videoW / Math.max(1, videoH);
-    const aspectC = cssW / Math.max(1, cssH);
-    const s = aspectC >= aspectV ? (cssW / Math.max(1, videoW)) : (cssH / Math.max(1, videoH));
-    const drawW = videoW * s;
-    const drawH = videoH * s;
-    const offX = (cssW - drawW) / 2;
-    const offY = (cssH - drawH) / 2;
-    return { x: offX + pt01.x * drawW, y: offY + pt01.y * drawH };
-  }
-
-  // 掌中心とサイズ（px）を取得
-  getPalmCenterAndSize(lm01, cssW, cssH, videoW, videoH) {
-    const idx = [0, 5, 9, 13, 17];
-    const pts = idx.map(i => this.project01ToPx(lm01[i], cssW, cssH, videoW, videoH));
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    const palmSize = pts.map(p => Math.hypot(p.x - cx, p.y - cy)).reduce((s, v) => s + v, 0) / pts.length;
-    return { center: { x: cx, y: cy }, palmSize: Math.max(1, palmSize) };
-  }
-
-  classify(nowSec) {
-    // 直近 windowSec のデータを抽出
+  classify(nowSec, suppressKick = false) {
     const windowLen = CFG.windowSec;
     const arr = this.landmarksBuf.toArray().filter((e) => nowSec - e.t <= windowLen);
     if (arr.length < 4) return { state: 'NONE', confidence: 0 };
@@ -420,17 +514,36 @@ export class HandTracker {
 
     // RUN の周期測定は廃止（ユーザー要望）。
 
-    // 指先（人差し指 8）
-    const tip = arr.map((e) => ({ x: offX + e.lm[idx8].x * drawW, y: offY + e.lm[idx8].y * drawH }));
-    const tipVx = diffSeries(time, tip.map(p => p.x));
-    const tipVy = diffSeries(time, tip.map(p => p.y));
-    const tipSpeed = tipVx.map((v, i) => Math.hypot(v, tipVy[i]));
+    // 指先（人差し指 8 と 中指 12）
+    const tipIndex = arr.map((e) => ({ x: offX + e.lm[idx8].x * drawW, y: offY + e.lm[idx8].y * drawH }));
+  const tipIndexZ = arr.map((e) => (e.lm[idx8].z ?? 0));
+    const tipIndexVx = diffSeries(time, tipIndex.map(p => p.x));
+    const tipIndexVy = diffSeries(time, tipIndex.map(p => p.y));
+    const tipIndexSpeed = tipIndexVx.map((v, i) => Math.hypot(v, tipIndexVy[i]));
+  const tipIndexVz = diffSeries(time, tipIndexZ);
 
-    // KICK（簡素化）: 指先の速度ピークのみで判定
-    const tipSpeedPeak = Math.max(...tipSpeed);
+    const tipMid = arr.map((e) => ({ x: offX + e.lm[idx12].x * drawW, y: offY + e.lm[idx12].y * drawH }));
+  const tipMidZ = arr.map((e) => (e.lm[idx12].z ?? 0));
+    const tipMidVx = diffSeries(time, tipMid.map(p => p.x));
+    const tipMidVy = diffSeries(time, tipMid.map(p => p.y));
+    const tipMidSpeed = tipMidVx.map((v, i) => Math.hypot(v, tipMidVy[i]));
+  const tipMidVz = diffSeries(time, tipMidZ);
+
+    // combine: pick the maximum peak among index and middle
+    const tipSpeed = tipIndexSpeed.concat(tipMidSpeed);
+    const tipVz = tipIndexVz.concat(tipMidVz);
+    const tipSpeedPeak = Math.max(...tipIndexSpeed, ...tipMidSpeed);
+    const tipForwardMin = Math.min(...tipIndexVz, ...tipMidVz);
+
+  // KICK（簡素化）: 指先の速度ピークのみで判定
+  // tipSpeedPeak と tipForwardMin は index/middle 両方のピーク/最小値を既に計算済み
     let kickScore = 0;
-    if (tipSpeedPeak > CFG.kick.minTipSpeedPxPerSec) {
-      kickScore = clamp((tipSpeedPeak - CFG.kick.minTipSpeedPxPerSec) / CFG.kick.minTipSpeedPxPerSec, 0, 1);
+    // suppressKick が指定されている場合は KICK 判定を抑止する
+    if (!suppressKick) {
+      // 2D の速度ピークが閾値を超え、かつ前方への z 速度が閾値以上であることを要求する
+      if (tipSpeedPeak > CFG.kick.minTipSpeedPxPerSec && tipForwardMin <= -CFG.kick.minTipForwardZ) {
+        kickScore = clamp((tipSpeedPeak - CFG.kick.minTipSpeedPxPerSec) / CFG.kick.minTipSpeedPxPerSec, 0, 1);
+      }
     }
 
     // RUN（簡素化）: KICK でない限りすべて RUN。加速用の confidence は指先速度RMSから算出。
@@ -483,6 +596,6 @@ export class HandTracker {
       }
     }
 
-    return { state: nextState, confidence: clamp(conf, 0, 1) };
+    return { state: nextState, confidence: clamp(conf, 0, 1), tipSpeedPeak, tipForwardMin, runConf, palmSize: palmCenters.length ? palmCenters[palmCenters.length-1].size : 0 };
   }
 }

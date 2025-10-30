@@ -73,8 +73,7 @@
         if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function'){
           try {
             window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', JSON.stringify(p));
-            window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', JSON.stringify(p));
-            console.log && console.log('[EmbeddedRelay] test sent to Unity', p);
+            console.log && console.log('[EmbeddedRelay] test sent to EmbeddedReceiver', p);
           } catch (e) {
             console.error && console.error('[EmbeddedRelay] test send failed', e);
           }
@@ -185,13 +184,26 @@
 
       var script = document.createElement("script");
       script.src = loaderUrl;
-      script.onload = () => {
+
+      // Coordination flags: we only start Unity when both the loader script
+      // is loaded and the embedded iframe has signalled that its camera
+      // / tracker is ready. This prevents Unity from loading before the
+      // camera is active.
+      window.__cameraReady = window.__cameraReady || false;
+      window.__unityScriptLoaded = window.__unityScriptLoaded || false;
+      window.__unityStarted = window.__unityStarted || false;
+
+      function startUnityIfReady() {
+        if (window.__unityStarted) return;
+        if (!window.__unityScriptLoaded) return;
+        if (!window.__cameraReady) return;
+        window.__unityStarted = true;
         createUnityInstance(canvas, config, (progress) => {
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                // expose unityInstance globally so other scripts can SendMessage to Unity
-                window.unityInstance = unityInstance;
+        }).then((unityInstance) => {
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          // expose unityInstance globally so other scripts can SendMessage to Unity
+          window.unityInstance = unityInstance;
 
                 // === ここから追加：Unityの標準出力/標準エラーをブラウザコンソールへ束ねる ===
                 try {
@@ -251,7 +263,13 @@
               }).catch((message) => {
                 alert(message);
               });
-            };
+      };
+
+      script.onload = () => {
+        window.__unityScriptLoaded = true;
+        console.log && console.log('[EmbeddedRelay] unity loader script loaded, waiting for camera ready...');
+        startUnityIfReady();
+      };
 
       // Receive messages from embedded iframe (Yubi-Soccer) and forward to Unity or overlay
       (function(){
@@ -288,14 +306,12 @@
               // Only forward pending states when the state changed since the last forwarded state
               var shouldSend = (lastSent !== p.state);
               if (!shouldSend) {
-                // Demote flush-suppressed logging to debug to avoid noisy console output
-                console.debug && console.debug('[EmbeddedRelay] flush: suppressed (no state change) for origin', o, p);
+                // suppressed (no state change) — don't spam console
                 continue;
               }
               var s = JSON.stringify(p);
               var pendingSent = false;
               try { window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s); pendingSent = true; } catch (e) { console.warn('[EmbeddedRelay] pending->EmbeddedReceiver failed', e); }
-              try { window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', s); pendingSent = true; } catch (e) { /* ignore */ }
               if (pendingSent) {
                 console.log && console.log('[EmbeddedRelay] Sent pending for origin', o, p);
                 __lastSentByOrigin[o] = p.state;
@@ -321,11 +337,23 @@
         window.addEventListener('message', function(ev){
           var data = ev.data;
           try { if (typeof data === 'string') data = JSON.parse(data); } catch(e) { /* keep original */ }
+          // Handle camera readiness messages from embedded iframe
+          if (data && data.type === 'camera') {
+            try {
+              var origin = ev.origin || 'unknown';
+              if (data.status === 'ready') {
+                window.__cameraReady = true;
+                console.log && console.log('[EmbeddedRelay] camera ready from', origin);
+                // Try starting Unity if loader already loaded
+                try { startUnityIfReady(); } catch(e){}
+              }
+            } catch(e) {}
+            return;
+          }
           if (!data || data.type !== 'state') return;
           var origin = ev.origin || 'unknown';
-          // Only log when state changed for this origin to reduce spam
+
           try {
-            // Log incoming messages only when the state changed for this origin to reduce spam
             var prevState = __lastStateByOrigin[origin];
             if (prevState !== data.state) {
               console.log && console.log('[EmbeddedRelay] message received from', origin, data);
@@ -333,93 +361,36 @@
             __lastStateByOrigin[origin] = data.state;
           } catch (e){}
 
-          // Optionally: check ev.origin for security if embedding cross-origin
           var payload = { type: 'embedded_state', state: data.state, confidence: data.confidence };
 
-          // If Unity instance available, try SendMessage to multiple likely GameObject names
+          // If Unity instance available, try a single JSON SendMessage to the known receiver.
           if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function'){
             var nowTs = Date.now();
             var lastSent = __lastSentByOrigin[origin];
-            var lastTs = __lastSentTsByOrigin[origin] || 0;
-            // Only forward to Unity when the state actually changed compared to the last forwarded state.
-            // This suppresses repeated identical 'NONE' / 'RUN' messages while keeping console output.
             var shouldSend = (lastSent !== payload.state);
 
             if (shouldSend) {
               var s = JSON.stringify(payload);
-              var shortS = payload.state || '';
-              var sent = false;
-              var acceptedCandidate = null;
-              // candidate GameObject names to try (covers common clone/name variants)
-              var candidates = ['EmbeddedReceiver','HandStateReceiver','EmbeddedReceiver(Clone)','HandStateReceiver(Clone)','GameManager','Main Camera'];
               try {
-                // try full JSON first and stop when one candidate accepts
-                for (var i=0;i<candidates.length;i++){
-                  try {
-                    window.unityInstance.SendMessage(candidates[i], 'OnEmbeddedState', s);
-                    acceptedCandidate = candidates[i];
-                    sent = true;
-                    break;
-                  } catch (e) { /*silent*/ }
-                }
-                // if none accepted, try short state-only string (stop on first success)
-                if (!sent){
-                  for (var j=0;j<candidates.length;j++){
-                    try {
-                      window.unityInstance.SendMessage(candidates[j], 'OnEmbeddedState', shortS);
-                      acceptedCandidate = candidates[j];
-                      sent = true;
-                      break;
-                    } catch (e) { /*silent*/ }
-                  }
-                }
-              } catch (e) { /*unexpected*/ }
-
-                if (sent) {
-                // Log a single sent entry (avoid per-candidate logging)
-                console.log && console.log('[EmbeddedRelay] Sent to', acceptedCandidate || '(unknown)', payload);
+                window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s);
+                console.log && console.log('[EmbeddedRelay] Sent to EmbeddedReceiver', payload);
                 __lastSentByOrigin[origin] = payload.state;
                 __lastSentTsByOrigin[origin] = nowTs;
-                // schedule gentle retries (short string) to improve delivery reliability
-                (function(shortVal, candidate){
-                  // If we have a known accepting candidate, retry only to that candidate to avoid sending to non-existent objects
-                  setTimeout(function(){
-                    try {
-                      if (candidate) {
-                        try { window.unityInstance.SendMessage(candidate,'OnEmbeddedState', shortVal); } catch(e){}
-                      } else {
-                        for (var k=0;k<3;k++){ var n=candidates[k% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} }
-                      }
-                    } catch(e){}
-                  }, 250);
-                  setTimeout(function(){
-                    try {
-                      if (candidate) {
-                        try { window.unityInstance.SendMessage(candidate,'OnEmbeddedState', shortVal); } catch(e){}
-                      } else {
-                        for (var k=0;k<3;k++){ var n=candidates[(k+1)% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} }
-                      }
-                    } catch(e){}
-                  }, 1000);
-                })(shortS, acceptedCandidate);
-                return; // done
+              } catch (e) {
+                try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (ee) { /* ignore */ }
+                console.warn && console.warn('[EmbeddedRelay] SendMessage failed, queued', e);
               }
             } else {
-              // Suppressed because no meaningful change — queue for retry and update overlay.
-              // Intentionally don't log here to keep console clean.
               try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (e) { /* ignore */ }
-              if (window.updateRecognition) window.updateRecognition(payload);
-              return;
             }
+            if (window.updateRecognition) window.updateRecognition(payload);
+            return;
           }
 
-          // If Unity not ready (or send failed), queue and still show overlay
+          // Unity not ready — queue and update overlay
           try {
             window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() });
-            console.debug && console.debug('[EmbeddedRelay] queued payload, will retry when unityInstance ready', payload);
           } catch (e){}
-
-          // Fallback: show in overlay so we always have visible feedback
           if (window.updateRecognition) window.updateRecognition(payload);
         }, false);
       })();

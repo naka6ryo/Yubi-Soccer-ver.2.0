@@ -61,9 +61,27 @@ public class HandStateReceiver : MonoBehaviour
             uiText = texts.FirstOrDefault();
         }
 
+        // If we found a UI.Text, ensure it's active and enabled in the scene. Sometimes
+        // Resources.FindObjectsOfTypeAll returns disabled or editor-only objects that
+        // won't render in the running WebGL player. If the found text is not active,
+        // treat it as not found so we create a visible on-screen fallback.
+        if (uiText != null)
+        {
+            try
+            {
+                if (!uiText.gameObject.activeInHierarchy || !uiText.enabled)
+                {
+                    uiText = null;
+                }
+            }
+            catch { uiText = null; }
+        }
+
         if (!HasAnyText() && createWorldTextFallback)
         {
-            CreateWorldText();
+            // prefer an on-screen overlay Canvas + UI.Text so it's visible regardless of
+            // scene camera setup in WebGL builds
+            CreateOnscreenCanvasText();
         }
     }
 
@@ -84,6 +102,48 @@ public class HandStateReceiver : MonoBehaviour
         tm.color = Color.yellow;
         tm.text = "State: -";
         _worldText = tm;
+    }
+
+    // Create an on-screen Canvas with a UI.Text (Screen Space - Overlay) so messages
+    // are visible in WebGL builds without relying on scene-specific UI setup.
+    void CreateOnscreenCanvasText()
+    {
+        try
+        {
+            var canvasGO = new GameObject("HandState_OverlayCanvas");
+            var canvas = canvasGO.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 1000;
+            var scaler = canvasGO.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 720);
+
+            var textGO = new GameObject("HandState_OverlayText");
+            textGO.transform.SetParent(canvasGO.transform, false);
+            var txt = textGO.AddComponent<Text>();
+            txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            txt.fontSize = 24;
+            txt.alignment = TextAnchor.UpperLeft;
+            txt.color = Color.yellow;
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.verticalOverflow = VerticalWrapMode.Overflow;
+            txt.text = "State: -";
+
+            // Position in top-left corner
+            var rect = txt.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(0, 1);
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(10, -10);
+
+            uiText = txt;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("HandStateReceiver: failed to create overlay text fallback: " + e.Message);
+            // fallback to world text if overlay creation fails
+            CreateWorldText();
+        }
     }
 
     /// <summary>

@@ -226,6 +226,11 @@
         }
         tracker.start();
 
+        // Notify parent that the camera/tracker is started and ready.
+        try {
+          window.parent.postMessage({ type: 'camera', status: 'ready' }, '*');
+        } catch (e) { /* ignore */ }
+
         mirrorToggle.addEventListener('change', () => {
           tracker.setMirror(mirrorToggle.checked);
           video.style.transform = mirrorToggle.checked ? 'scaleX(-1)' : 'scaleX(1)';
