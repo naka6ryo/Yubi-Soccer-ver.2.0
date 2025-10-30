@@ -288,7 +288,8 @@
               // Only forward pending states when the state changed since the last forwarded state
               var shouldSend = (lastSent !== p.state);
               if (!shouldSend) {
-                console.log && console.log('[EmbeddedRelay] flush: suppressed (no state change) for origin', o, p);
+                // Demote flush-suppressed logging to debug to avoid noisy console output
+                console.debug && console.debug('[EmbeddedRelay] flush: suppressed (no state change) for origin', o, p);
                 continue;
               }
               var s = JSON.stringify(p);
