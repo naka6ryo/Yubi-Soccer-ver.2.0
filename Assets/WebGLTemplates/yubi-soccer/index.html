@@ -375,25 +375,38 @@
                 }
               } catch (e) { /*unexpected*/ }
 
-              if (sent) {
+                if (sent) {
                 // Log a single sent entry (avoid per-candidate logging)
-                console.log && console.log(acceptedCandidate && acceptedCandidate.indexOf('Short') === -1 ? '[EmbeddedRelay] Sent to' : '[EmbeddedRelay] Sent short to', acceptedCandidate || '(unknown)', sent ? payload : shortS);
+                console.log && console.log('[EmbeddedRelay] Sent to', acceptedCandidate || '(unknown)', payload);
                 __lastSentByOrigin[origin] = payload.state;
                 __lastSentTsByOrigin[origin] = nowTs;
                 // schedule gentle retries (short string) to improve delivery reliability
-                (function(shortVal){
+                (function(shortVal, candidate){
+                  // If we have a known accepting candidate, retry only to that candidate to avoid sending to non-existent objects
                   setTimeout(function(){
-                    try { for (var k=0;k<3;k++){ var n=candidates[k% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} } } catch(e){}
+                    try {
+                      if (candidate) {
+                        try { window.unityInstance.SendMessage(candidate,'OnEmbeddedState', shortVal); } catch(e){}
+                      } else {
+                        for (var k=0;k<3;k++){ var n=candidates[k% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} }
+                      }
+                    } catch(e){}
                   }, 250);
                   setTimeout(function(){
-                    try { for (var k=0;k<3;k++){ var n=candidates[(k+1)% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} } } catch(e){}
+                    try {
+                      if (candidate) {
+                        try { window.unityInstance.SendMessage(candidate,'OnEmbeddedState', shortVal); } catch(e){}
+                      } else {
+                        for (var k=0;k<3;k++){ var n=candidates[(k+1)% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} }
+                      }
+                    } catch(e){}
                   }, 1000);
-                })(shortS);
+                })(shortS, acceptedCandidate);
                 return; // done
               }
             } else {
-              // Suppressed because no meaningful change — queue for retry and update overlay. Keep this quiet (debug) to reduce console spam.
-              console.debug && console.debug('[EmbeddedRelay] suppressed send to Unity (no state change)', payload);
+              // Suppressed because no meaningful change — queue for retry and update overlay.
+              // Intentionally don't log here to keep console clean.
               try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (e) { /* ignore */ }
               if (window.updateRecognition) window.updateRecognition(payload);
               return;
