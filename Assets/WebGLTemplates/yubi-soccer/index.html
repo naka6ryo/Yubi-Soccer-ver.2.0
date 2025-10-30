@@ -292,10 +292,14 @@
                 continue;
               }
               var s = JSON.stringify(p);
-              try { window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent pending to EmbeddedReceiver', p); } catch (e) { console.warn('[EmbeddedRelay] pending->EmbeddedReceiver failed', e); }
-              try { window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent pending to HandStateReceiver', p); } catch (e) { /* ignore */ }
-              __lastSentByOrigin[o] = p.state;
-              __lastSentTsByOrigin[o] = nowTs;
+              var pendingSent = false;
+              try { window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s); pendingSent = true; } catch (e) { console.warn('[EmbeddedRelay] pending->EmbeddedReceiver failed', e); }
+              try { window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', s); pendingSent = true; } catch (e) { /* ignore */ }
+              if (pendingSent) {
+                console.log && console.log('[EmbeddedRelay] Sent pending for origin', o, p);
+                __lastSentByOrigin[o] = p.state;
+                __lastSentTsByOrigin[o] = nowTs;
+              }
             }
           } catch (e) { console.warn('[EmbeddedRelay] flush error', e); }
         }
@@ -320,8 +324,11 @@
           var origin = ev.origin || 'unknown';
           // Only log when state changed for this origin to reduce spam
           try {
-            // Always log incoming messages to aid debugging; we still track last state per origin
-            console.log && console.log('[EmbeddedRelay] message received from', origin, data);
+            // Log incoming messages only when the state changed for this origin to reduce spam
+            var prevState = __lastStateByOrigin[origin];
+            if (prevState !== data.state) {
+              console.log && console.log('[EmbeddedRelay] message received from', origin, data);
+            }
             __lastStateByOrigin[origin] = data.state;
           } catch (e){}
 
@@ -341,22 +348,35 @@
               var s = JSON.stringify(payload);
               var shortS = payload.state || '';
               var sent = false;
+              var acceptedCandidate = null;
               // candidate GameObject names to try (covers common clone/name variants)
               var candidates = ['EmbeddedReceiver','HandStateReceiver','EmbeddedReceiver(Clone)','HandStateReceiver(Clone)','GameManager','Main Camera'];
               try {
-                // try full JSON first
+                // try full JSON first and stop when one candidate accepts
                 for (var i=0;i<candidates.length;i++){
-                  try { window.unityInstance.SendMessage(candidates[i], 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent to', candidates[i], payload); sent = true; } catch (e) { /*silent*/ }
+                  try {
+                    window.unityInstance.SendMessage(candidates[i], 'OnEmbeddedState', s);
+                    acceptedCandidate = candidates[i];
+                    sent = true;
+                    break;
+                  } catch (e) { /*silent*/ }
                 }
-                // if none accepted, try short state-only string
+                // if none accepted, try short state-only string (stop on first success)
                 if (!sent){
                   for (var j=0;j<candidates.length;j++){
-                    try { window.unityInstance.SendMessage(candidates[j], 'OnEmbeddedState', shortS); console.log && console.log('[EmbeddedRelay] Sent short to', candidates[j], shortS); sent = true; } catch (e) { /*silent*/ }
+                    try {
+                      window.unityInstance.SendMessage(candidates[j], 'OnEmbeddedState', shortS);
+                      acceptedCandidate = candidates[j];
+                      sent = true;
+                      break;
+                    } catch (e) { /*silent*/ }
                   }
                 }
               } catch (e) { /*unexpected*/ }
 
               if (sent) {
+                // Log a single sent entry (avoid per-candidate logging)
+                console.log && console.log(acceptedCandidate && acceptedCandidate.indexOf('Short') === -1 ? '[EmbeddedRelay] Sent to' : '[EmbeddedRelay] Sent short to', acceptedCandidate || '(unknown)', sent ? payload : shortS);
                 __lastSentByOrigin[origin] = payload.state;
                 __lastSentTsByOrigin[origin] = nowTs;
                 // schedule gentle retries (short string) to improve delivery reliability
@@ -371,8 +391,8 @@
                 return; // done
               }
             } else {
-              // Suppressed because no meaningful change — log and queue for retry, still update overlay
-              console.log && console.log('[EmbeddedRelay] suppressed send to Unity (no state change)', payload);
+              // Suppressed because no meaningful change — queue for retry and update overlay. Keep this quiet (debug) to reduce console spam.
+              console.debug && console.debug('[EmbeddedRelay] suppressed send to Unity (no state change)', payload);
               try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (e) { /* ignore */ }
               if (window.updateRecognition) window.updateRecognition(payload);
               return;
