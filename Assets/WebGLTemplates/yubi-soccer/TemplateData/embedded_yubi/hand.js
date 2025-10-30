@@ -29,16 +29,18 @@ const CFG = {
     minTipForwardZ: 0.5,
   },
   charge: {
-    // PIP 関節の角度しきい値 (rad)。angleBetween(PIP->MCP, PIP->DIP) がこの値未満なら曲がっていると判定
-    angleThresholdRad: 1.5,
+    // 厳しめの判定に変更: より大きく曲げないと CHARGE とならないようにする
+    // PIP 関節の角度しきい値 (rad)。angleAt(...) < angleThresholdRad -> 曲がっていると判定
+    // 小さな曲がりを誤検出しないよう、PI(≈3.1416) から少し離れた値に設定する
+  // しきい値を少し緩めて、軽い曲げでも検出しやすくする
+  angleThresholdRad: 2.85,
     // CHARGE を開始するまでのホールド時間（秒）
-    holdSec: 0.1,
-    // MCP（第1関節）の角度もしきい値として考慮する（angle at MCP between wrist->MCP and PIP->MCP）
-    mcpAngleThresholdRad: 1.5,
-    // KICK を抑止するための「わずかな曲がり」検出用しきい値（CHARGE の閾値は変更しない）
-    // 直立（約 pi rad = 3.14）に近い値で小さな曲がりを検出する。デフォルトは 2.9rad（約166°）。
-    anyBendAngleRad: 2.9,
-    anyBendMcpAngleRad: 2.9,
+    holdSec: 0.06,
+    // MCP（第1関節）の角度もしきい値として考慮する
+    mcpAngleThresholdRad: 2.85,
+    // anyBend は KICK 抑止に使う閾値。主閾値に近づけて若干緩くする
+    anyBendAngleRad: 2.70,
+    anyBendMcpAngleRad: 2.70,
   },
 };
 
@@ -115,6 +117,12 @@ export class HandTracker {
     this.procCtx = this.procCanvas.getContext('2d', { willReadFrequently: true });
 
     // ジョイスティック機能を削除して片手検出に簡素化
+    // Scene transform smoothing state
+    this.sceneTransform = { tx: 0, ty: 0, scale: 1 };
+    // 0..1 smoothing factor (higher = snappier, lower = smoother/slower)
+    this.sceneSmoothFactor = 0.12;
+    // Debug DOM element for CHARGE tuning (created lazily)
+    this._dbgDiv = null;
   }
 
   async init() {
@@ -253,40 +261,51 @@ export class HandTracker {
       // CHARGE 判定: 人差し指の PIP(6) を基準に MCP(5) と DIP(7) との角度を測る
       // さらに中指(PIP 10, MCP 9, DIP 11) も同様に CHARGE として扱う
       try {
-  const pMCP = this.project01ToPx(normalizedLandmarks[5], cssW, cssH, video.videoWidth, video.videoHeight);
-  const pPIP = this.project01ToPx(normalizedLandmarks[6], cssW, cssH, video.videoWidth, video.videoHeight);
-  const pDIP = this.project01ToPx(normalizedLandmarks[7], cssW, cssH, video.videoWidth, video.videoHeight);
-  // PIP の角度 (PIP を中心に MCP->PIP と DIP->PIP の角度)
-  const ax = pMCP.x - pPIP.x; const ay = pMCP.y - pPIP.y;
-  const bx = pDIP.x - pPIP.x; const by = pDIP.y - pPIP.y;
-  const ang = angleBetween(ax, ay, bx, by);
-  if (ang < CFG.charge.angleThresholdRad) isCharge = true;
-  // anyBend: PIP の角度が CHARGE より緩い閾値を下回れば "わずかに曲がっている" とみなす
-  if (ang < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad)) isAnyBend = true;
-  // MCP の角度 (MCP を中心に 手首->MCP と PIP->MCP の角度)
-  const pWrist = this.project01ToPx(normalizedLandmarks[0], cssW, cssH, video.videoWidth, video.videoHeight);
-  const mx1 = pWrist.x - pMCP.x; const my1 = pWrist.y - pMCP.y;
-  const mx2 = pPIP.x - pMCP.x; const my2 = pPIP.y - pMCP.y;
-  const mcpAng = angleBetween(mx1, my1, mx2, my2);
-  if (mcpAng < (CFG.charge.mcpAngleThresholdRad || CFG.charge.angleThresholdRad)) isCharge = true;
-        // 中指もチェック
-  const mMCP = this.project01ToPx(normalizedLandmarks[9], cssW, cssH, video.videoWidth, video.videoHeight);
-  const mPIP = this.project01ToPx(normalizedLandmarks[10], cssW, cssH, video.videoWidth, video.videoHeight);
-  const mDIP = this.project01ToPx(normalizedLandmarks[11], cssW, cssH, video.videoWidth, video.videoHeight);
-  const mx = mMCP.x - mPIP.x; const my = mMCP.y - mPIP.y;
-  const bx2 = mDIP.x - mPIP.x; const by2 = mDIP.y - mPIP.y;
-  const mang = angleBetween(mx, my, bx2, by2);
-  if (mang < CFG.charge.angleThresholdRad) isCharge = true;
-  if (mang < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad)) isAnyBend = true;
-  // 中指の MCP 角度も評価
-  const mWrist = this.project01ToPx(normalizedLandmarks[0], cssW, cssH, video.videoWidth, video.videoHeight);
-  const mmx1 = mWrist.x - mMCP.x; const mmy1 = mWrist.y - mMCP.y;
-  const mmx2 = mPIP.x - mMCP.x; const mmy2 = mPIP.y - mMCP.y;
-  const mmcpAng = angleBetween(mmx1, mmy1, mmx2, mmy2);
-  if (mmcpAng < (CFG.charge.mcpAngleThresholdRad || CFG.charge.angleThresholdRad)) isCharge = true;
-  if (mmcpAng < (CFG.charge.anyBendMcpAngleRad || CFG.charge.mcpAngleThresholdRad || CFG.charge.angleThresholdRad)) isAnyBend = true;
+        // Use normalized 3D coordinates for angle checks (more robust / scale-invariant)
+        const n = normalizedLandmarks;
+        const angle3 = (ax, ay, az, bx, by, bz) => {
+          const da = Math.hypot(ax, ay, az);
+          const db = Math.hypot(bx, by, bz);
+          if (da < 1e-6 || db < 1e-6) return Math.PI;
+          let dot = (ax * bx + ay * by + az * bz) / (da * db);
+          dot = Math.max(-1, Math.min(1, dot));
+          return Math.acos(dot);
+        };
+
+        // helper to compute angle at center between a->center and b->center using normalized coords
+        const angleAt = (idxA, idxCenter, idxB) => {
+          const a = n[idxA] || { x: 0, y: 0, z: 0 };
+          const c = n[idxCenter] || { x: 0, y: 0, z: 0 };
+          const b = n[idxB] || { x: 0, y: 0, z: 0 };
+          const ax = a.x - c.x, ay = a.y - c.y, az = (a.z || 0) - (c.z || 0);
+          const bx = b.x - c.x, by = b.y - c.y, bz = (b.z || 0) - (c.z || 0);
+          return angle3(ax, ay, az, bx, by, bz);
+        };
+
+        const idx = {
+          wrist: 0, idxMCP: 5, idxPIP: 6, idxDIP: 7, idxTIP: 8,
+          midMCP: 9, midPIP: 10, midDIP: 11, midTIP: 12
+        };
+
+  const indexPipAng = angleAt(idx.idxMCP, idx.idxPIP, idx.idxDIP);
+  const indexMcpAng = angleAt(idx.wrist, idx.idxMCP, idx.idxPIP);
+  const midPipAng = angleAt(idx.midMCP, idx.midPIP, idx.midDIP);
+  const midMcpAng = angleAt(idx.wrist, idx.midMCP, idx.midPIP);
+
+  // Finger-level bend: use PIP (第2関節) のみで判定する（ユーザ指定）
+  const indexBent = (indexPipAng < CFG.charge.angleThresholdRad);
+  const midBent = (midPipAng < CFG.charge.angleThresholdRad);
+  // CHARGE if either index or middle finger PIP is bent
+  isCharge = indexBent || midBent;
+
+  // anyBend: use PIP only for suppressing KICK
+  const anyBendIndex = (indexPipAng < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad));
+  const anyBendMid = (midPipAng < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad));
+  isAnyBend = anyBendIndex || anyBendMid;
+
+        // Debugging: removed embedded overlay per user request (HUD removed).
       } catch (e) {
-        // ignore errors in charge calc
+        // ignore errors in charge calc but keep flag false
         isCharge = false;
       }
       this.noHandCount = 0;
@@ -386,36 +405,104 @@ export class HandTracker {
   this.actionState.chargePending = !!(this.chargePending && nowSecFloat <= this.chargePendingUntil);
 
   this.onResult && this.onResult({ fps: this.fps, state: this.state, confidence: this.stateConf, charge: isCharge, actionState: this.actionState });
-  // デバッグ HUD 表示
+  // デバッグ HUD 表示 (DOM 側へ移動)。
   this.drawHUD(this.ctx, this.overlay, this.fps, !!normalizedLandmarks, isCharge);
+
+  // update scene transform to center/zoom on the hand (gentler tuning)
+  try {
+    this.updateSceneTransform(normalizedLandmarks);
+  } catch (e) { /* ignore */ }
 
     // 次フレーム
     requestAnimationFrame(() => this.processLoop());
   }
 
-  drawHUD(ctx, canvas, fps, hasLm, charge) {
-    const cssW = canvas.clientWidth || window.innerWidth;
-    const cssH = canvas.clientHeight || window.innerHeight;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 1;
-  ctx.fillRect(8, 8, 180, 56);
-  ctx.strokeRect(8, 8, 180, 56);
-    ctx.fillStyle = '#fff';
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillText(`MP: ${this.handLandmarker ? 'OK' : 'NG'}`, 14, 25);
-  ctx.fillText(`FPS: ${Math.round(fps)}`, 14, 40);
-  // current state
-  ctx.fillStyle = 'rgba(200,220,255,0.95)';
-  ctx.font = '12px system-ui, sans-serif';
-  ctx.fillText(`STATE: ${this.state}`, 14, 54);
-    // CHARGE 表示は UI 側で削除：何も描かない
-    if (!hasLm) {
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.fillText('No hand', 80, 25);
+  // hand preview intentionally removed to simplify UI (was previously drawHandPreview)
+
+  updateSceneTransform(normalizedLandmarks) {
+    const scene = document.getElementById('scene');
+    if (!scene) return;
+    const video = this.video;
+    const overlay = this.overlay;
+    const cssW = overlay.clientWidth || window.innerWidth;
+    const cssH = overlay.clientHeight || window.innerHeight;
+
+    if (!normalizedLandmarks || !normalizedLandmarks[0]) {
+      // smoothly reset transform to identity
+      const targetTx = 0, targetTy = 0, targetScale = 1;
+      this.sceneTransform.tx = lerp(this.sceneTransform.tx, targetTx, this.sceneSmoothFactor);
+      this.sceneTransform.ty = lerp(this.sceneTransform.ty, targetTy, this.sceneSmoothFactor);
+      this.sceneTransform.scale = lerp(this.sceneTransform.scale, targetScale, this.sceneSmoothFactor);
+      scene.style.transform = `translate(${this.sceneTransform.tx}px, ${this.sceneTransform.ty}px) scale(${this.sceneTransform.scale})`;
+      return;
     }
-    ctx.restore();
+    // compute mapping used by drawLandmarks (object-fit: cover handling)
+    const videoW = video.videoWidth || cssW;
+    const videoH = video.videoHeight || cssH;
+    const aspectV = videoW / Math.max(1, videoH);
+    const aspectC = cssW / Math.max(1, cssH);
+    const s = aspectC >= aspectV ? (cssW / Math.max(1, videoW)) : (cssH / Math.max(1, videoH));
+    const drawW = videoW * s;
+    const drawH = videoH * s;
+    const offX = (cssW - drawW) / 2;
+    const offY = (cssH - drawH) / 2;
+
+    // Build bounding box of landmarks (ensure fingertips included)
+    const indices = Array.from({ length: 21 }, (_, i) => i); // 0..20
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const i of indices) {
+      const p = normalizedLandmarks[i];
+      if (!p) continue;
+      const px = offX + p.x * drawW;
+      const py = offY + p.y * drawH;
+      if (px < minX) minX = px;
+      if (py < minY) minY = py;
+      if (px > maxX) maxX = px;
+      if (py > maxY) maxY = py;
+    }
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      // fallback to identity
+      const targetTx = 0, targetTy = 0, targetScale = 1;
+      this.sceneTransform.tx = lerp(this.sceneTransform.tx, targetTx, this.sceneSmoothFactor);
+      this.sceneTransform.ty = lerp(this.sceneTransform.ty, targetTy, this.sceneSmoothFactor);
+      this.sceneTransform.scale = lerp(this.sceneTransform.scale, targetScale, this.sceneSmoothFactor);
+      scene.style.transform = `translate(${this.sceneTransform.tx}px, ${this.sceneTransform.ty}px) scale(${this.sceneTransform.scale})`;
+      return;
+    }
+
+    const bboxW = Math.max(1, maxX - minX);
+    const bboxH = Math.max(1, maxY - minY);
+    const bboxCX = (minX + maxX) / 2;
+    const bboxCY = (minY + maxY) / 2;
+
+    // Use the smaller viewport dimension to keep square cropping behavior
+    const viewportSize = Math.min(cssW, cssH);
+    // margin fraction around the bbox (10-12%) to ensure fingertips aren't flush to edge
+    const margin = 0.12;
+    const available = viewportSize * (1 - margin * 2);
+    let scale = available / Math.max(bboxW, bboxH);
+
+    // clamp: do not zoom out below 1 (keep original or zoom in), and cap zoom-in to 2x
+    scale = Math.max(1, Math.min(scale, 2));
+
+    // compute translate so that bbox center maps to viewport center after scaling
+    const centerX = cssW / 2;
+    const centerY = cssH / 2;
+    const targetTx = centerX - bboxCX * scale;
+    const targetTy = centerY - bboxCY * scale;
+
+    // smooth the motion using lerp toward target values
+    this.sceneTransform.tx = lerp(this.sceneTransform.tx, targetTx, this.sceneSmoothFactor);
+    this.sceneTransform.ty = lerp(this.sceneTransform.ty, targetTy, this.sceneSmoothFactor);
+    this.sceneTransform.scale = lerp(this.sceneTransform.scale, scale, this.sceneSmoothFactor);
+
+    scene.style.transform = `translate(${this.sceneTransform.tx}px, ${this.sceneTransform.ty}px) scale(${this.sceneTransform.scale})`;
+  }
+
+  drawHUD(ctx, canvas, fps, hasLm, charge) {
+    // HUD drawing moved to DOM (#fps). Keep this function as a no-op to avoid
+    // double-rendering the FPS text on the overlay canvas.
+    return;
   }
 
   normalizeLandmarks01(lm, mirror) {
