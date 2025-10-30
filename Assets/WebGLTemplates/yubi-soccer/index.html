@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity Web Player | {{{ PRODUCT_NAME }}}</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+#if SHOW_DIAGNOSTICS
+    <link rel="stylesheet" href="<<<TemplateData/diagnostics.css>>>">
+    <script src="<<<TemplateData/diagnostics.js>>>"></script>
+#endif
+  </head>
+  <body>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas" width={{{ WIDTH }}} height={{{ HEIGHT }}} tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"> </div>
+      <!-- Recognition overlay: UnityからJSONを受け取って表示します -->
+      <div id="recognition-panel" class="recognition-hidden" aria-live="polite">
+        <div id="recognition-header">Recognition</div>
+        <pre id="recognition-content">(no data)</pre>
+      </div>
+      <div id="unity-footer">
+        <div id="unity-logo-title-footer"></div>
+        <div id="unity-fullscreen-button"></div>
+#if SHOW_DIAGNOSTICS
+        <img id="diagnostics-icon" src="TemplateData/webmemd-icon.png">
+#endif
+        <div id="unity-build-title">{{{ PRODUCT_NAME }}}</div>
+      </div>
+  </div>
+  <!-- 認識結果表示用スクリプト -->
+  <script src="TemplateData/recognition_overlay.js"></script>
+    <!-- Yubi-Soccer 埋め込み（iframe）: TemplateData/embedded_yubi に Yubi-Soccer の Web ビルドを置いてください -->
+    <div id="yubi-container">
+      <iframe id="yubi-iframe" src="TemplateData/embedded_yubi/index.html" title="Yubi-Soccer"></iframe>
+      <button id="yubi-toggle" aria-pressed="false">Yubi</button>
+    </div>
+    <script>
+      // iframe を小さく表示しておき、トグルで開閉する簡易ロジック
+      (function(){
+        const btn = document.createElement('button');
+        // If the #yubi-toggle already present, use it; otherwise use the one from DOM
+        const toggle = document.getElementById('yubi-toggle');
+        const iframe = document.getElementById('yubi-iframe');
+        function setVisible(visible){
+          if(!iframe) return;
+          iframe.style.opacity = visible ? '1' : '0.0';
+          iframe.style.pointerEvents = visible ? 'auto' : 'none';
+          if(toggle) toggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        }
+        // 初期は小さく表示（半透明で操作不可）。ユーザがボタンで展開できます。
+        setVisible(false);
+        if(toggle){
+          toggle.onclick = function(){
+            const pressed = toggle.getAttribute('aria-pressed') === 'true';
+            setVisible(!pressed);
+          };
+        }
+      })();
+
+      // Debug helper: call from the console to test SendMessage path
+      window.__embeddedRelayTest = function(state, confidence){
+        state = state || 'RUN';
+        confidence = (typeof confidence === 'number') ? confidence : 0.99;
+        var p = { type: 'embedded_state', state: state, confidence: confidence };
+        if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function'){
+          try {
+            window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', JSON.stringify(p));
+            window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', JSON.stringify(p));
+            console.log && console.log('[EmbeddedRelay] test sent to Unity', p);
+          } catch (e) {
+            console.error && console.error('[EmbeddedRelay] test send failed', e);
+          }
+        } else {
+          try { window.__pendingEmbeddedStates.push({ origin: 'console-test', payload: p, ts: Date.now() }); console.warn && console.warn('[EmbeddedRelay] test queued (unityInstance not ready)', p); } catch (e) { }
+        }
+      };
+    </script>
+  <script>
+      var canvas = document.querySelector("#unity-canvas");
+
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
+      function unityShowBanner(msg, type) {
+        var warningBanner = document.querySelector("#unity-warning");
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+        workerUrl: buildUrl + "/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+        symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        showBanner: unityShowBanner,
+      };
+
+      // By default, Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+
+      // If you would like all file writes inside Unity Application.persistentDataPath
+      // directory to automatically persist so that the contents are remembered when
+      // the user revisits the site the next time, uncomment the following line:
+      // config.autoSyncPersistentDataPath = true;
+      // This autosyncing is currently not the default behavior to avoid regressing
+      // existing user projects that might rely on the earlier manual
+      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
+      // expected to change.
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        document.querySelector("#unity-container").className = "unity-mobile";
+        canvas.className = "unity-mobile";
+
+        // To lower canvas resolution on mobile devices to gain some
+        // performance, uncomment the following line:
+        // config.devicePixelRatio = 1;
+
+#if SHOW_DIAGNOSTICS
+        // position the diagnostics icon in the corner on the canvas
+        let diagnostics_icon = document.getElementById("diagnostics-icon");
+        diagnostics_icon.style.position = "fixed";
+        diagnostics_icon.style.bottom = "10px";
+        diagnostics_icon.style.right = "0px";
+        canvas.after(diagnostics_icon);
+#endif
+
+      } else {
+        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
+        canvas.style.width = "{{{ WIDTH }}}px";
+        canvas.style.height = "{{{ HEIGHT }}}px";
+      }
+
+#if BACKGROUND_FILENAME
+      canvas.style.background = "url('" + buildUrl + "/{{{ BACKGROUND_FILENAME.replace(/'/g, '%27') }}}') center / cover";
+#endif
+      document.querySelector("#unity-loading-bar").style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
+              }).then((unityInstance) => {
+                document.querySelector("#unity-loading-bar").style.display = "none";
+                // expose unityInstance globally so other scripts can SendMessage to Unity
+                window.unityInstance = unityInstance;
+#if SHOW_DIAGNOSTICS
+                document.getElementById("diagnostics-icon").onclick = () => {
+                  unityDiagnostics.openDiagnosticsDiv(unityInstance.GetMetricsInfo);
+                };
+#endif
+                document.querySelector("#unity-fullscreen-button").onclick = () => {
+                  unityInstance.SetFullscreen(1);
+                };
+
+#if DEVELOPMENT_PLAYER
+                // Unloading web content from DOM so that browser GC can run can be tricky to get right.
+                // This code snippet shows how to correctly implement a Unity content Unload mechanism to a web page.
+
+                // Unloading Unity content enables a web page to reclaim the memory used by Unity, e.g. for
+                // the purpose of later loading another Unity content instance on the _same_ web page.
+
+                // When using this functionality, take caution to carefully make sure to clear all JavaScript code,
+                // DOM element and event handler references to the old content you may have retained, or
+                // otherwise the browser's garbage collector will be unable to reclaim the old page.
+
+                // N.b. Unity content does _not_ need to be manually unloaded when the user is navigating away from
+                // the current page to another web page. The browser will take care to clear memory of old visited
+                // pages automatically. This functionality is only needed if you want to switch between loading
+                // multiple Unity builds on a single web page.
+                var quit = document.createElement("button");
+                quit.style = "margin-left: 5px; background-color: lightgray; border: none; padding: 5px; cursor: pointer";
+                quit.innerHTML = "Unload";
+                document.querySelector("#unity-build-title").appendChild(quit);
+                quit.onclick = () => {
+                  // Quit Unity application execution
+                  unityInstance.Quit().then(() => {
+                    // Remove DOM elements from the page so GC can run
+                    document.querySelector("#unity-container").remove();
+                    canvas = null;
+                    // Remover script elements from the page so GC can run
+                    script.remove();
+                    script = null;
+                  });
+                };
+#endif
+              }).catch((message) => {
+                alert(message);
+              });
+            };
+
+      // Receive messages from embedded iframe (Yubi-Soccer) and forward to Unity or overlay
+      (function(){
+        // pending queue if unityInstance not ready yet
+        window.__pendingEmbeddedStates = window.__pendingEmbeddedStates || [];
+        var __didLogUnityReady = false;
+        function tryFlushPending() {
+          if (!window.unityInstance || typeof window.unityInstance.SendMessage !== 'function') return;
+          try {
+            if (!__didLogUnityReady && window.__pendingEmbeddedStates && window.__pendingEmbeddedStates.length) {
+              console.log && console.log('[EmbeddedRelay] unityInstance ready, flushing pending (collapsing duplicates)', window.__pendingEmbeddedStates.length);
+              __didLogUnityReady = true;
+            }
+
+            // Collapse pending entries by origin, keep only the last entry per origin.
+            var lastByOrigin = {};
+            while (window.__pendingEmbeddedStates && window.__pendingEmbeddedStates.length) {
+              try {
+                var item = window.__pendingEmbeddedStates.shift();
+                if (!item) continue;
+                var o = item.origin || 'unknown';
+                lastByOrigin[o] = item; // overwrite; we keep the last one
+              } catch (e) { /* ignore malformed entries */ }
+            }
+
+            // Send only the last entry per origin (apply the same send-throttle logic)
+            for (var o in lastByOrigin) {
+              if (!lastByOrigin.hasOwnProperty(o)) continue;
+              var it = lastByOrigin[o];
+              var p = it.payload || it; // support older shape
+              var nowTs = Date.now();
+              var lastSent = __lastSentByOrigin[o];
+              var lastTs = __lastSentTsByOrigin[o] || 0;
+              var shouldSend = false;
+              if (lastSent !== p.state) shouldSend = true;
+              if (!shouldSend && p.state && p.state !== 'NONE' && p.confidence && p.confidence > 0.25) shouldSend = true;
+              if (!shouldSend && (nowTs - lastTs) > __SEND_MIN_INTERVAL_MS) shouldSend = true;
+              if (!shouldSend) {
+                console.debug && console.debug('[EmbeddedRelay] flush: suppressed send for origin', o, p);
+                continue;
+              }
+              var s = JSON.stringify(p);
+              try { window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent pending to EmbeddedReceiver', p); } catch (e) { console.warn('[EmbeddedRelay] pending->EmbeddedReceiver failed', e); }
+              try { window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent pending to HandStateReceiver', p); } catch (e) { /* ignore */ }
+              __lastSentByOrigin[o] = p.state;
+              __lastSentTsByOrigin[o] = nowTs;
+            }
+          } catch (e) { console.warn('[EmbeddedRelay] flush error', e); }
+        }
+
+        // periodically try to flush pending states if Unity wasn't ready yet
+        setInterval(tryFlushPending, 500);
+
+  // Keep last logged state per origin to reduce noise
+  var __lastStateByOrigin = {};
+  // Track last state we actually forwarded to Unity and when, per origin.
+  // This lets us suppress repeated 'NONE' / low-confidence messages while
+  // still ensuring occasional heartbeat updates and any real changes
+  // are forwarded immediately.
+  var __lastSentByOrigin = {};
+  var __lastSentTsByOrigin = {};
+  var __SEND_MIN_INTERVAL_MS = 500; // at most one identical-state send per origin per 500ms
+
+        window.addEventListener('message', function(ev){
+          var data = ev.data;
+          try { if (typeof data === 'string') data = JSON.parse(data); } catch(e) { /* keep original */ }
+          if (!data || data.type !== 'state') return;
+          var origin = ev.origin || 'unknown';
+          // Only log when state changed for this origin to reduce spam
+          try {
+            if (data.state && __lastStateByOrigin[origin] === data.state) {
+              // skip noisy identical-state logs
+            } else {
+              console.log && console.log('[EmbeddedRelay] message received from', origin, data);
+              __lastStateByOrigin[origin] = data.state;
+            }
+          } catch (e){}
+
+          // Optionally: check ev.origin for security if embedding cross-origin
+          var payload = { type: 'embedded_state', state: data.state, confidence: data.confidence };
+
+          // If Unity instance available, try SendMessage to multiple likely GameObject names
+          if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function'){
+            var nowTs = Date.now();
+            var lastSent = __lastSentByOrigin[origin];
+            var lastTs = __lastSentTsByOrigin[origin] || 0;
+            var shouldSend = false;
+
+            // Always send when the state changed compared to last forwarded state
+            if (lastSent !== payload.state) shouldSend = true;
+
+            // If state did not change, still allow forwarding when confidence is high
+            // (avoids missing a strong RUN/KICK that reasserts itself)
+            if (!shouldSend && payload.state && payload.state !== 'NONE' && payload.confidence && payload.confidence > 0.25) {
+              shouldSend = true;
+            }
+
+            // Otherwise allow occasional heartbeat for identical states (throttled)
+            if (!shouldSend && (nowTs - lastTs) > __SEND_MIN_INTERVAL_MS) shouldSend = true;
+
+            if (shouldSend) {
+              var s = JSON.stringify(payload);
+              var shortS = payload.state || '';
+              var sent = false;
+              // candidate GameObject names to try (covers common clone/name variants)
+              var candidates = ['EmbeddedReceiver','HandStateReceiver','EmbeddedReceiver(Clone)','HandStateReceiver(Clone)','GameManager','Main Camera'];
+              try {
+                // try full JSON first
+                for (var i=0;i<candidates.length;i++){
+                  try { window.unityInstance.SendMessage(candidates[i], 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent to', candidates[i], payload); sent = true; } catch (e) { /*silent*/ }
+                }
+                // if none accepted, try short state-only string
+                if (!sent){
+                  for (var j=0;j<candidates.length;j++){
+                    try { window.unityInstance.SendMessage(candidates[j], 'OnEmbeddedState', shortS); console.log && console.log('[EmbeddedRelay] Sent short to', candidates[j], shortS); sent = true; } catch (e) { /*silent*/ }
+                  }
+                }
+              } catch (e) { /*unexpected*/ }
+
+              if (sent) {
+                __lastSentByOrigin[origin] = payload.state;
+                __lastSentTsByOrigin[origin] = nowTs;
+                // schedule gentle retries (short string) to improve delivery reliability
+                (function(shortVal){
+                  setTimeout(function(){
+                    try { for (var k=0;k<3;k++){ var n=candidates[k% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} } } catch(e){}
+                  }, 250);
+                  setTimeout(function(){
+                    try { for (var k=0;k<3;k++){ var n=candidates[(k+1)% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} } } catch(e){}
+                  }, 1000);
+                })(shortS);
+                return; // done
+              }
+            } else {
+              // Suppressed because no meaningful change — queue for retry and keep overlay updated
+              console.debug && console.debug('[EmbeddedRelay] suppressed send to Unity (no meaningful change)', payload);
+              try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (e) { /* ignore */ }
+              if (window.updateRecognition) window.updateRecognition(payload);
+              return;
+            }
+          }
+
+          // If Unity not ready (or send failed), queue and still show overlay
+          try {
+            window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() });
+            console.debug && console.debug('[EmbeddedRelay] queued payload, will retry when unityInstance ready', payload);
+          } catch (e){}
+
+          // Fallback: show in overlay so we always have visible feedback
+          if (window.updateRecognition) window.updateRecognition(payload);
+        }, false);
+      })();
+
+      document.body.appendChild(script);
+
+    </script>
+  </body>
+</html>

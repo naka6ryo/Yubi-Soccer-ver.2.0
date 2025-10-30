@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Finger Soccer (Three.js + MediaPipe Hands)</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #000;
+        color: #fff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, sans-serif;
+      }
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+      }
+      video#camera {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(1);
+        z-index: 0;
+        background: #000;
+      }
+      canvas#overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+        pointer-events: none;
+      }
+      #ui {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 3;
+        background: rgba(0,0,0,0.35);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+        line-height: 1.4;
+        backdrop-filter: blur(6px);
+      }
+      #controls {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 3;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      button, label {
+        font-size: 14px;
+      }
+      #startBtn {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 4;
+        padding: 10px 16px;
+        border-radius: 999px;
+        border: none;
+        background: #36c;
+        color: #fff;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      }
+      canvas#three {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <video id="camera" playsinline muted></video>
+      <canvas id="three"></canvas>
+      <canvas id="overlay"></canvas>
+      <div id="ui">
+        <div>FPS: <span id="fps">-</span></div>
+  <div>State: <span id="state">NONE</span></div>
+        <div>Confidence: <span id="conf">0.00</span></div>
+      </div>
+      <div id="controls">
+        <label style="background: rgba(0,0,0,0.35); padding:6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+          <input type="checkbox" id="mirrorToggle" /> ミラー反転
+        </label>
+      </div>
+      <!-- カメラ選択ダイアログ -->
+      <div id="deviceDialog" style="display:none; position:absolute; inset:0; background: rgba(0,0,0,0.6); z-index:5; align-items:center; justify-content:center;">
+        <div id="devicePanel" style="background: rgba(16,16,16,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px; min-width: 280px; max-width: 92vw;">
+          <div style="font-weight:700; margin-bottom: 8px;">カメラを選択</div>
+          <select id="cameraSelect" style="width:100%; padding:6px; border-radius:6px; background:#111; color:#fff; border:1px solid rgba(255,255,255,0.2);"></select>
+          <div style="display:flex; justify-content:flex-end; gap: 8px; margin-top:10px;">
+            <button id="cancelDeviceBtn">キャンセル</button>
+            <button id="useCameraBtn">使用する</button>
+          </div>
+        </div>
+      </div>
+      <button id="startBtn">開始</button>
+    </div>
+
+    <script type="module">
+  import { setBall, updatePhysics, setRunBoost, kickImpulse } from './main.js';
+  import { setupRenderer, resizeRendererToDisplaySize } from './renderer.js';
+      import { HandTracker } from './hand.js';
+
+      const video = document.getElementById('camera');
+      const overlay = document.getElementById('overlay');
+      const threeCanvas = document.getElementById('three');
+      const startBtn = document.getElementById('startBtn');
+      const fpsEl = document.getElementById('fps');
+      const stateEl = document.getElementById('state');
+      const confEl = document.getElementById('conf');
+      const mirrorToggle = document.getElementById('mirrorToggle');
+  const deviceDialog = document.getElementById('deviceDialog');
+  const cameraSelect = document.getElementById('cameraSelect');
+  const useCameraBtn = document.getElementById('useCameraBtn');
+  const cancelDeviceBtn = document.getElementById('cancelDeviceBtn');
+
+  let three;
+  let tracker;
+  let lastState = 'NONE';
+
+      function isSecureOrLocalhost() {
+        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        return location.protocol === 'https:' || isLocalhost;
+      }
+
+      async function listVideoDevicesEnsuringPermission() {
+        let devices = await navigator.mediaDevices.enumerateDevices();
+        let cams = devices.filter(d => d.kind === 'videoinput');
+        const hasLabels = cams.some(d => d.label);
+        if (!hasLabels) {
+          try {
+            const temp = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            temp.getTracks().forEach(t => t.stop());
+          } catch (_) { /* ignore */ }
+          devices = await navigator.mediaDevices.enumerateDevices();
+          cams = devices.filter(d => d.kind === 'videoinput');
+        }
+        return cams;
+      }
+
+      function showDeviceDialog(devices) {
+        const preferred = localStorage.getItem('preferredCameraId');
+        cameraSelect.innerHTML = '';
+        for (const d of devices) {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `カメラ (${d.deviceId.slice(0,6)}…)`;
+          if (preferred && preferred === d.deviceId) opt.selected = true;
+          cameraSelect.appendChild(opt);
+        }
+        deviceDialog.style.display = 'flex';
+      }
+
+      async function startWithDeviceId(deviceId) {
+        try {
+          if (!isSecureOrLocalhost()) {
+            throw new Error('このページは HTTPS で提供されていないため、カメラにアクセスできません。公開URL(HTTPS)で開いてください。');
+          }
+          const constraints = deviceId ? { video: { deviceId: { exact: deviceId } }, audio: false } : { video: { facingMode: 'user' }, audio: false };
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          await video.play();
+        } catch (err) {
+          console.error(err);
+          alert('カメラにアクセスできませんでした。\n' + (err && err.message ? err.message : 'Permission/HTTPS/デバイスの設定を確認してください。'));
+          startBtn.disabled = false;
+          return false;
+        }
+
+  // Three.js 初期化（描画とボール生成は renderer.js が担当）
+  three = setupRenderer(threeCanvas);
+  // renderer.setupRenderer は { scene, camera, renderer, clock, ball } を返す
+  // physics 側へ ball を渡す
+  setBall(three.ball);
+
+        // Hand tracker 初期化
+        tracker = new HandTracker({
+          video,
+          overlay,
+          mirror: mirrorToggle.checked,
+              onResult: ({ fps, state, confidence, charge }) => {
+            fpsEl.textContent = fps.toFixed(0);
+            stateEl.textContent = state;
+            confEl.textContent = confidence.toFixed(2);
+            // charge display removed
+            if (state === 'RUN') setRunBoost(confidence);
+            if (state !== lastState && state === 'KICK') {
+              kickImpulse(confidence);
+            }
+                // send state to parent (embedding page) so Unity can receive it
+                try{
+                  const msg = { type: 'state', state: state, confidence: confidence };
+                  // If running standalone window.parent === window, but postMessage still works
+                  window.parent.postMessage(msg, '*');
+                }catch(e){ /* ignore */ }
+            lastState = state;
+          },
+        });
+        try {
+          await tracker.init();
+        } catch (e) {
+          console.error(e);
+          alert('MediaPipe (HandLandmarker) の初期化に失敗しました。\nネットワークや CDN へのアクセス状況を確認してください。');
+          startBtn.disabled = false;
+          startBtn.style.display = '';
+          return false;
+        }
+        tracker.start();
+
+        mirrorToggle.addEventListener('change', () => {
+          tracker.setMirror(mirrorToggle.checked);
+          video.style.transform = mirrorToggle.checked ? 'scaleX(-1)' : 'scaleX(1)';
+        });
+        video.style.transform = mirrorToggle.checked ? 'scaleX(-1)' : 'scaleX(1)';
+
+        // レンダリングループ
+        function renderLoop() {
+          resizeRendererToDisplaySize(three.renderer, three.camera);
+          updatePhysics(three.clock.getDelta());
+          three.renderer.render(three.scene, three.camera);
+          requestAnimationFrame(renderLoop);
+        }
+        requestAnimationFrame(renderLoop);
+
+        startBtn.style.display = 'none';
+        return true;
+      }
+
+      async function start() {
+        try {
+          const devices = await listVideoDevicesEnsuringPermission();
+          if (!devices || devices.length === 0) {
+            startBtn.disabled = true; // 実際に開始する時だけ無効化
+            await startWithDeviceId(null);
+            return;
+          }
+          if (devices.length === 1) {
+            startBtn.disabled = true;
+            localStorage.setItem('preferredCameraId', devices[0].deviceId);
+            await startWithDeviceId(devices[0].deviceId);
+            return;
+          }
+          // 複数あるので選択 UI を表示。ボタンは引き続き有効。
+          showDeviceDialog(devices);
+          startBtn.disabled = false;
+        } catch (e) {
+          console.error(e);
+          alert('カメラデバイスの取得に失敗しました。通常の起動を試みます。');
+          startBtn.disabled = true;
+          await startWithDeviceId(null);
+        }
+      }
+
+      useCameraBtn.addEventListener('click', async () => {
+        const id = cameraSelect.value || null;
+        deviceDialog.style.display = 'none';
+        if (id) localStorage.setItem('preferredCameraId', id);
+        startBtn.disabled = true;
+        await startWithDeviceId(id);
+      });
+
+      cancelDeviceBtn.addEventListener('click', async () => {
+        deviceDialog.style.display = 'none';
+        startBtn.disabled = true;
+        await startWithDeviceId(null);
+      });
+
+      // 背景クリックでキャンセル（誤って閉じた後でも開始ボタンを再度押せる）
+      deviceDialog.addEventListener('click', (e) => {
+        if (e.target === deviceDialog) {
+          deviceDialog.style.display = 'none';
+          startBtn.disabled = false;
+        }
+      });
+
+      startBtn.addEventListener('click', () => start());
+    </script>
+  </body>
+  </html>

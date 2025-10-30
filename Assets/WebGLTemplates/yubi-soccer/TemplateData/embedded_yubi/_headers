@@ -1,0 +1,24 @@
+/
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-cache
+
+/vendor/mediapipe/wasm/*
+  Content-Type: application/octet-stream
+  Access-Control-Allow-Origin: *
+  Cache-Control: max-age=31536000
+
+/*.task
+  Content-Type: application/octet-stream
+  Access-Control-Allow-Origin: *
+  Cache-Control: max-age=31536000
+
+*.wasm
+  Content-Type: application/wasm
+  Access-Control-Allow-Origin: *
+  Cache-Control: max-age=31536000
+
+*.mjs
+  Content-Type: text/javascript
+  Cache-Control: max-age=31536000

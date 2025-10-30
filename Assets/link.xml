@@ -1,0 +1,6 @@
+<linker>
+  <!-- Preserve HandStateReceiver so SendMessage target methods are not stripped in IL2CPP/WebGL builds -->
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="HandStateReceiver" preserve="all" />
+  </assembly>
+</linker>

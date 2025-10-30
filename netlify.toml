@@ -1,0 +1,7 @@
+[build]
+  # No build command needed for static TemplateData; adjust if you add a build step
+  publish = "Assets/WebGLTemplates/TemplateData"
+
+[dev]
+  # Local dev server can be configured if you use Netlify Dev
+  port = 8888
