@@ -78,7 +78,7 @@
           } catch (e) {
             console.error && console.error('[EmbeddedRelay] test send failed', e);
           }
-        } else {
+          } else {
           try { window.__pendingEmbeddedStates.push({ origin: 'console-test', payload: p, ts: Date.now() }); console.warn && console.warn('[EmbeddedRelay] test queued (unityInstance not ready)', p); } catch (e) { }
         }
       };
@@ -192,6 +192,22 @@
                 document.querySelector("#unity-loading-bar").style.display = "none";
                 // expose unityInstance globally so other scripts can SendMessage to Unity
                 window.unityInstance = unityInstance;
+
+                // === ここから追加：Unityの標準出力/標準エラーをブラウザコンソールへ束ねる ===
+                try {
+                  // Unityのバージョン差を吸収するため、Moduleを確実に持たせる
+                  unityInstance.Module = unityInstance.Module || {};
+                  unityInstance.Module.print = (text) => {
+                    try { console.log('[Unity]', text); } catch (e) {}
+                  };
+                  unityInstance.Module.printErr = (text) => {
+                    try { console.error('[Unity]', text); } catch (e) {}
+                  };
+                } catch (e) {
+                  console.warn('[Unity] failed to hook Module.print/printErr', e);
+                }
+                // === 追加ここまで ===
+
 #if SHOW_DIAGNOSTICS
                 document.getElementById("diagnostics-icon").onclick = () => {
                   unityDiagnostics.openDiagnosticsDiv(unityInstance.GetMetricsInfo);
@@ -269,12 +285,10 @@
               var nowTs = Date.now();
               var lastSent = __lastSentByOrigin[o];
               var lastTs = __lastSentTsByOrigin[o] || 0;
-              var shouldSend = false;
-              if (lastSent !== p.state) shouldSend = true;
-              if (!shouldSend && p.state && p.state !== 'NONE' && p.confidence && p.confidence > 0.25) shouldSend = true;
-              if (!shouldSend && (nowTs - lastTs) > __SEND_MIN_INTERVAL_MS) shouldSend = true;
+              // Only forward pending states when the state changed since the last forwarded state
+              var shouldSend = (lastSent !== p.state);
               if (!shouldSend) {
-                console.debug && console.debug('[EmbeddedRelay] flush: suppressed send for origin', o, p);
+                console.log && console.log('[EmbeddedRelay] flush: suppressed (no state change) for origin', o, p);
                 continue;
               }
               var s = JSON.stringify(p);
@@ -306,12 +320,9 @@
           var origin = ev.origin || 'unknown';
           // Only log when state changed for this origin to reduce spam
           try {
-            if (data.state && __lastStateByOrigin[origin] === data.state) {
-              // skip noisy identical-state logs
-            } else {
-              console.log && console.log('[EmbeddedRelay] message received from', origin, data);
-              __lastStateByOrigin[origin] = data.state;
-            }
+            // Always log incoming messages to aid debugging; we still track last state per origin
+            console.log && console.log('[EmbeddedRelay] message received from', origin, data);
+            __lastStateByOrigin[origin] = data.state;
           } catch (e){}
 
           // Optionally: check ev.origin for security if embedding cross-origin
@@ -322,19 +333,9 @@
             var nowTs = Date.now();
             var lastSent = __lastSentByOrigin[origin];
             var lastTs = __lastSentTsByOrigin[origin] || 0;
-            var shouldSend = false;
-
-            // Always send when the state changed compared to last forwarded state
-            if (lastSent !== payload.state) shouldSend = true;
-
-            // If state did not change, still allow forwarding when confidence is high
-            // (avoids missing a strong RUN/KICK that reasserts itself)
-            if (!shouldSend && payload.state && payload.state !== 'NONE' && payload.confidence && payload.confidence > 0.25) {
-              shouldSend = true;
-            }
-
-            // Otherwise allow occasional heartbeat for identical states (throttled)
-            if (!shouldSend && (nowTs - lastTs) > __SEND_MIN_INTERVAL_MS) shouldSend = true;
+            // Only forward to Unity when the state actually changed compared to the last forwarded state.
+            // This suppresses repeated identical 'NONE' / 'RUN' messages while keeping console output.
+            var shouldSend = (lastSent !== payload.state);
 
             if (shouldSend) {
               var s = JSON.stringify(payload);
@@ -370,8 +371,8 @@
                 return; // done
               }
             } else {
-              // Suppressed because no meaningful change — queue for retry and keep overlay updated
-              console.debug && console.debug('[EmbeddedRelay] suppressed send to Unity (no meaningful change)', payload);
+              // Suppressed because no meaningful change — log and queue for retry, still update overlay
+              console.log && console.log('[EmbeddedRelay] suppressed send to Unity (no state change)', payload);
               try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (e) { /* ignore */ }
               if (window.updateRecognition) window.updateRecognition(payload);
               return;
