@@ -39,7 +39,10 @@
   <script src="TemplateData/recognition_overlay.js"></script>
     <!-- Yubi-Soccer 埋め込み（iframe）: TemplateData/embedded_yubi に Yubi-Soccer の Web ビルドを置いてください -->
     <div id="yubi-container">
-      <iframe id="yubi-iframe" src="TemplateData/embedded_yubi/index.html" title="Yubi-Soccer"></iframe>
+      <!-- Responsive square iframe: size based on viewport height (height = 38vh), width set equal to height to keep square -->
+      <iframe id="yubi-iframe" src="TemplateData/embedded_yubi/index.html" title="Yubi-Soccer"
+        style="height:38vh; width:38vh; max-height:420px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); overflow:hidden;">
+      </iframe>
       <button id="yubi-toggle" aria-pressed="false">Yubi</button>
     </div>
     <script>
@@ -47,8 +50,10 @@
       (function(){
         const btn = document.createElement('button');
         // If the #yubi-toggle already present, use it; otherwise use the one from DOM
-        const toggle = document.getElementById('yubi-toggle');
+  const toggle = document.getElementById('yubi-toggle');
         const iframe = document.getElementById('yubi-iframe');
+  // hide the old Yubi toggle button — we replace it with a modal-driven flow
+  if (toggle) toggle.style.display = 'none';
         function setVisible(visible){
           if(!iframe) return;
           iframe.style.opacity = visible ? '1' : '0.0';
@@ -65,7 +70,7 @@
         }
       })();
 
-      // Debug helper: call from the console to test SendMessage path
+  // Debug helper: call from the console to test SendMessage path
       window.__embeddedRelayTest = function(state, confidence){
         state = state || 'RUN';
         confidence = (typeof confidence === 'number') ? confidence : 0.99;
@@ -81,6 +86,60 @@
           try { window.__pendingEmbeddedStates.push({ origin: 'console-test', payload: p, ts: Date.now() }); console.warn && console.warn('[EmbeddedRelay] test queued (unityInstance not ready)', p); } catch (e) { }
         }
       };
+      
+      // --- Camera selection modal (main page) ---
+      (function(){
+        // Insert modal HTML into the page
+        var modal = document.createElement('div');
+        modal.id = 'cameraModal';
+        modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:9999;';
+        modal.innerHTML = '\n          <div id="cameraModalPanel" style="background:#111;color:#fff;padding:20px;border-radius:10px;min-width:320px;max-width:90vw;text-align:left">\n            <h3 style="margin:0 0 10px">カメラを選択して開始</h3>\n            <div style="margin-bottom:12px">\n              <select id="cameraSelectMain" style="width:100%;padding:8px;border-radius:6px;background:#000;color:#fff;border:1px solid rgba(255,255,255,0.08)"></select>\n            </div>\n            <div style="display:flex;gap:8px;justify-content:flex-end">\n              <button id="cameraStartMain" style="padding:8px 12px;border-radius:6px;background:#36c;border:none;color:#fff;font-weight:700">開始</button>\n            </div>\n          </div>\n        ';
+        document.body.appendChild(modal);
+
+        var cameraSelectMain = document.getElementById('cameraSelectMain');
+        var cameraStartMain = document.getElementById('cameraStartMain');
+        async function listVideoDevicesEnsuringPermissionMain(){
+          try{
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            let cams = devices.filter(d => d.kind === 'videoinput');
+            const hasLabels = cams.some(d => d.label);
+            if (!hasLabels) {
+              try { const temp = await navigator.mediaDevices.getUserMedia({ video: true }); temp.getTracks().forEach(t=>t.stop()); } catch(e) { }
+              devices = await navigator.mediaDevices.enumerateDevices();
+              cams = devices.filter(d => d.kind === 'videoinput');
+            }
+            return cams;
+          }catch(e){ return []; }
+        }
+
+        async function populateAndShow(){
+          const cams = await listVideoDevicesEnsuringPermissionMain();
+          cameraSelectMain.innerHTML = '';
+          if (!cams || cams.length === 0){
+            var opt = document.createElement('option'); opt.value=''; opt.textContent='利用可能なカメラがありません'; cameraSelectMain.appendChild(opt);
+          } else {
+            for (const c of cams){ var o = document.createElement('option'); o.value = c.deviceId; o.textContent = c.label || ('カメラ ('+c.deviceId.slice(0,6)+')'); cameraSelectMain.appendChild(o); }
+          }
+          // modal already visible on append
+        }
+
+        cameraStartMain.addEventListener('click', function(){
+          var id = cameraSelectMain.value || null;
+          // iframe は別 IIFE 内で定義されている可能性があるため、ここで明示的に DOM から取得する
+          var iframeEl = document.getElementById('yubi-iframe');
+          // make iframe visible and allow interaction
+          if (iframeEl){ iframeEl.style.opacity = '1'; iframeEl.style.pointerEvents = 'auto'; }
+          try {
+            // send start command to embedded iframe
+            if (iframeEl && iframeEl.contentWindow) iframeEl.contentWindow.postMessage({ type: 'start_camera', deviceId: id }, '*');
+          } catch(e){}
+          // hide modal
+          modal.style.display = 'none';
+        });
+
+        // Populate list and show modal immediately
+        populateAndShow();
+      })();
     </script>
   <script>
       var canvas = document.querySelector("#unity-canvas");
