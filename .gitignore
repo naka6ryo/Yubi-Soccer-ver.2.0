@@ -1,0 +1,62 @@
+# ===== Unity =====
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+UserSettings/
+MemoryCaptures/
+Logs/
+/*.log
+
+# Asset meta data should only be ignored when the corresponding asset is also ignored
+# (e.g. package manager cache files)
+# Files created by popular IDEs
+.vscode/
+.idea/
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Visual Studio / Rider
+*.csproj
+*.unityproj
+*.sln
+*.sdf
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Crashlytics, etc.
+crashlytics-build.properties
+
+# Unity3D generated meta files
+# (keep .meta for project Assets but ignore from packages/build artifacts when appropriate)
+
+# Build output
+/Build/
+/Builds/
+
+# Persistent files that are not part of the project
+UserSettings/
+
+# Ignore the following folders (can be re-included if needed)
+Library/
+Temp/
+Obj/
+
+# Ignore generated files created at runtime
+sysinfo/
+
+# Exclude the embedded cloned repo .git folder if it exists
+Assets/WebGLTemplates/yubi-soccer/TemplateData/embedded_yubi/.git/
+
+# End of Unity .gitignore
