@@ -22,7 +22,6 @@ PluginImporter:
         Exclude OSXUniversal: 0
         Exclude Win: 0
         Exclude Win64: 0
-        Exclude WebGL: 1
   - first:
       Android: Android
     second:
@@ -31,11 +30,6 @@ PluginImporter:
         CPU: ARMv7
   - first:
       Any: 
-    second:
-      enabled: 0
-      settings: {}
-  - first:
-      WebGL: WebGL
     second:
       enabled: 0
       settings: {}
