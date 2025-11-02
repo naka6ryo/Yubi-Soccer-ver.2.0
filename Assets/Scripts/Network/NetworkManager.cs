@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
+using UnityEngine.SceneManagement;
 
 // Simple NetworkManager using Photon PUN 2.
 // - QuickMatch(): join random room (MaxPlayers=2) or create one if none available.
@@ -24,6 +26,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     [Header("UI (optional)")]
     public TMP_Text statusText;
+
+    [Header("GameScene")]
+    [Tooltip("部屋が満員になったらマスターがロードするシーン名。Build Settings に登録してください。")]
+    public string gameSceneName = "Multi Player";
 
     bool joinAfterConnect = false;
 
@@ -96,49 +102,25 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         Log($"Joined room. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
-        // Auto-instantiate player prefab (requires a "Player" prefab under Assets/Resources)
-        if (PhotonNetwork.IsConnected && PhotonNetwork.InRoom)
-        {
-            // Before instantiating, ensure the Player prefab exists under Resources (required by DefaultPool)
-            var prefab = Resources.Load<GameObject>("Player");
-            if (prefab == null)
-            {
-                Debug.LogError("Player prefab not found in Resources. Ensure 'Assets/Resources/Player.prefab' exists (name must be exactly 'Player'). Skipping instantiate.");
-                return;
-            }
-
-            // extra diagnostics: log what's in the prefab to aid debugging (Photon DefaultPool errors often stem from prefab internals)
-            try
-            {
-                var comps = prefab.GetComponents<Component>();
-                string compList = string.Join(", ", comps.Select(c => c == null ? "<null>" : c.GetType().Name));
-                var hasPV = prefab.GetComponent<PhotonView>() != null;
-                Debug.Log($"Player prefab info: components=[{compList}] PhotonView={(hasPV ? "yes" : "no")}");
-
-                // simple spawn: random nearby position to avoid exact overlap
-                var spawn = new Vector3(UnityEngine.Random.Range(-2f, 2f), 1f, UnityEngine.Random.Range(-2f, 2f));
-                Log($"Instantiating Player at {spawn}");
-
-                // wrap instantiate to capture any exceptions coming from Photon/DefaultPool or prefab Awake/Start
-                try
-                {
-                    PhotonNetwork.Instantiate("Player", spawn, Quaternion.identity);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"PhotonNetwork.Instantiate threw exception: {ex}\nPrefab path: Assets/Resources/Player.prefab\nCheck Console for earlier errors from prefab Awake/Start.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Error while inspecting Player prefab: {ex}");
-            }
-        }
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         Log($"Player entered: {newPlayer.NickName} ({PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
+
+        // 部屋が満員になったらマスタークライアントがシーンをロード（AutomaticallySyncScene = true 前提）
+        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        {
+            Log($"Room full. MasterClient loading '{gameSceneName}'...");
+            try
+            {
+                PhotonNetwork.LoadLevel(gameSceneName);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
+            }
+        }
     }
 
     public override void OnDisconnected(DisconnectCause cause)
