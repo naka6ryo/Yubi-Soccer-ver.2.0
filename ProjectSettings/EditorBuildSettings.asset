@@ -14,9 +14,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Hand Landmark Detection.unity
     guid: 98d49dcfe667ea822a91d6b74f7cb2e9
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/HandTrack.unity
     guid: 92ef09d90d175b2429c6918d2078a0f0
+  - enabled: 1
+    path: Assets/Scenes/Player Move Test mobile.unity
+    guid: 0627fdd763c9f034ea3dd1e105f93b3c
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
