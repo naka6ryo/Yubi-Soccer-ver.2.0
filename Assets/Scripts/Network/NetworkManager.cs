@@ -25,7 +25,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool autoConnectOnStart = true;
 
     [Header("UI (optional)")]
-    public TMP_Text statusText;
+    [Tooltip("ステータス表示クラス（オプション）")]
+    public StatusDisplay statusDisplay;
 
     [Header("GameScene")]
     [Tooltip("部屋が満員になったらマスターがロードするシーン名。Build Settings に登録してください。")]
@@ -131,6 +132,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     void Log(string text)
     {
         Debug.Log("[NetworkManager] " + text);
-        if (statusText != null) statusText.text = text;
+        if (statusDisplay != null) statusDisplay.UpdateStatus(text);
     }
 }

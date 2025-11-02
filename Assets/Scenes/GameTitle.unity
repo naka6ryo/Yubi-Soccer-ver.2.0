@@ -211,6 +211,7 @@ GameObject:
   - component: {fileID: 874583753}
   - component: {fileID: 874583752}
   - component: {fileID: 874583756}
+  - component: {fileID: 874583757}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -316,6 +317,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   networkManager: {fileID: 1059339878}
   quickMatchButton: {fileID: 1724872338}
+--- !u!114 &874583757
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 874583751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b526a7617c6841a494ed8923602e263, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   statusText: {fileID: 1525413443}
 --- !u!1 &1059339877
 GameObject:
@@ -349,7 +362,7 @@ MonoBehaviour:
   appId: 94d602f9-f0c0-4010-b408-0b47e8bc3d67
   maxPlayers: 2
   autoConnectOnStart: 1
-  statusText: {fileID: 1525413443}
+  statusDisplay: {fileID: 874583757}
   gameSceneName: Multi Player
 --- !u!4 &1059339879
 Transform:
