@@ -161,6 +161,7 @@ MonoBehaviour:
   rotationSpeed: 120
   lerpRate: 10
   playerCamera: {fileID: 5114838246848122034}
+  joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -210,13 +211,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8778997366463236887}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.1975253, y: -0, z: -0, w: 0.98029786}
-  m_LocalPosition: {x: 0, y: 2.57, z: -2.81}
+  m_LocalRotation: {x: 0.12526454, y: -0, z: 0.00000002235174, w: 0.9921234}
+  m_LocalPosition: {x: 0, y: 2.12, z: -3.23}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1140175212217321892}
-  m_LocalEulerAnglesHint: {x: 22.785, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 14.392, y: 0, z: 0}
 --- !u!20 &5114838246848122034
 Camera:
   m_ObjectHideFlags: 0
@@ -250,7 +251,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 67.2
   orthographic: 0
   orthographic size: 5
   m_Depth: 0

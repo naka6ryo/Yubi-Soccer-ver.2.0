@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fd490fb2dfb0ea24587326069306a124
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/Materials/Custom_ReinhardtHolographicShieldRed.mat
+  uploadId: 745700

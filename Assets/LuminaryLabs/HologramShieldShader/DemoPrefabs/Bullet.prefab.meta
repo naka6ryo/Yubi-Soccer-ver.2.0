@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e13d62510f681c648a8934573629a374
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/DemoPrefabs/Bullet.prefab
+  uploadId: 745700

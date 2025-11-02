@@ -29,7 +29,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     void Start()
     {
         // Find HandStateReceiver in the scene
-        receiver = FindObjectOfType<HandStateReceiver>();
+        receiver = FindFirstObjectByType<HandStateReceiver>();
 
         // Ensure camera is only active for the local player
         if (playerCamera != null)
