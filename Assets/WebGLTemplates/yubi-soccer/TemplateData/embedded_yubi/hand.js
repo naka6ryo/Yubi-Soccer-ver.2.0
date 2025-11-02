@@ -16,7 +16,7 @@ const CFG = {
     // 代替: 手首の上下速度のゼロ交差から走動作（周期運動）を検出
     freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
     zeroXMinAmp: 80,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
-    minTipSpeedPxPerSec: 200, // 甲から離れた領域での指先速度の下限（RUN 用）
+    minTipSpeedPxPerSec: 100, // 甲から離れた領域での指先速度の下限（RUN 用）
   },
   kick: {
     minAngVel: 10.0, // rad/s
