@@ -28,6 +28,11 @@ public class HandStateReceiver : MonoBehaviour
     [Tooltip("フォールバックで表示する 3D TextMesh を自動生成する場合は true にする。")]
     public bool createWorldTextFallback = true;
 
+    // 現在のステートと信頼度（他のスクリプトから参照可能）
+    [Header("Current State")]
+    public string currentState = "NONE";
+    public float currentConfidence = 0f;
+
     // internal reference to fallback TextMesh
     private TextMesh _worldText;
 
@@ -177,6 +182,10 @@ public class HandStateReceiver : MonoBehaviour
 
         // Log parsed payload for visibility in browser console (WebGL)
         try { Debug.Log($"HandStateReceiver.parsed: state={payload.state} confidence={payload.confidence}"); } catch { }
+
+        // Update current state (public variables for other scripts to access)
+        currentState = payload.state ?? "NONE";
+        currentConfidence = payload.confidence;
 
         // Prepare display text
         var text = $"State: {payload.state}\nConfidence: {payload.confidence:F2}";

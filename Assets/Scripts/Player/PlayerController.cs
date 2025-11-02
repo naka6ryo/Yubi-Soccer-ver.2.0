@@ -1,5 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
+using System.Collections;
+using System.Collections.Generic;
 
 // Simple player controller with Photon networking.
 // - W: move forward
@@ -20,9 +22,15 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
     Vector3 networkPosition;
     Quaternion networkRotation;
+    public FixedJoystick joystick;
+
+    HandStateReceiver receiver;
 
     void Start()
     {
+        // Find HandStateReceiver in the scene
+        receiver = FindObjectOfType<HandStateReceiver>();
+
         // Ensure camera is only active for the local player
         if (playerCamera != null)
         {
@@ -52,9 +60,21 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         float forward = 0f;
         if (Input.GetKey(KeyCode.W)) forward = 1f;
 
+        if (receiver != null)
+        {
+            string state = receiver.currentState;  // "KICK", "RUN", "NONE" など
+            float confidence = receiver.currentConfidence;
+
+            if (state == "RUN" && confidence > 0.7f)
+            {
+                forward = 1f;
+            }
+        }
+
         float turn = 0f;
         if (Input.GetKey(KeyCode.A)) turn = -1f;
         if (Input.GetKey(KeyCode.D)) turn = 1f;
+        else if (joystick != null) turn = 2 * joystick.Horizontal;
 
         if (forward != 0f)
         {
