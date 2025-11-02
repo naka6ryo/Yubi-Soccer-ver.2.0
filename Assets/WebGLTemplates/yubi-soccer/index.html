@@ -39,7 +39,10 @@
   <script src="TemplateData/recognition_overlay.js"></script>
     <!-- Yubi-Soccer 埋め込み（iframe）: TemplateData/embedded_yubi に Yubi-Soccer の Web ビルドを置いてください -->
     <div id="yubi-container">
-      <iframe id="yubi-iframe" src="TemplateData/embedded_yubi/index.html" title="Yubi-Soccer"></iframe>
+      <!-- Responsive square iframe: size based on viewport height (height = 38vh), width set equal to height to keep square -->
+      <iframe id="yubi-iframe" src="TemplateData/embedded_yubi/index.html" title="Yubi-Soccer"
+        style="height:38vh; width:38vh; max-height:420px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); overflow:hidden;">
+      </iframe>
       <button id="yubi-toggle" aria-pressed="false">Yubi</button>
     </div>
     <script>
@@ -47,8 +50,10 @@
       (function(){
         const btn = document.createElement('button');
         // If the #yubi-toggle already present, use it; otherwise use the one from DOM
-        const toggle = document.getElementById('yubi-toggle');
+  const toggle = document.getElementById('yubi-toggle');
         const iframe = document.getElementById('yubi-iframe');
+  // hide the old Yubi toggle button — we replace it with a modal-driven flow
+  if (toggle) toggle.style.display = 'none';
         function setVisible(visible){
           if(!iframe) return;
           iframe.style.opacity = visible ? '1' : '0.0';
@@ -65,7 +70,7 @@
         }
       })();
 
-      // Debug helper: call from the console to test SendMessage path
+  // Debug helper: call from the console to test SendMessage path
       window.__embeddedRelayTest = function(state, confidence){
         state = state || 'RUN';
         confidence = (typeof confidence === 'number') ? confidence : 0.99;
@@ -73,15 +78,221 @@
         if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function'){
           try {
             window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', JSON.stringify(p));
-            window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', JSON.stringify(p));
-            console.log && console.log('[EmbeddedRelay] test sent to Unity', p);
+            console.log && console.log('[EmbeddedRelay] test sent to EmbeddedReceiver', p);
           } catch (e) {
             console.error && console.error('[EmbeddedRelay] test send failed', e);
           }
-        } else {
+          } else {
           try { window.__pendingEmbeddedStates.push({ origin: 'console-test', payload: p, ts: Date.now() }); console.warn && console.warn('[EmbeddedRelay] test queued (unityInstance not ready)', p); } catch (e) { }
         }
       };
+      
+      // --- Camera selection modal (main page) ---
+      (function(){
+        // Insert modal HTML into the page
+        var modal = document.createElement('div');
+        modal.id = 'cameraModal';
+        modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:9999;';
+        modal.innerHTML = '\n          <div id="cameraModalPanel" style="background:#111;color:#fff;padding:20px;border-radius:10px;min-width:320px;max-width:90vw;text-align:left">\n            <h3 style="margin:0 0 10px">カメラを選択して開始</h3>\n            <div style="margin-bottom:12px">\n              <select id="cameraSelectMain" style="width:100%;padding:8px;border-radius:6px;background:#000;color:#fff;border:1px solid rgba(255,255,255,0.08)"></select>\n            </div>\n            <div style="display:flex;gap:8px;justify-content:flex-end">\n              <button id="cameraStartMain" style="padding:8px 12px;border-radius:6px;background:#36c;border:none;color:#fff;font-weight:700">開始</button>\n            </div>\n          </div>\n        ';
+        document.body.appendChild(modal);
+
+        var cameraSelectMain = document.getElementById('cameraSelectMain');
+        var cameraStartMain = document.getElementById('cameraStartMain');
+        async function listVideoDevicesEnsuringPermissionMain(){
+          try{
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            let cams = devices.filter(d => d.kind === 'videoinput');
+            const hasLabels = cams.some(d => d.label);
+            if (!hasLabels) {
+              try { const temp = await navigator.mediaDevices.getUserMedia({ video: true }); temp.getTracks().forEach(t=>t.stop()); } catch(e) { }
+              devices = await navigator.mediaDevices.enumerateDevices();
+              cams = devices.filter(d => d.kind === 'videoinput');
+            }
+            return cams;
+          }catch(e){ return []; }
+        }
+
+        async function populateAndShow(){
+          const cams = await listVideoDevicesEnsuringPermissionMain();
+          cameraSelectMain.innerHTML = '';
+          if (!cams || cams.length === 0){
+            var opt = document.createElement('option'); opt.value=''; opt.textContent='利用可能なカメラがありません'; cameraSelectMain.appendChild(opt);
+          } else {
+            for (const c of cams){ var o = document.createElement('option'); o.value = c.deviceId; o.textContent = c.label || ('カメラ ('+c.deviceId.slice(0,6)+')'); cameraSelectMain.appendChild(o); }
+          }
+          // modal already visible on append
+        }
+
+        cameraStartMain.addEventListener('click', function(){
+          // DeviceOrientation パーミッション要求（ユーザージェスチャー内で実行）
+          if (window.requestOrientationPermission) {
+            window.requestOrientationPermission();
+          }
+          
+          var id = cameraSelectMain.value || null;
+          // iframe は別 IIFE 内で定義されている可能性があるため、ここで明示的に DOM から取得する
+          var iframeEl = document.getElementById('yubi-iframe');
+          // make iframe visible and allow interaction
+          if (iframeEl){ iframeEl.style.opacity = '1'; iframeEl.style.pointerEvents = 'auto'; }
+          try {
+            // send start command to embedded iframe
+            if (iframeEl && iframeEl.contentWindow) iframeEl.contentWindow.postMessage({ type: 'start_camera', deviceId: id }, '*');
+          } catch(e){}
+          // hide modal
+          modal.style.display = 'none';
+        });
+
+        // Populate list and show modal immediately
+        populateAndShow();
+      })();
+    </script>
+    <!-- Orientation-aware placement: place the embedded camera square left/right in landscape (bottom anchored) -->
+    <script>
+      (function(){
+        var lastGamma = null, lastBeta = null;
+        var lastSide = 'right'; // fallback default
+
+        // DeviceOrientation パーミッション要求（iOS 13+）
+        function requestOrientationPermission(){
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS 13+ requires permission
+            DeviceOrientationEvent.requestPermission()
+              .then(function(response){
+                if (response === 'granted') {
+                  console.log('[Orientation] Permission granted');
+                  attachOrientationListener();
+                } else {
+                  console.warn('[Orientation] Permission denied');
+                }
+              })
+              .catch(function(e){
+                console.error('[Orientation] Permission request failed', e);
+              });
+          } else {
+            // Non-iOS or older iOS: attach listener directly
+            attachOrientationListener();
+          }
+        }
+        
+        // グローバルに公開（カメラ開始ボタンから呼べるように）
+        window.requestOrientationPermission = requestOrientationPermission;
+
+        function attachOrientationListener(){
+          window.addEventListener('deviceorientation', function(ev){
+            if (typeof ev.gamma === 'number') lastGamma = ev.gamma; // 左右傾き [-90,90]
+            if (typeof ev.beta === 'number') lastBeta = ev.beta;   // 前後傾き [-180,180]
+          }, { passive: true });
+        }
+
+        // 非iOS環境では即座にリスナーを登録
+        if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
+          attachOrientationListener();
+        }
+
+        function inRangeDeg(a, lo, hi){
+          // 角度 a(0..360) が [lo,hi] に入るか
+          while (a < 0) a += 360; while (a >= 360) a -= 360;
+          if (lo <= hi) return a >= lo && a <= hi;
+          return a >= lo || a <= hi; // wrap-around
+        }
+
+        function normalizeDeg(a){
+          if (typeof a !== 'number' || isNaN(a)) return null;
+          var n = a % 360; if (n < 0) n += 360; return n;
+        }
+
+        function detectLandscapeSide(){
+          var result = null;
+
+          // 優先順位1: DeviceOrientation の gamma（物理的な傾き）- 画面回転ロックに影響されない
+          try {
+            if (lastGamma != null && lastBeta != null) {
+              var betaAbs = Math.abs(lastBeta);
+              if (betaAbs < 60) {
+                // beta が小さい（通常の持ち方）: gamma 値で判定
+                // 横持ち時のgamma値: 右手で持つと正、左手で持つと負
+                // 閾値を広げて検出しやすく（±5°）
+                if (lastGamma > 5) { result = 'right'; }
+                else if (lastGamma < -5) { result = 'left'; }
+              } else {
+                // beta が大きい（手前に傾けた時）: 判定を逆転
+                if (lastGamma > 5) { result = 'left'; }
+                else if (lastGamma < -5) { result = 'right'; }
+              }
+            }
+          } catch(e){}
+
+          // 優先順位2: window.orientation（iOS/一部Android）
+          if (!result) {
+            try {
+              var o = (typeof window.orientation === 'number') ? window.orientation : null;
+              var oa = normalizeDeg(o);
+              if (oa != null) {
+                if (inRangeDeg(oa, 60, 120)) { result = 'right'; }
+                else if (inRangeDeg(oa, 240, 300)) { result = 'left'; }
+              }
+            } catch(e){}
+          }
+
+          // 優先順位3: Screen Orientation API
+          if (!result) {
+            try {
+              if (screen.orientation) {
+                var ang = normalizeDeg(screen.orientation.angle);
+                var typ = String(screen.orientation.type || '');
+                if (ang != null) {
+                  if (inRangeDeg(ang, 60, 120)) { result = 'right'; }
+                  else if (inRangeDeg(ang, 240, 300)) { result = 'left'; }
+                }
+                if (!result) {
+                  if (typ.indexOf('landscape-primary') !== -1) { result = 'right'; }
+                  else if (typ.indexOf('landscape-secondary') !== -1) { result = 'left'; }
+                }
+              }
+            } catch(e){}
+          }
+
+          // 判断不能 → 直前の結果を維持
+          if (!result) {
+            result = lastSide || 'right';
+          }
+
+          return result;
+        }
+
+        function applyPlacement(){
+          var cont = document.getElementById('yubi-container');
+          if (!cont) return;
+          var side = detectLandscapeSide();
+          cont.style.position = 'fixed';
+          cont.style.bottom = '12px';
+          cont.style.top = 'auto';
+          cont.style.zIndex = '1000';
+          cont.style.width = 'auto'; // CSSの固定幅を上書き
+          cont.style.transition = 'left .3s ease, right .3s ease, bottom .2s ease';
+          // 常に側面配置（portrait時も gamma で判定）
+          if (side === 'left') {
+            cont.style.left = '12px';
+            cont.style.right = 'auto';
+          } else {
+            // right or fallback
+            cont.style.right = '12px';
+            cont.style.left = 'auto';
+          }
+          if (side) lastSide = side;
+        }
+
+        // 初期適用 & 変化に追従
+        try { applyPlacement(); } catch(e){}
+        window.addEventListener('resize', applyPlacement);
+        window.addEventListener('orientationchange', applyPlacement);
+        if (screen.orientation && screen.orientation.addEventListener) {
+          screen.orientation.addEventListener('change', applyPlacement);
+        }
+        document.addEventListener('visibilitychange', applyPlacement);
+        // DeviceOrientation の変化を定期的にチェック（画面回転ロック対応）
+        setInterval(applyPlacement, 200);
+      })();
     </script>
   <script>
       var canvas = document.querySelector("#unity-canvas");
@@ -185,13 +396,42 @@
 
       var script = document.createElement("script");
       script.src = loaderUrl;
-      script.onload = () => {
+
+      // Coordination flags: we only start Unity when both the loader script
+      // is loaded and the embedded iframe has signalled that its camera
+      // / tracker is ready. This prevents Unity from loading before the
+      // camera is active.
+      window.__cameraReady = window.__cameraReady || false;
+      window.__unityScriptLoaded = window.__unityScriptLoaded || false;
+      window.__unityStarted = window.__unityStarted || false;
+
+      function startUnityIfReady() {
+        if (window.__unityStarted) return;
+        if (!window.__unityScriptLoaded) return;
+        if (!window.__cameraReady) return;
+        window.__unityStarted = true;
         createUnityInstance(canvas, config, (progress) => {
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                // expose unityInstance globally so other scripts can SendMessage to Unity
-                window.unityInstance = unityInstance;
+        }).then((unityInstance) => {
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          // expose unityInstance globally so other scripts can SendMessage to Unity
+          window.unityInstance = unityInstance;
+
+                // === ここから追加：Unityの標準出力/標準エラーをブラウザコンソールへ束ねる ===
+                try {
+                  // Unityのバージョン差を吸収するため、Moduleを確実に持たせる
+                  unityInstance.Module = unityInstance.Module || {};
+                  unityInstance.Module.print = (text) => {
+                    try { console.log('[Unity]', text); } catch (e) {}
+                  };
+                  unityInstance.Module.printErr = (text) => {
+                    try { console.error('[Unity]', text); } catch (e) {}
+                  };
+                } catch (e) {
+                  console.warn('[Unity] failed to hook Module.print/printErr', e);
+                }
+                // === 追加ここまで ===
+
 #if SHOW_DIAGNOSTICS
                 document.getElementById("diagnostics-icon").onclick = () => {
                   unityDiagnostics.openDiagnosticsDiv(unityInstance.GetMetricsInfo);
@@ -235,7 +475,13 @@
               }).catch((message) => {
                 alert(message);
               });
-            };
+      };
+
+      script.onload = () => {
+        window.__unityScriptLoaded = true;
+        console.log && console.log('[EmbeddedRelay] unity loader script loaded, waiting for camera ready...');
+        startUnityIfReady();
+      };
 
       // Receive messages from embedded iframe (Yubi-Soccer) and forward to Unity or overlay
       (function(){
@@ -269,19 +515,20 @@
               var nowTs = Date.now();
               var lastSent = __lastSentByOrigin[o];
               var lastTs = __lastSentTsByOrigin[o] || 0;
-              var shouldSend = false;
-              if (lastSent !== p.state) shouldSend = true;
-              if (!shouldSend && p.state && p.state !== 'NONE' && p.confidence && p.confidence > 0.25) shouldSend = true;
-              if (!shouldSend && (nowTs - lastTs) > __SEND_MIN_INTERVAL_MS) shouldSend = true;
+              // Only forward pending states when the state changed since the last forwarded state
+              var shouldSend = (lastSent !== p.state);
               if (!shouldSend) {
-                console.debug && console.debug('[EmbeddedRelay] flush: suppressed send for origin', o, p);
+                // suppressed (no state change) — don't spam console
                 continue;
               }
               var s = JSON.stringify(p);
-              try { window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent pending to EmbeddedReceiver', p); } catch (e) { console.warn('[EmbeddedRelay] pending->EmbeddedReceiver failed', e); }
-              try { window.unityInstance.SendMessage('HandStateReceiver', 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent pending to HandStateReceiver', p); } catch (e) { /* ignore */ }
-              __lastSentByOrigin[o] = p.state;
-              __lastSentTsByOrigin[o] = nowTs;
+              var pendingSent = false;
+              try { window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s); pendingSent = true; } catch (e) { console.warn('[EmbeddedRelay] pending->EmbeddedReceiver failed', e); }
+              if (pendingSent) {
+                console.log && console.log('[EmbeddedRelay] Sent pending for origin', o, p);
+                __lastSentByOrigin[o] = p.state;
+                __lastSentTsByOrigin[o] = nowTs;
+              }
             }
           } catch (e) { console.warn('[EmbeddedRelay] flush error', e); }
         }
@@ -302,89 +549,60 @@
         window.addEventListener('message', function(ev){
           var data = ev.data;
           try { if (typeof data === 'string') data = JSON.parse(data); } catch(e) { /* keep original */ }
+          // Handle camera readiness messages from embedded iframe
+          if (data && data.type === 'camera') {
+            try {
+              var origin = ev.origin || 'unknown';
+              if (data.status === 'ready') {
+                window.__cameraReady = true;
+                console.log && console.log('[EmbeddedRelay] camera ready from', origin);
+                // Try starting Unity if loader already loaded
+                try { startUnityIfReady(); } catch(e){}
+              }
+            } catch(e) {}
+            return;
+          }
           if (!data || data.type !== 'state') return;
           var origin = ev.origin || 'unknown';
-          // Only log when state changed for this origin to reduce spam
+
           try {
-            if (data.state && __lastStateByOrigin[origin] === data.state) {
-              // skip noisy identical-state logs
-            } else {
+            var prevState = __lastStateByOrigin[origin];
+            if (prevState !== data.state) {
               console.log && console.log('[EmbeddedRelay] message received from', origin, data);
-              __lastStateByOrigin[origin] = data.state;
             }
+            __lastStateByOrigin[origin] = data.state;
           } catch (e){}
 
-          // Optionally: check ev.origin for security if embedding cross-origin
           var payload = { type: 'embedded_state', state: data.state, confidence: data.confidence };
 
-          // If Unity instance available, try SendMessage to multiple likely GameObject names
+          // If Unity instance available, try a single JSON SendMessage to the known receiver.
           if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function'){
             var nowTs = Date.now();
             var lastSent = __lastSentByOrigin[origin];
-            var lastTs = __lastSentTsByOrigin[origin] || 0;
-            var shouldSend = false;
-
-            // Always send when the state changed compared to last forwarded state
-            if (lastSent !== payload.state) shouldSend = true;
-
-            // If state did not change, still allow forwarding when confidence is high
-            // (avoids missing a strong RUN/KICK that reasserts itself)
-            if (!shouldSend && payload.state && payload.state !== 'NONE' && payload.confidence && payload.confidence > 0.25) {
-              shouldSend = true;
-            }
-
-            // Otherwise allow occasional heartbeat for identical states (throttled)
-            if (!shouldSend && (nowTs - lastTs) > __SEND_MIN_INTERVAL_MS) shouldSend = true;
+            var shouldSend = (lastSent !== payload.state);
 
             if (shouldSend) {
               var s = JSON.stringify(payload);
-              var shortS = payload.state || '';
-              var sent = false;
-              // candidate GameObject names to try (covers common clone/name variants)
-              var candidates = ['EmbeddedReceiver','HandStateReceiver','EmbeddedReceiver(Clone)','HandStateReceiver(Clone)','GameManager','Main Camera'];
               try {
-                // try full JSON first
-                for (var i=0;i<candidates.length;i++){
-                  try { window.unityInstance.SendMessage(candidates[i], 'OnEmbeddedState', s); console.log && console.log('[EmbeddedRelay] Sent to', candidates[i], payload); sent = true; } catch (e) { /*silent*/ }
-                }
-                // if none accepted, try short state-only string
-                if (!sent){
-                  for (var j=0;j<candidates.length;j++){
-                    try { window.unityInstance.SendMessage(candidates[j], 'OnEmbeddedState', shortS); console.log && console.log('[EmbeddedRelay] Sent short to', candidates[j], shortS); sent = true; } catch (e) { /*silent*/ }
-                  }
-                }
-              } catch (e) { /*unexpected*/ }
-
-              if (sent) {
+                window.unityInstance.SendMessage('EmbeddedReceiver', 'OnEmbeddedState', s);
+                console.log && console.log('[EmbeddedRelay] Sent to EmbeddedReceiver', payload);
                 __lastSentByOrigin[origin] = payload.state;
                 __lastSentTsByOrigin[origin] = nowTs;
-                // schedule gentle retries (short string) to improve delivery reliability
-                (function(shortVal){
-                  setTimeout(function(){
-                    try { for (var k=0;k<3;k++){ var n=candidates[k% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} } } catch(e){}
-                  }, 250);
-                  setTimeout(function(){
-                    try { for (var k=0;k<3;k++){ var n=candidates[(k+1)% candidates.length]; try{ window.unityInstance.SendMessage(n,'OnEmbeddedState', shortVal); }catch(e){} } } catch(e){}
-                  }, 1000);
-                })(shortS);
-                return; // done
+              } catch (e) {
+                try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (ee) { /* ignore */ }
+                console.warn && console.warn('[EmbeddedRelay] SendMessage failed, queued', e);
               }
             } else {
-              // Suppressed because no meaningful change — queue for retry and keep overlay updated
-              console.debug && console.debug('[EmbeddedRelay] suppressed send to Unity (no meaningful change)', payload);
               try { window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() }); } catch (e) { /* ignore */ }
-              if (window.updateRecognition) window.updateRecognition(payload);
-              return;
             }
+            if (window.updateRecognition) window.updateRecognition(payload);
+            return;
           }
 
-          // If Unity not ready (or send failed), queue and still show overlay
+          // Unity not ready — queue and update overlay
           try {
             window.__pendingEmbeddedStates.push({ origin: origin, payload: payload, ts: Date.now() });
-            console.debug && console.debug('[EmbeddedRelay] queued payload, will retry when unityInstance ready', payload);
           } catch (e){}
-
-          // Fallback: show in overlay so we always have visible feedback
           if (window.updateRecognition) window.updateRecognition(payload);
         }, false);
       })();

@@ -38,18 +38,28 @@
         z-index: 2;
         pointer-events: none;
       }
+      /* HUD simplified: only show FPS text, remove semi-transparent background */
       #ui {
         position: absolute;
         top: 8px;
         left: 8px;
         z-index: 3;
-        background: rgba(0,0,0,0.35);
-        border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 8px;
-        padding: 8px 10px;
+        background: transparent !important; /* removed semi-transparent black box */
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important; /* keep layout minimal */
+        margin: 0 !important;
         font-size: 13px;
-        line-height: 1.4;
-        backdrop-filter: blur(6px);
+        line-height: 1.2;
+        backdrop-filter: none !important;
+      }
+      /* Ensure children don't show backgrounds or borders */
+      #ui, #ui * {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
       }
       #controls {
         position: absolute;
@@ -88,18 +98,14 @@
   </head>
   <body>
     <div id="app">
-      <video id="camera" playsinline muted></video>
-      <canvas id="three"></canvas>
-      <canvas id="overlay"></canvas>
+      <div id="scene" style="position:absolute;inset:0;overflow:visible;transform-origin:0 0;transition: transform 120ms linear;">
+        <video id="camera" playsinline muted></video>
+        <canvas id="three"></canvas>
+        <canvas id="overlay"></canvas>
+      </div>
+  <!-- internal preview removed per UX request -->
       <div id="ui">
         <div>FPS: <span id="fps">-</span></div>
-  <div>State: <span id="state">NONE</span></div>
-        <div>Confidence: <span id="conf">0.00</span></div>
-      </div>
-      <div id="controls">
-        <label style="background: rgba(0,0,0,0.35); padding:6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
-          <input type="checkbox" id="mirrorToggle" /> ミラー反転
-        </label>
       </div>
       <!-- カメラ選択ダイアログ -->
       <div id="deviceDialog" style="display:none; position:absolute; inset:0; background: rgba(0,0,0,0.6); z-index:5; align-items:center; justify-content:center;">
@@ -124,10 +130,12 @@
       const overlay = document.getElementById('overlay');
       const threeCanvas = document.getElementById('three');
       const startBtn = document.getElementById('startBtn');
-      const fpsEl = document.getElementById('fps');
-      const stateEl = document.getElementById('state');
-      const confEl = document.getElementById('conf');
-      const mirrorToggle = document.getElementById('mirrorToggle');
+  const fpsEl = document.getElementById('fps');
+  // state/confidence removed from HUD
+  const stateEl = null;
+  const confEl = null;
+  // Mirror is enabled by default now
+  const MIRROR_DEFAULT = true;
   const deviceDialog = document.getElementById('deviceDialog');
   const cameraSelect = document.getElementById('cameraSelect');
   const useCameraBtn = document.getElementById('useCameraBtn');
@@ -196,11 +204,11 @@
         tracker = new HandTracker({
           video,
           overlay,
-          mirror: mirrorToggle.checked,
+          mirror: MIRROR_DEFAULT,
               onResult: ({ fps, state, confidence, charge }) => {
             fpsEl.textContent = fps.toFixed(0);
-            stateEl.textContent = state;
-            confEl.textContent = confidence.toFixed(2);
+            // HUD only displays FPS; keep state/confidence for internal logic
+            try { /* intended no-op for removed HUD fields */ } catch(e){}
             // charge display removed
             if (state === 'RUN') setRunBoost(confidence);
             if (state !== lastState && state === 'KICK') {
@@ -226,11 +234,13 @@
         }
         tracker.start();
 
-        mirrorToggle.addEventListener('change', () => {
-          tracker.setMirror(mirrorToggle.checked);
-          video.style.transform = mirrorToggle.checked ? 'scaleX(-1)' : 'scaleX(1)';
-        });
-        video.style.transform = mirrorToggle.checked ? 'scaleX(-1)' : 'scaleX(1)';
+        // Notify parent that the camera/tracker is started and ready.
+        try {
+          window.parent.postMessage({ type: 'camera', status: 'ready' }, '*');
+        } catch (e) { /* ignore */ }
+
+        // Apply default mirror transform (mirror enabled by default)
+        video.style.transform = MIRROR_DEFAULT ? 'scaleX(-1)' : 'scaleX(1)';
 
         // レンダリングループ
         function renderLoop() {
@@ -292,7 +302,19 @@
         }
       });
 
-      startBtn.addEventListener('click', () => start());
+      // start button is now controlled by parent page — listen for start_camera message
+      startBtn.style.display = 'none';
+
+      window.addEventListener('message', function(ev){
+        var data = ev.data;
+        try { if (typeof data === 'string') data = JSON.parse(data); } catch(e) { /* keep original */ }
+        if (!data) return;
+        if (data.type === 'start_camera'){
+          var id = data.deviceId || null;
+          // start with the requested device id
+          startWithDeviceId(id);
+        }
+      }, false);
     </script>
   </body>
   </html>
