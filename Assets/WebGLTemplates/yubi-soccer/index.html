@@ -280,6 +280,21 @@
             cont.style.left = 'auto';
           }
           if (side) lastSide = side;
+          
+          // Unityのジョイスティック位置も更新（カメラが左側→ジョイスティックは右側）
+          updateJoystickPosition(side);
+        }
+        
+        // Unityへジョイスティック位置変更を通知
+        function updateJoystickPosition(cameraSide){
+          if (!window.unityInstance || typeof window.unityInstance.SendMessage !== 'function') return;
+          try {
+            // カメラが左側ならジョイスティックは右側、カメラが右側ならジョイスティックは左側
+            window.unityInstance.SendMessage('JoystickController', 'SetJoystickSide', cameraSide);
+            console.log && console.log('[JoystickPosition] Updated joystick side:', cameraSide);
+          } catch(e) {
+            console.warn && console.warn('[JoystickPosition] Failed to update joystick position', e);
+          }
         }
 
         // 初期適用 & 変化に追従
