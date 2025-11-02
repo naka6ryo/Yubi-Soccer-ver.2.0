@@ -73,7 +73,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         float turn = 0f;
         if (Input.GetKey(KeyCode.A)) turn = -1f;
-        if (Input.GetKey(KeyCode.D)) turn = 1f;
+        else if (Input.GetKey(KeyCode.D)) turn = 1f;
         else if (joystick != null) turn = 2 * joystick.Horizontal;
 
         if (forward != 0f)
