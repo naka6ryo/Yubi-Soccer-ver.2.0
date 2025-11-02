@@ -32,6 +32,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [Tooltip("部屋が満員になったらマスターがロードするシーン名。Build Settings に登録してください。")]
     public string gameSceneName = "Multi Player";
 
+    [Header("MatchingScene")]
+    [Tooltip("マッチングシーンの名前")]
+    public string matchingSceneName = "Matching";
+
     bool joinAfterConnect = false;
 
     void Start()
@@ -103,6 +107,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         Log($"Joined room. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
+
+        // マスタークライアントのみがシーン遷移を実行（AutomaticallySyncScene = true により全クライアントが同期）
+        if (PhotonNetwork.IsMasterClient)
+        {
+            Log($"MasterClient loading scene '{matchingSceneName}' (current: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
+            try
+            {
+                PhotonNetwork.LoadLevel(matchingSceneName);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to LoadLevel('{matchingSceneName}'): {ex}");
+            }
+        }
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)

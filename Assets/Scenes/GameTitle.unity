@@ -364,6 +364,7 @@ MonoBehaviour:
   autoConnectOnStart: 1
   statusDisplay: {fileID: 874583757}
   gameSceneName: Multi Player
+  matchingSceneName: Matching
 --- !u!4 &1059339879
 Transform:
   m_ObjectHideFlags: 0

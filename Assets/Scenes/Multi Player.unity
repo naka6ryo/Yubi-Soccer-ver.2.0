@@ -356,7 +356,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   networkManager: {fileID: 2011265865}
   quickMatchButton: {fileID: 0}
-  statusText: {fileID: 0}
 --- !u!1 &1343660808
 GameObject:
   m_ObjectHideFlags: 0
@@ -404,6 +403,8 @@ MonoBehaviour:
   tmpProText: {fileID: 0}
   uiText: {fileID: 0}
   createWorldTextFallback: 1
+  currentState: NONE
+  currentConfidence: 0
 --- !u!1 &1570823644
 GameObject:
   m_ObjectHideFlags: 0
@@ -761,8 +762,9 @@ MonoBehaviour:
   appId: 94d602f9-f0c0-4010-b408-0b47e8bc3d67
   maxPlayers: 2
   autoConnectOnStart: 1
-  statusText: {fileID: 0}
+  statusDisplay: {fileID: 0}
   gameSceneName: Multi Player
+  matchingSceneName: Matching
 --- !u!4 &2011265866
 Transform:
   m_ObjectHideFlags: 0
