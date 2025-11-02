@@ -124,6 +124,11 @@
         }
 
         cameraStartMain.addEventListener('click', function(){
+          // DeviceOrientation パーミッション要求（ユーザージェスチャー内で実行）
+          if (window.requestOrientationPermission) {
+            window.requestOrientationPermission();
+          }
+          
           var id = cameraSelectMain.value || null;
           // iframe は別 IIFE 内で定義されている可能性があるため、ここで明示的に DOM から取得する
           var iframeEl = document.getElementById('yubi-iframe');
@@ -139,6 +144,179 @@
 
         // Populate list and show modal immediately
         populateAndShow();
+      })();
+    </script>
+    <!-- Orientation-aware placement: place the embedded camera square left/right in landscape (bottom anchored) -->
+    <script>
+      (function(){
+        var lastGamma = null, lastBeta = null;
+        var lastSide = 'right'; // fallback default
+
+        // DeviceOrientation パーミッション要求（iOS 13+）
+        function requestOrientationPermission(){
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS 13+ requires permission
+            DeviceOrientationEvent.requestPermission()
+              .then(function(response){
+                if (response === 'granted') {
+                  console.log('[Orientation] Permission granted');
+                  attachOrientationListener();
+                } else {
+                  console.warn('[Orientation] Permission denied');
+                }
+              })
+              .catch(function(e){
+                console.error('[Orientation] Permission request failed', e);
+              });
+          } else {
+            // Non-iOS or older iOS: attach listener directly
+            attachOrientationListener();
+          }
+        }
+        
+        // グローバルに公開（カメラ開始ボタンから呼べるように）
+        window.requestOrientationPermission = requestOrientationPermission;
+
+        function attachOrientationListener(){
+          window.addEventListener('deviceorientation', function(ev){
+            if (typeof ev.gamma === 'number') lastGamma = ev.gamma; // 左右傾き [-90,90]
+            if (typeof ev.beta === 'number') lastBeta = ev.beta;   // 前後傾き [-180,180]
+          }, { passive: true });
+        }
+
+        // 非iOS環境では即座にリスナーを登録
+        if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
+          attachOrientationListener();
+        }
+
+        function inRangeDeg(a, lo, hi){
+          // 角度 a(0..360) が [lo,hi] に入るか
+          while (a < 0) a += 360; while (a >= 360) a -= 360;
+          if (lo <= hi) return a >= lo && a <= hi;
+          return a >= lo || a <= hi; // wrap-around
+        }
+
+        function normalizeDeg(a){
+          if (typeof a !== 'number' || isNaN(a)) return null;
+          var n = a % 360; if (n < 0) n += 360; return n;
+        }
+
+        function detectLandscapeSide(){
+          var result = null;
+
+          // 優先順位1: DeviceOrientation の gamma（物理的な傾き）- 画面回転ロックに影響されない
+          try {
+            if (lastGamma != null && lastBeta != null) {
+              var betaAbs = Math.abs(lastBeta);
+              if (betaAbs < 60) {
+                // beta が小さい（通常の持ち方）: gamma 値で判定
+                // 横持ち時のgamma値: 右手で持つと正、左手で持つと負
+                // 閾値を広げて検出しやすく（±5°）
+                if (lastGamma > 5) { result = 'right'; }
+                else if (lastGamma < -5) { result = 'left'; }
+              } else {
+                // beta が大きい（手前に傾けた時）: 判定を逆転
+                if (lastGamma > 5) { result = 'left'; }
+                else if (lastGamma < -5) { result = 'right'; }
+              }
+            }
+          } catch(e){}
+
+          // 優先順位2: window.orientation（iOS/一部Android）
+          if (!result) {
+            try {
+              var o = (typeof window.orientation === 'number') ? window.orientation : null;
+              var oa = normalizeDeg(o);
+              if (oa != null) {
+                if (inRangeDeg(oa, 60, 120)) { result = 'right'; }
+                else if (inRangeDeg(oa, 240, 300)) { result = 'left'; }
+              }
+            } catch(e){}
+          }
+
+          // 優先順位3: Screen Orientation API
+          if (!result) {
+            try {
+              if (screen.orientation) {
+                var ang = normalizeDeg(screen.orientation.angle);
+                var typ = String(screen.orientation.type || '');
+                if (ang != null) {
+                  if (inRangeDeg(ang, 60, 120)) { result = 'right'; }
+                  else if (inRangeDeg(ang, 240, 300)) { result = 'left'; }
+                }
+                if (!result) {
+                  if (typ.indexOf('landscape-primary') !== -1) { result = 'right'; }
+                  else if (typ.indexOf('landscape-secondary') !== -1) { result = 'left'; }
+                }
+              }
+            } catch(e){}
+          }
+
+          // 判断不能 → 直前の結果を維持
+          if (!result) {
+            result = lastSide || 'right';
+          }
+
+          return result;
+        }
+
+        function applyPlacement(){
+          var cont = document.getElementById('yubi-container');
+          if (!cont) return;
+          var side = detectLandscapeSide();
+          cont.style.position = 'fixed';
+          cont.style.bottom = '12px';
+          cont.style.top = 'auto';
+          cont.style.zIndex = '1000';
+          cont.style.width = 'auto'; // CSSの固定幅を上書き
+          cont.style.transition = 'left .3s ease, right .3s ease, bottom .2s ease';
+          // 常に側面配置（portrait時も gamma で判定）
+          if (side === 'left') {
+            cont.style.left = '12px';
+            cont.style.right = 'auto';
+          } else {
+            // right or fallback
+            cont.style.right = '12px';
+            cont.style.left = 'auto';
+          }
+          if (side) lastSide = side;
+          
+          // デバッグ表示を更新
+          updateDebugOverlay(side);
+        }
+        
+        // デバッグオーバーレイ表示
+        var debugOverlay = null;
+        function updateDebugOverlay(side){
+          if (!debugOverlay) {
+            debugOverlay = document.createElement('div');
+            debugOverlay.id = 'orientation-debug';
+            debugOverlay.style.cssText = 'position:fixed;top:10px;left:10px;background:rgba(0,255,0,0.8);color:#000;padding:10px;border-radius:5px;font-family:monospace;font-size:12px;z-index:10000;line-height:1.4;';
+            document.body.appendChild(debugOverlay);
+          }
+          
+          var betaAbs = Math.abs(lastBeta || 0);
+          var mode = betaAbs < 60 ? '通常' : '逆転';
+          
+          debugOverlay.innerHTML = 
+            'gamma: ' + (lastGamma != null ? lastGamma.toFixed(1) : 'null') + '°<br>' +
+            'beta: ' + (lastBeta != null ? lastBeta.toFixed(1) : 'null') + '°<br>' +
+            '|beta|: ' + betaAbs.toFixed(1) + '°<br>' +
+            'モード: ' + mode + '<br>' +
+            '判定: ' + side + '<br>' +
+            'lastSide: ' + lastSide;
+        }
+
+        // 初期適用 & 変化に追従
+        try { applyPlacement(); } catch(e){}
+        window.addEventListener('resize', applyPlacement);
+        window.addEventListener('orientationchange', applyPlacement);
+        if (screen.orientation && screen.orientation.addEventListener) {
+          screen.orientation.addEventListener('change', applyPlacement);
+        }
+        document.addEventListener('visibilitychange', applyPlacement);
+        // DeviceOrientation の変化を定期的にチェック（画面回転ロック対応）
+        setInterval(applyPlacement, 200);
       })();
     </script>
   <script>

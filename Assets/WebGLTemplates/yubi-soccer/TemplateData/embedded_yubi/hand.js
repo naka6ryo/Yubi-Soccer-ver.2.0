@@ -12,7 +12,7 @@ const CFG = {
   hysteresis: { on: 0.65, off: 0.45 },
   run: {
     minAbsCorr: 0.5,
-    minSpeedAmp: 200, // px/s 相当（指振りの速度閾値）
+    minSpeedAmp: 100, // px/s 相当（指振りの速度閾値）
     // 代替: 手首の上下速度のゼロ交差から走動作（周期運動）を検出
     freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
     zeroXMinAmp: 80,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
@@ -22,7 +22,7 @@ const CFG = {
     minAngVel: 10.0, // rad/s
     minWristSpeed: 500.0, // px/s （10 px/frame @30fps 相当）
     // KICK は指先速度ピークのみで判定
-    minTipSpeedPxPerSec: 1800, // 指先速度による KICK しきい値
+    minTipSpeedPxPerSec: 3500, // 指先速度による KICK しきい値
     // 前方向（カメラ方向）への z 速度の最小値 (normalized z units per sec)
     // MediaPipe の z はカメラに近づくと通常負の値になるため、
     // ここでは負方向の速度（値が小さくなる＝より負）を期待する。
