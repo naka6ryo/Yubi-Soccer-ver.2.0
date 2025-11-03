@@ -413,7 +413,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -100}
+  m_AnchoredPosition: {x: 0, y: -300}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &801380821
@@ -429,6 +429,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   networkManager: {fileID: 1381035366}
+  button: {fileID: 801380822}
 --- !u!114 &801380822
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -797,6 +798,7 @@ MonoBehaviour:
   appId: 94d602f9-f0c0-4010-b408-0b47e8bc3d67
   maxPlayers: 2
   autoConnectOnStart: 1
+  startGameButton: {fileID: 801380821}
   statusDisplay: {fileID: 1013196548}
   gameSceneName: Multi Player Stadium
   matchingSceneName: Matching
