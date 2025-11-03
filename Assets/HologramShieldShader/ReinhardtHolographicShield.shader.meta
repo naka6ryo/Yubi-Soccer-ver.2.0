@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 1857df4dd80c41e4d81dfdcfc8419027
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/ReinhardtHolographicShield.shader
+  uploadId: 745700

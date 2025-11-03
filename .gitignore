@@ -60,3 +60,4 @@ sysinfo/
 Assets/WebGLTemplates/yubi-soccer/TemplateData/embedded_yubi/.git/
 
 # End of Unity .gitignore
+Assets/Scenes/Stadium/LightingData.asset

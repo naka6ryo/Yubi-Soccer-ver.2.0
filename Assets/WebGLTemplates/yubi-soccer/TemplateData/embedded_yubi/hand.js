@@ -12,11 +12,11 @@ const CFG = {
   hysteresis: { on: 0.65, off: 0.45 },
   run: {
     minAbsCorr: 0.5,
-    minSpeedAmp: 80, // px/s 相当（指振りの速度閾値）
+    minSpeedAmp: 20, // px/s 相当（指振りの速度閾値）
     // 代替: 手首の上下速度のゼロ交差から走動作（周期運動）を検出
     freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
-    zeroXMinAmp: 80,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
-    minTipSpeedPxPerSec: 80, // 甲から離れた領域での指先速度の下限（RUN 用）
+    zeroXMinAmp: 20,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
+    minTipSpeedPxPerSec: 20, // 甲から離れた領域での指先速度の下限（RUN 用）
   },
   kick: {
     minAngVel: 10.0, // rad/s
@@ -74,8 +74,8 @@ export class HandTracker {
     this.running = false;
     this.lastTs = performance.now();
     this.fps = 0;
-  // 検出スロットル: ミリ秒単位。デフォルトは 15 FPS 相当
-  this.detectIntervalMs = 1000 / 15;
+  // 検出スロットル: ミリ秒単位。高速化: 30 FPS 相当に変更
+  this.detectIntervalMs = 1000 / 30;
   this.lastDetectTime = 0;
   this.lastDetectResult = null;
 
@@ -354,12 +354,15 @@ export class HandTracker {
       this.state = 'KICK';
       this.stateConf = desiredConf;
       this.kickHoldUntil = nowSecFloat + 1.0;
-      window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+      // KICK 遷移時は即座に送信
+      if (this.prevState !== 'KICK') {
+        window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+      }
     } else {
       this.state = desiredState;
       this.stateConf = desiredConf;
 
-      // 状態が変化したときのみメッセージ送信
+      // 状態が変化したときのみメッセージ送信（重複送信を回避）
       if (this.prevState !== this.state) {
         if (this.state === 'KICK') {
           window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
@@ -382,11 +385,16 @@ export class HandTracker {
         this.chargePendingUntil = 0;
       } else {
         // 強制 KICK（chargePending）: KICK に上書きし、保持期限を設定
+        const wasKick = this.state === 'KICK';
         this.state = 'KICK';
         this.stateConf = 1.0;
         this.kickHoldUntil = nowSecFloat + 1.0;
         this.chargePending = false;
         this.chargePendingUntil = 0;
+        // 新規KICK遷移時のみメッセージ送信
+        if (!wasKick) {
+          window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+        }
       }
     }
 // 更新されたアクション状態を組み立てて onResult に渡す

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 93be543cf93db4a46b3b5c0a28863dab
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/HologramPrefabs/SphereHologram.prefab
+  uploadId: 745700

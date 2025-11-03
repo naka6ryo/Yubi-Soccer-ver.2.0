@@ -33,6 +33,10 @@ public class HandStateReceiver : MonoBehaviour
     public string currentState = "NONE";
     public float currentConfidence = 0f;
 
+    // 最後に受信した時刻（重複メッセージのスキップ用）
+    private float lastUpdateTime = 0f;
+    private const float UPDATE_INTERVAL = 0.016f; // 約60 FPSまでの更新を許容
+
     // internal reference to fallback TextMesh
     private TextMesh _worldText;
 
@@ -159,6 +163,14 @@ public class HandStateReceiver : MonoBehaviour
     [Preserve]
     public void OnEmbeddedState(string json)
     {
+        // スロットリング: 高頻度の更新を間引いて物理演算への影響を最小化
+        float now = Time.realtimeSinceStartup;
+        if (now - lastUpdateTime < UPDATE_INTERVAL)
+        {
+            return; // 更新間隔が短すぎる場合はスキップ
+        }
+        lastUpdateTime = now;
+
         // Always log raw incoming payload so we can see it in the browser console for WebGL builds
         try { Debug.Log("HandStateReceiver.OnEmbeddedState raw: " + (json ?? "(null)")); } catch { }
         ;
