@@ -128,23 +128,54 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Log($"Player entered: {newPlayer.NickName} ({PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
 
         // 部屋が満員になったらマスタークライアントがシーンをロード（AutomaticallySyncScene = true 前提）
-        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        // if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        // {
+        //     Log($"Room full. MasterClient loading '{gameSceneName}'...");
+        //     try
+        //     {
+        //         PhotonNetwork.LoadLevel(gameSceneName);
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
+        //     }
+        // }
+
+        // 満員になったことは通知するが、自動遷移はしない（StartGameButton から呼ばれる）
+        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers)
         {
-            Log($"Room full. MasterClient loading '{gameSceneName}'...");
-            try
-            {
-                PhotonNetwork.LoadLevel(gameSceneName);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
-            }
+            Log("Room is now full. Master client can start the game.");
         }
     }
 
     public override void OnDisconnected(DisconnectCause cause)
     {
         Log($"Disconnected from Photon: {cause}");
+    }
+
+    public void StartGame()
+    {
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            Debug.LogWarning("StartGame can only be called by the Master Client.");
+            return;
+        }
+
+        if (PhotonNetwork.CurrentRoom.PlayerCount < PhotonNetwork.CurrentRoom.MaxPlayers)
+        {
+            Debug.LogWarning("Cannot start game - room is not full yet.");
+            return;
+        }
+
+        Log($"Master starting game... Loading '{gameSceneName}'");
+        try
+        {
+            PhotonNetwork.LoadLevel(gameSceneName);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
+        }
     }
 
     void Log(string text)
