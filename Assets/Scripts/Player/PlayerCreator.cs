@@ -15,7 +15,7 @@ public class PlayerCreator : MonoBehaviour
     public float spawnRadius = 2f;
 
     [Tooltip("スポーン高さ（Y）")]
-    public float spawnHeight = 1f;
+    public float spawnHeight = 4.0f;
 
     private GameObject localPlayerInstance;
 
@@ -50,9 +50,9 @@ public class PlayerCreator : MonoBehaviour
 
         // ランダムスポーン位置
         var spawnPos = new Vector3(
-            Random.Range(-spawnRadius, spawnRadius),
-            spawnHeight,
-            Random.Range(-spawnRadius, spawnRadius)
+            1826.69f,
+            8.0f,
+            1821.66f
         );
 
         Debug.Log($"PlayerSpawner: Instantiating '{playerPrefabName}' at {spawnPos}");
