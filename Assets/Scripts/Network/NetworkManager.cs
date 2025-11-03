@@ -25,6 +25,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool autoConnectOnStart = true;
 
     [Header("UI (optional)")]
+    
+    [Tooltip("ゲーム開始ボタン（マッチングシーンに配置）")]
+    public StartGameButton startGameButton;
     [Tooltip("ステータス表示クラス（オプション）")]
     public StatusDisplay statusDisplay;
 
@@ -40,6 +43,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     void Start()
     {
+        if (PhotonNetwork.InRoom)
+        {
+            Log($"Already in room: {PhotonNetwork.CurrentRoom.Name}");
+            // Matching シーンにいて満員なら StartGameButton を表示
+            return;
+        }
+
+        PhotonNetwork.AutomaticallySyncScene = true;
+
+        if (autoConnectOnStart && !PhotonNetwork.IsConnected)
+        {
+            Log("Connecting to Photon...");
+            PhotonNetwork.ConnectUsingSettings();
+        }
         // If user provided an AppId in the inspector, override the project's PhotonServerSettings at runtime.
         if (!string.IsNullOrEmpty(appId))
         {
@@ -127,23 +144,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Log($"Player entered: {newPlayer.NickName} ({PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
 
-        // 部屋が満員になったらマスタークライアントがシーンをロード（AutomaticallySyncScene = true 前提）
-        // if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
-        // {
-        //     Log($"Room full. MasterClient loading '{gameSceneName}'...");
-        //     try
-        //     {
-        //         PhotonNetwork.LoadLevel(gameSceneName);
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
-        //     }
-        // }
-
-        // 満員になったことは通知するが、自動遷移はしない（StartGameButton から呼ばれる）
-        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers)
+        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
         {
+            startGameButton.SetVisible(true);
             Log("Room is now full. Master client can start the game.");
         }
     }

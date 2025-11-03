@@ -1,28 +1,27 @@
 using UnityEngine;
 using UnityEngine.UI;
-using Photon.Pun;
-using Photon.Realtime;
 
 /// <summary>
-/// マッチングシーンでゲーム開始ボタンを制御するクラス。
-/// 部屋が満員かつマスタークライアントの場合のみボタンを表示します。
+/// ゲーム開始ボタンの表示制御を担当するクラス。
+/// NetworkManager から呼び出されます。
 /// </summary>
 [RequireComponent(typeof(Button))]
-public class StartGameButton : MonoBehaviourPunCallbacks
+public class StartGameButton : MonoBehaviour
 {
+    [Tooltip("NetworkManager への参照")]
     public NetworkManager networkManager;
 
-    private Button button;
+    public Button button;
 
-    void Start()
+    void Awake()
     {
-        button = GetComponent<Button>();
         button.onClick.AddListener(OnStartGameClicked);
-        this.gameObject.SetActive(false);
+        gameObject.SetActive(false);
     }
 
     void OnStartGameClicked()
     {
+        Debug.Log("ボタンは押せてる");
         if (networkManager != null)
         {
             networkManager.StartGame();
@@ -33,34 +32,15 @@ public class StartGameButton : MonoBehaviourPunCallbacks
         }
     }
 
-    void UpdateButtonVisibility()
+    /// <summary>
+    /// ボタンの表示/非表示を制御する（NetworkManager から呼ばれる）
+    /// </summary>
+    public void SetVisible(bool visible)
     {
-        // マスタークライアントかつ部屋が満員の場合のみボタンを表示
-        bool shouldShow = PhotonNetwork.IsMasterClient 
-            && PhotonNetwork.InRoom 
-            && PhotonNetwork.CurrentRoom.PlayerCount >= PhotonNetwork.CurrentRoom.MaxPlayers;
-
-        button.interactable = shouldShow;
-        Debug.Log("ShouldShow:" + shouldShow);
-        this.gameObject.SetActive(shouldShow);
-    }
-
-    // Photon コールバック: プレイヤーが入室したときに更新
-    public override void OnPlayerEnteredRoom(Player newPlayer)
-    {
-        Debug.Log("コールバック！！");
-        UpdateButtonVisibility();
-    }
-
-    // Photon コールバック: プレイヤーが退室したときに更新
-    public override void OnPlayerLeftRoom(Player otherPlayer)
-    {
-        UpdateButtonVisibility();
-    }
-
-    // Photon コールバック: マスタークライアントが変わったときに更新
-    public override void OnMasterClientSwitched(Player newMasterClient)
-    {
-        UpdateButtonVisibility();
+        if (button != null)
+        {
+            button.interactable = visible;
+        }
+        gameObject.SetActive(visible);
     }
 }
