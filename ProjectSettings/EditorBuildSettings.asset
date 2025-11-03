@@ -11,7 +11,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/GameTitle.unity
     guid: d4f6135e8bdbe4fd78b83ef93a66ecb8
-  - enabled: 0
+  - enabled: 1
+    path: Assets/Scenes/Matching.unity
+    guid: 20d55087cf28649df9469a4e6499f0ab
+  - enabled: 1
     path: Assets/Scenes/Multi Player.unity
     guid: 71646916df78b5249ac928095307d43d
   - enabled: 0
