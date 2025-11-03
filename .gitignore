@@ -60,4 +60,7 @@ sysinfo/
 Assets/WebGLTemplates/yubi-soccer/TemplateData/embedded_yubi/.git/
 
 # End of Unity .gitignore
+
+# Large files (over 100MB GitHub limit)
 Assets/Scenes/Stadium/LightingData.asset
+Assets/Fonts/CC Running With Scissors Medium SDF.asset
