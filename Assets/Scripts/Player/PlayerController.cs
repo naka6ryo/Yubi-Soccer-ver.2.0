@@ -31,6 +31,24 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         // Find HandStateReceiver in the scene
         receiver = FindFirstObjectByType<HandStateReceiver>();
 
+        // ジョイスティックが見つからない場合は自動検索
+        if (joystick == null)
+        {
+            joystick = FindFirstObjectByType<FixedJoystick>();
+            if (joystick != null)
+            {
+                Debug.Log($"[PlayerController] Auto-found FixedJoystick: {joystick.gameObject.name}");
+            }
+            else
+            {
+                Debug.LogWarning("[PlayerController] FixedJoystick not found in scene!");
+            }
+        }
+        else
+        {
+            Debug.Log($"[PlayerController] Joystick assigned: {joystick.gameObject.name}");
+        }
+
         // Ensure camera is only active for the local player
         if (playerCamera != null)
         {
@@ -39,6 +57,8 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         networkPosition = transform.position;
         networkRotation = transform.rotation;
+
+        Debug.Log($"[PlayerController] Initialized. IsMine: {photonView.IsMine}");
     }
 
     void Update()
@@ -74,7 +94,17 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         float turn = 0f;
         if (Input.GetKey(KeyCode.A)) turn = -1f;
         else if (Input.GetKey(KeyCode.D)) turn = 1f;
-        else if (joystick != null) turn = 2 * joystick.Horizontal;
+
+        // ジョイスティックの入力（キーボード入力がない場合）
+        if (turn == 0f && joystick != null)
+        {
+            float joyInput = joystick.Horizontal;
+            if (Mathf.Abs(joyInput) > 0.01f)
+            {
+                Debug.Log($"[PlayerController] Joystick input: {joyInput}");
+            }
+            turn = 2 * joyInput;
+        }
 
         if (forward != 0f)
         {
