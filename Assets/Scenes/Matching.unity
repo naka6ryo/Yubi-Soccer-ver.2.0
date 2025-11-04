@@ -526,7 +526,7 @@ MonoBehaviour:
   maxPlayers: 2
   autoConnectOnStart: 1
   statusDisplay: {fileID: 1013196548}
-  gameSceneName: Multi Player
+  gameSceneName: Multi Player Stadium
   matchingSceneName: Matching
 --- !u!4 &1381035367
 Transform:
