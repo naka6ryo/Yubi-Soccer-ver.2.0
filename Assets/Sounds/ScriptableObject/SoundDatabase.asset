@@ -13,11 +13,9 @@ MonoBehaviour:
   m_Name: SoundDatabase
   m_EditorClassIdentifier: 
   seList:
-  - name: "\u30BB\u30EC\u30AF\u30C8\u30DC\u30BF\u30F3\u3092\u62BC\u3057\u305F\u97F3"
+  - name: "\u6C7A\u5B9A"
     clip: {fileID: 8300000, guid: 7cf4a40656a85e14dbc8786f4094abea, type: 3}
   bgmList:
-  - name: 
-    clip: {fileID: 0}
   - name: "\u30BF\u30A4\u30C8\u30EB"
     clip: {fileID: 8300000, guid: 074d594ebc201654fba379d4c6eb4fdd, type: 3}
   - name: "\u8A66\u5408\u4E2D"
