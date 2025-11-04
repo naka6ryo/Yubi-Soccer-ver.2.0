@@ -555,7 +555,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6f97c67706ae48ba8e5720866ccf1d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerPrefabName: Player
+  playerPrefabName: Player Blue
   spawnRadius: 2
   spawnHeight: 1
 --- !u!1 &1411125664
