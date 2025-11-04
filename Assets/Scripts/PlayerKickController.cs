@@ -211,6 +211,7 @@ namespace YubiSoccer.Player
 
         private void Update()
         {
+            // キーボード入力は常に受け付ける（手の認識と共存）
             HandleInput();
             UpdateKickState(Time.deltaTime);
         }
@@ -233,46 +234,8 @@ namespace YubiSoccer.Player
                         {
                             chargeTime += Time.deltaTime;
                             chargeTime = Mathf.Min(chargeTime, maxChargeTime);
-                            // プレビュー: チャージに応じて地面円を更新
-                            if (showIndicatorWhileCharging && radiusIndicator != null)
-                            {
-                                float c01 = Mathf.Clamp01(chargeTime / maxChargeTime);
-                                float t = Mathf.Clamp01(chargeToRadius.Evaluate(c01));
-                                float previewRadius = scaleHitboxWithCharge
-                                    ? Mathf.Lerp(zeroChargeMaxRadius, maxRadius, t)
-                                    : maxRadius;
-                                radiusIndicator.Show();
-                                radiusIndicator.SetRadius(previewRadius);
-
-                                // 線幅もチャージでスケール
-                                if (scaleIndicatorWidthWithCharge)
-                                {
-                                    float wt = Mathf.Clamp01(chargeToIndicatorWidth.Evaluate(c01));
-                                    float w = Mathf.Lerp(indicatorWidthAtZeroCharge, indicatorWidthAtFullCharge, wt);
-                                    radiusIndicator.SetWidth(w);
-                                }
-
-                                // 色（現在色を取得し、必要なら更新）
-                                Color currentColor = radiusIndicator.GetCurrentColor();
-                                if (colorIndicatorWithCharge)
-                                {
-                                    float ct = Mathf.Clamp01(chargeToIndicatorColor.Evaluate(c01));
-                                    Color col;
-                                    if (useIndicatorGradient && indicatorColorGradient != null)
-                                    {
-                                        col = indicatorColorGradient.Evaluate(ct);
-                                    }
-                                    else
-                                    {
-                                        col = Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
-                                    }
-                                    radiusIndicator.SetColor(col);
-                                    currentColor = col;
-                                }
-
-                                // パルス演出（中心から0→現在半径まで拡がる円を繰り返し描画）
-                                radiusIndicator.UpdatePulseEffect(previewRadius, currentColor, c01, Time.deltaTime);
-                            }
+                            float c01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+                            UpdateChargingVisuals(c01, Time.deltaTime);
                         }
                         if (Input.GetKeyUp(kickKey))
                         {
@@ -400,6 +363,98 @@ namespace YubiSoccer.Player
                 // 反動途中で無効化された場合のみ、反動前の基準(開始時の向き)へ戻す
                 recoilTransform.localRotation = recoilBaseLocalRotation;
             }
+        }
+
+        [Header("External Control")]
+        [Tooltip("外部(ハンドステート等)からの制御を許可。キーボードと共存可能")]
+        [SerializeField] private bool allowExternalControl = true;
+
+        /// <summary>
+        /// 外部制御: タップ(短押し)キックを即発動。
+        /// </summary>
+        public void ExternalKickTap()
+        {
+            if (!allowExternalControl) return;
+            if (state != KickState.Idle) return;
+            lastKickPowerMultiplier = 1f;
+            lastCharge01 = 0f;
+            BeginKick();
+        }
+
+        /// <summary>
+        /// 外部制御: チャージ開始。
+        /// </summary>
+        public void ExternalChargeStart()
+        {
+            if (!allowExternalControl) return;
+            if (state != KickState.Idle) return;
+            state = KickState.Charging;
+            chargeTime = 0f;
+            UpdateChargingVisuals(0f, 0f);
+        }
+
+        /// <summary>
+        /// 外部制御: チャージ継続。毎フレーム呼び出しを想定。
+        /// </summary>
+        public void ExternalChargeUpdate(float dt)
+        {
+            if (!allowExternalControl) return;
+            if (state != KickState.Charging) return;
+            chargeTime += Mathf.Max(0f, dt);
+            chargeTime = Mathf.Min(chargeTime, maxChargeTime);
+            float c01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+            UpdateChargingVisuals(c01, dt);
+        }
+
+        /// <summary>
+        /// 外部制御: チャージ解放(発動)。
+        /// </summary>
+        public void ExternalChargeRelease()
+        {
+            if (!allowExternalControl) return;
+            if (state != KickState.Charging) return;
+            float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+            lastCharge01 = charge01;
+            lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+            BeginKick();
+        }
+
+        /// <summary>
+        /// チャージ中のプレビュー(半径/幅/色/パルス)を更新
+        /// </summary>
+        private void UpdateChargingVisuals(float c01, float dt)
+        {
+            if (!(showIndicatorWhileCharging && radiusIndicator != null)) return;
+
+            float t = Mathf.Clamp01(chargeToRadius.Evaluate(c01));
+            float previewRadius = scaleHitboxWithCharge
+                ? Mathf.Lerp(zeroChargeMaxRadius, maxRadius, t)
+                : maxRadius;
+            radiusIndicator.Show();
+            radiusIndicator.SetRadius(previewRadius);
+
+            // 線幅
+            if (scaleIndicatorWidthWithCharge)
+            {
+                float wt = Mathf.Clamp01(chargeToIndicatorWidth.Evaluate(c01));
+                float w = Mathf.Lerp(indicatorWidthAtZeroCharge, indicatorWidthAtFullCharge, wt);
+                radiusIndicator.SetWidth(w);
+            }
+
+            // 色
+            Color currentColor = radiusIndicator.GetCurrentColor();
+            if (colorIndicatorWithCharge)
+            {
+                float ct = Mathf.Clamp01(chargeToIndicatorColor.Evaluate(c01));
+                Color col = (useIndicatorGradient && indicatorColorGradient != null)
+                    ? indicatorColorGradient.Evaluate(ct)
+                    : Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
+                radiusIndicator.SetColor(col);
+                currentColor = col;
+            }
+
+            // パルス
+            radiusIndicator.UpdatePulseEffect(previewRadius, currentColor, c01, Mathf.Max(0f, dt));
         }
 
         private void StartRecoil()

@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using System.Collections;
 using System.Collections.Generic;
+using YubiSoccer.Player;
 
 // Simple player controller with Photon networking.
 // - W: move forward
@@ -19,6 +20,8 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
     [Header("Runtime refs")]
     public Camera playerCamera; // assignable in prefab; will be enabled only for local player
+    [Header("Kick Control")]
+    public PlayerKickController kickController;
 
     Vector3 networkPosition;
     Quaternion networkRotation;
@@ -29,6 +32,8 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     // 手のジェスチャー状態を保持
     private bool isRunning = false;
     private float runConfidence = 0f;
+    private bool isCharging = false;
+    private string currentHandState = "NONE";
 
     void Start()
     {
@@ -69,6 +74,16 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         {
             playerCamera.gameObject.SetActive(photonView.IsMine);
         }
+        // KickController の自動取得
+        if (kickController == null)
+        {
+            kickController = GetComponent<PlayerKickController>();
+            if (kickController == null)
+            {
+                kickController = FindFirstObjectByType<PlayerKickController>();
+            }
+        }
+        // 外部制御は PlayerKickController 側で許可されていれば共存するため、強制切替は不要
 
         networkPosition = transform.position;
         networkRotation = transform.rotation;
@@ -93,6 +108,40 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             isRunning = false;
             runConfidence = 0f;
         }
+
+        // KICK / CHARGE への対応
+        currentHandState = state ?? "NONE";
+        if (!photonView.IsMine) return;
+        if (kickController == null) return;
+
+        var s = currentHandState.ToUpperInvariant();
+        switch (s)
+        {
+            case "KICK":
+                // チャージ中なら解放してからタップ
+                if (isCharging)
+                {
+                    kickController.ExternalChargeRelease();
+                    isCharging = false;
+                }
+                kickController.ExternalKickTap();
+                break;
+            case "CHARGE":
+                if (!isCharging)
+                {
+                    kickController.ExternalChargeStart();
+                    isCharging = true;
+                }
+                break;
+            default:
+                // CHARGE 以外へ遷移したら、チャージ中なら解放
+                if (isCharging)
+                {
+                    kickController.ExternalChargeRelease();
+                    isCharging = false;
+                }
+                break;
+        }
     }
 
     void OnDestroy()
@@ -109,6 +158,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (photonView.IsMine)
         {
             HandleInput();
+            // ハンドステートによる長押しチャージ継続
+            if (isCharging && kickController != null)
+            {
+                kickController.ExternalChargeUpdate(Time.deltaTime);
+            }
         }
         else
         {

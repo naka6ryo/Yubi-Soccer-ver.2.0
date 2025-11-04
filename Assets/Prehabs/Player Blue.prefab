@@ -164,6 +164,7 @@ MonoBehaviour:
   rotationSpeed: 120
   lerpRate: 10
   playerCamera: {fileID: 5114838246848122034}
+  kickController: {fileID: 0}
   joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
@@ -488,6 +489,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  allowExternalControl: 1
 --- !u!1 &5882613890568250856
 GameObject:
   m_ObjectHideFlags: 0
