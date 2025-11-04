@@ -34,6 +34,18 @@ public class HandStateReceiver : MonoBehaviour
     [Tooltip("フォールバックの UI.Text（Canvas 上の Text）")]
     public Text uiText;
 
+    [Header("State Colors")]
+    [Tooltip("RUN 表示時の文字色")]
+    [SerializeField] private Color runColor = Color.green;
+    [Tooltip("CHARGE 表示時の文字色")]
+    [SerializeField] private Color chargeColor = Color.yellow;
+    [Tooltip("KICK 表示時の文字色")]
+    [SerializeField] private Color kickColor = Color.red;
+    [Tooltip("NONE（非表示時など）に対応する色。通常は未使用ですがフォールバックで使用することがあります")]
+    [SerializeField] private Color noneColor = Color.gray;
+    [Tooltip("未定義ステートの既定色")]
+    [SerializeField] private Color defaultColor = Color.cyan;
+
     // 現在のステートと信頼度（他のスクリプトから参照可能）
     [Header("Current State")]
     public string currentState = "NONE";
@@ -55,6 +67,20 @@ public class HandStateReceiver : MonoBehaviour
         try { Debug.Log($"HandStateReceiver.Start GameObject={gameObject.name}"); } catch { }
         // 自動テキストアタッチ処理を削除
         // 必要に応じて Inspector で手動でアサインしてください
+
+        // 初期表示テキストを消しておく（NONE表示ポリシーに合わせる）
+        try
+        {
+            if (tmpProText != null)
+            {
+                TrySetTextMeshPro(tmpProText, string.Empty, Color.white);
+            }
+            if (uiText != null)
+            {
+                uiText.text = string.Empty;
+            }
+        }
+        catch { }
     }
 
     /// <summary>
@@ -114,40 +140,67 @@ public class HandStateReceiver : MonoBehaviour
         }
 
         // Prepare display text (オプション: UI が設定されている場合のみ表示)
+        // 表示は RUN / CHARGE / KICK のみ。NONE やその他は非表示（空文字）。
         if (tmpProText != null || uiText != null)
         {
-            var text = $"State: {payload.state}\nConfidence: {payload.confidence:F2}";
-            var color = ColorForState(payload.state);
+            string s = (payload.state ?? "").ToUpperInvariant();
+            bool show = (s == "RUN" || s == "CHARGE" || s == "KICK");
 
-            // Update UI: prefer TMP if assigned (set via reflection so script compiles without TMPro)
-            if (tmpProText != null)
+            if (show)
             {
-                TrySetTextMeshPro(tmpProText, text, color);
+                // ラベルや信頼度は表示せず、純粋に状態名のみ表示（大文字）
+                var text = s; // e.g., RUN / CHARGE / KICK
+                var color = ColorForState(payload.state);
+
+                // Update UI: prefer TMP if assigned (set via reflection so script compiles without TMPro)
+                if (tmpProText != null)
+                {
+                    // RectTransform が割り当てられていても、中のテキストを自動検出して設定する
+                    if (!TrySetTextMeshPro(tmpProText, text, color))
+                    {
+                        // 失敗した場合のフォールバック: 子孫からテキストコンポーネントを探す
+                        TrySetOnDescendantText(tmpProText, text, color);
+                    }
+                }
+                else if (uiText != null)
+                {
+                    uiText.text = text;
+                    uiText.color = color;
+                }
             }
-            else if (uiText != null)
+            else
             {
-                uiText.text = text;
-                uiText.color = color;
+                // 非表示: テキストを空にする
+                if (tmpProText != null)
+                {
+                    if (!TrySetTextMeshPro(tmpProText, string.Empty, Color.white))
+                        TrySetOnDescendantText(tmpProText, string.Empty, Color.white);
+                }
+                if (uiText != null)
+                {
+                    uiText.text = string.Empty;
+                }
             }
         }
     }
 
     private Color ColorForState(string state)
     {
-        if (string.IsNullOrEmpty(state)) return Color.white;
+        if (string.IsNullOrEmpty(state)) return defaultColor;
         switch (state.ToUpperInvariant())
         {
-            case "KICK": return Color.red;
-            case "RUN": return Color.green;
-            case "NONE": return Color.gray;
-            default: return Color.cyan;
+            case "KICK": return kickColor;
+            case "RUN": return runColor;
+            case "CHARGE": return chargeColor;
+            case "NONE": return noneColor;
+            default: return defaultColor;
         }
     }
 
     // Try to set TMP text via reflection (works even if TMPro assembly is not referenced at compile time)
-    private void TrySetTextMeshPro(Component comp, string text, Color color)
+    private bool TrySetTextMeshPro(Component comp, string text, Color color)
     {
-        if (comp == null) return;
+        if (comp == null) return false;
         try
         {
             var type = comp.GetType();
@@ -161,11 +214,40 @@ public class HandStateReceiver : MonoBehaviour
             {
                 colorProp.SetValue(comp, color, null);
             }
-            return;
+            return textProp != null;
         }
         catch (Exception e)
         {
             Debug.LogWarning("HandStateReceiver: failed to set TextMeshPro via reflection: " + e.Message);
+            return false;
         }
+    }
+
+    // 子孫のコンポーネントの中から "text" プロパティを持つものを探して設定
+    private bool TrySetOnDescendantText(Component root, string text, Color color)
+    {
+        if (root == null) return false;
+        try
+        {
+            // まず同一GameObject上の全コンポーネントを試す
+            var selfComps = root.gameObject.GetComponents<Component>();
+            foreach (var c in selfComps)
+            {
+                if (c == null) continue;
+                if (TrySetTextMeshPro(c, text, color)) return true;
+            }
+            // 次に子孫を探索（非アクティブ含む）
+            var all = root.GetComponentsInChildren<Component>(true);
+            foreach (var c in all)
+            {
+                if (c == null || c == root) continue;
+                if (TrySetTextMeshPro(c, text, color)) return true;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("HandStateReceiver: TrySetOnDescendantText failed: " + e.Message);
+        }
+        return false;
     }
 }
