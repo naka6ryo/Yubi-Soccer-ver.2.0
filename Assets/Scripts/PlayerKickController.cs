@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
+using YubiSoccer.VFX;
 
 namespace YubiSoccer.Player
 {
@@ -126,6 +127,15 @@ namespace YubiSoccer.Player
         [SerializeField] private Color indicatorColorAtFullCharge = new Color(1f, 0.5f, 0.2f, 0.9f);
         [Tooltip("チャージ率→色補間重みのカーブ(0..1)")]
         [SerializeField] private AnimationCurve chargeToIndicatorColor = AnimationCurve.Linear(0, 0, 1, 1);
+
+        [Header("Impact VFX")]
+        [Tooltip("キックが対象に当たった瞬間に★リップルを生成する")]
+        [SerializeField] private bool spawnImpactStarRipple = true;
+        [SerializeField] private float impactRippleMaxRadius = 0.35f;
+        [SerializeField] private float impactRippleDuration = 0.3f;
+        [SerializeField, Min(3)] private int impactRippleSpikes = 5;
+        [SerializeField, Range(0.1f, 0.99f)] private float impactRippleInnerRatio = 0.45f;
+        [SerializeField] private float impactRippleLineWidth = 0.035f;
 
         private KickState state = KickState.Idle;
         private float currentRadius;
@@ -541,6 +551,52 @@ namespace YubiSoccer.Player
             rb.AddForce(impulse, ForceMode.Impulse);
 
             kickedThisActivation.Add(rb);
+
+            // インパクトVFX（★リップル）
+            if (spawnImpactStarRipple)
+            {
+                // キックゾーンのワールド中心
+                Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+                Vector3 center = other.bounds.center;
+                Vector3 hitPos;
+                Vector3 normal;
+
+                // SphereColliderの場合は幾何的に厳密な接触面を計算
+                var sphere = other as SphereCollider;
+                if (sphere != null)
+                {
+                    Vector3 sphereCenter = sphere.transform.TransformPoint(sphere.center);
+                    float worldR = sphere.radius * Mathf.Max(sphere.transform.lossyScale.x, Mathf.Max(sphere.transform.lossyScale.y, sphere.transform.lossyScale.z));
+                    Vector3 towardKick = (kickWorldCenter - sphereCenter).sqrMagnitude > 0.000001f
+                        ? (kickWorldCenter - sphereCenter).normalized
+                        : (center - transform.position).normalized;
+                    // ボール側表面の点（プレイヤー側に向いた表面）
+                    hitPos = sphereCenter + towardKick * worldR;
+                    normal = towardKick; // 球の法線は中心→表面
+                }
+                else
+                {
+                    // 一般コライダ: ClosestPoint から法線を近似
+                    hitPos = other.ClosestPoint(kickWorldCenter);
+                    if ((hitPos - kickWorldCenter).sqrMagnitude < 0.000001f)
+                    {
+                        hitPos = other.ClosestPoint(transform.position);
+                    }
+                    normal = (hitPos - center).sqrMagnitude > 0.000001f ? (hitPos - center).normalized : (center - transform.position).normalized;
+                }
+
+                // 色はチャージ色を流用
+                Color rippleColor = GetChargeColor(lastCharge01);
+                ImpactStarRipple.Spawn(hitPos, normal, rippleColor, impactRippleMaxRadius, impactRippleDuration, impactRippleSpikes, impactRippleInnerRatio, impactRippleLineWidth);
+            }
+        }
+
+        private Color GetChargeColor(float charge01)
+        {
+            float ct = Mathf.Clamp01(chargeToIndicatorColor != null ? chargeToIndicatorColor.Evaluate(Mathf.Clamp01(charge01)) : Mathf.Clamp01(charge01));
+            if (useIndicatorGradient && indicatorColorGradient != null)
+                return indicatorColorGradient.Evaluate(ct);
+            return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
         }
 
         private void OnDrawGizmosSelected()

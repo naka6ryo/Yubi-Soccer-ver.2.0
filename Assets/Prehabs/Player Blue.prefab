@@ -489,6 +489,12 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  spawnImpactStarRipple: 1
+  impactRippleMaxRadius: 0.35
+  impactRippleDuration: 0.3
+  impactRippleSpikes: 5
+  impactRippleInnerRatio: 0.45
+  impactRippleLineWidth: 0.035
   allowExternalControl: 1
 --- !u!1 &5882613890568250856
 GameObject:
