@@ -18534,8 +18534,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 19.4, y: 150}
-  m_SizeDelta: {x: 80.7349, y: 22.922}
+  m_AnchoredPosition: {x: 15.5, y: 150}
+  m_SizeDelta: {x: 97.316, y: 22.4187}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &970727572
 MonoBehaviour:
@@ -18557,7 +18557,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 0:48
+  m_text: 1:00
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: c38e15f2734227048823e35398e5c14c, type: 2}
   m_sharedMaterial: {fileID: 8036166633064547671, guid: c38e15f2734227048823e35398e5c14c, type: 2}
@@ -18584,7 +18584,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 24.75
+  m_fontSize: 24.2
   m_fontSizeBase: 70
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -23851,6 +23851,117 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3910389245817564933, guid: ef0819289b6872c489741847d10aa279, type: 3}
   m_PrefabInstance: {fileID: 1292398341}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1299779559
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1299779561}
+  - component: {fileID: 1299779560}
+  - component: {fileID: 1299779562}
+  m_Layer: 0
+  m_Name: TimeManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1299779560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1299779559}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87c92376c00eabd41b04ce52ab48ab04, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetRect: {fileID: 1427445363}
+  targetText: {fileID: 1427445361}
+  sequence:
+  - 3
+  - 2
+  - 1
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  showStartAfter: 1
+  startText: GO!
+  startTextColor: {r: 0.2, g: 1, b: 0.4, a: 1}
+  slideInDuration: 0.35
+  holdDuration: 0.6
+  slideOutDuration: 0.35
+  ease:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  startOffsetRight: 800
+  endOffsetLeft: 800
+  autoPlayOnStart: 1
+  autoToggleActive: 1
+  stateCanvasGroup: {fileID: 0}
+  stateRootGameObject: {fileID: 355522174}
+  hideStateDuringCountdown: 1
+  onFinished:
+    m_PersistentCalls:
+      m_Calls: []
+  matchTimer: {fileID: 1299779562}
+  startMatchTimerOnFinish: 1
+--- !u!4 &1299779561
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1299779559}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 295.5101, y: 153.27444, z: 26.04657}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1299779562
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1299779559}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01fcde435abcc5a4eaf19f30802e1c38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  durationSeconds: 60
+  clearTextWhenFinished: 1
+  tmpTextUGUI: {fileID: 970727572}
+  tmpText3D: {fileID: 0}
+  uiText: {fileID: 0}
 --- !u!1001 &1300039877
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -39496,3 +39607,4 @@ SceneRoots:
   - {fileID: 210188017}
   - {fileID: 734142375}
   - {fileID: 137890519}
+  - {fileID: 1299779561}

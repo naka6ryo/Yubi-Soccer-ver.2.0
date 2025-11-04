@@ -26,6 +26,8 @@ namespace YubiSoccer.Game
         [SerializeField] private bool autoFindSpawners = true;
         [SerializeField] private BreakableProximityGlassSpawner[] spawners;
 
+        // 試合タイマー連携は Countdown UI 側に移譲（本クラスでは管理しない）
+
         private Vector3 initialPos;
         private Quaternion initialRot;
 
@@ -54,6 +56,7 @@ namespace YubiSoccer.Game
 
         private void HandleGoal(Team scoredFor)
         {
+            try { Debug.Log("[GoalResetManager] Goal detected. Starting reset countdown..."); } catch { }
             StopAllCoroutines();
             StartCoroutine(CoResetAfterDelay());
         }
@@ -81,6 +84,8 @@ namespace YubiSoccer.Game
                 ResetExistingGlasses();
                 // Spawnerがあれば不足分を再生成
                 RespawnGlasses();
+
+                // マッチタイマーの開始は PreGameCountdown 等の UI 側で行います
             }
         }
 
@@ -106,5 +111,6 @@ namespace YubiSoccer.Game
                 s.RespawnAll();
             }
         }
+
     }
 }
