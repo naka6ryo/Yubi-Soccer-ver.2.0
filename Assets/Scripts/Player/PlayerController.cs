@@ -22,10 +22,6 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     public Camera playerCamera; // assignable in prefab; will be enabled only for local player
     [Header("Kick Control")]
     public PlayerKickController kickController;
-    
-    [Header("Sound")]
-    [Tooltip("走行中に再生するSEの間隔(秒)")]
-    [SerializeField] private float runSEInterval = 1.0f;
 
     Vector3 networkPosition;
     Quaternion networkRotation;
@@ -92,6 +88,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
                 kickController = FindFirstObjectByType<PlayerKickController>();
             }
         }
+        // KickHitboxExpander の自動取得
+        if (kickHitbox == null)
+        {
+            kickHitbox = GetComponentInChildren<YubiSoccer.Player.KickHitboxExpander>();
+        }
         // 外部制御は PlayerKickController 側で許可されていれば共存するため、強制切替は不要
 
         networkPosition = transform.position;
@@ -123,6 +124,15 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         // KICK / CHARGE への対応
         currentHandState = state ?? "NONE";
         if (!photonView.IsMine) return;
+
+        // 物理キックオンの場合は、KickController を呼ばずにヒットボックス拡大を操作
+        if (physicsKickOnly)
+        {
+            if (kickHitbox == null) return;
+            HandlePhysicsKickByState(currentHandState);
+            return;
+        }
+
         if (kickController == null) return;
 
         var s = currentHandState.ToUpperInvariant();
@@ -155,6 +165,38 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         }
     }
 
+    void HandlePhysicsKickByState(string state)
+    {
+        var s = (state ?? "NONE").ToUpperInvariant();
+        switch (s)
+        {
+            case "KICK":
+                // 単発拡大（Tap）
+                kickHitbox.KickTap();
+                // チャージ解除相当（安全にリセット）
+                if (isCharging)
+                {
+                    kickHitbox.ChargeRelease();
+                    isCharging = false;
+                }
+                break;
+            case "CHARGE":
+                if (!isCharging)
+                {
+                    kickHitbox.ChargeStart();
+                    isCharging = true;
+                }
+                break;
+            default:
+                if (isCharging)
+                {
+                    kickHitbox.ChargeRelease();
+                    isCharging = false;
+                }
+                break;
+        }
+    }
+
     void OnDestroy()
     {
         // イベントリスナーを解除
@@ -170,9 +212,32 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         {
             HandleInput();
             // ハンドステートによる長押しチャージ継続
-            if (isCharging && kickController != null)
+            if (isCharging)
             {
-                kickController.ExternalChargeUpdate(Time.deltaTime);
+                if (physicsKickOnly)
+                {
+                    if (kickHitbox != null) kickHitbox.ChargeUpdate(Time.deltaTime);
+                }
+                else if (kickController != null)
+                {
+                    kickController.ExternalChargeUpdate(Time.deltaTime);
+                }
+            }
+            // 走行中のSEを 1 秒ごとに再生
+            if (isMoving)
+            {
+                runSETimer -= Time.deltaTime;
+                if (runSETimer <= 0f)
+                {
+                    // サウンドマネージャがあれば再生（null 安全）
+                    soundManager?.PlaySE("走る");
+                    runSETimer = Mathf.Max(0.001f, runSEInterval);
+                }
+            }
+            else
+            {
+                // 停止時はタイマーをリセットして即時再生を防ぐ
+                runSETimer = 0f;
             }
             // 走行中のSEを 1 秒ごとに再生
             if (isMoving)
