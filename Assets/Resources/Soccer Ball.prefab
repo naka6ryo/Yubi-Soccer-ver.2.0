@@ -15,6 +15,8 @@ GameObject:
   - component: {fileID: 6490759478954629837}
   - component: {fileID: -1550621411530859504}
   - component: {fileID: 3595070269344119584}
+  - component: {fileID: 4601256780439917848}
+  - component: {fileID: 281945145269262638}
   m_Layer: 0
   m_Name: Soccer Ball
   m_TagString: Ball
@@ -132,6 +134,7 @@ MonoBehaviour:
   observableSearch: 2
   ObservedComponents:
   - {fileID: -1550621411530859504}
+  - {fileID: 281945145269262638}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
@@ -178,3 +181,33 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &4601256780439917848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975457108487340}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3a1662a0d5cb342a510a8e00ab90b0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ownerOnlyApply: 1
+--- !u!114 &281945145269262638
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1975457108487340}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3c3ddc777b67f34097a5872e2a81a23, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  positionLerpRate: 12
+  rotationLerpRate: 12
+  teleportDistance: 3
+  enableAutoTeleport: 0
+  localImpulseGrace: 0.12

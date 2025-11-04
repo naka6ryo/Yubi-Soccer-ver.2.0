@@ -166,6 +166,8 @@ MonoBehaviour:
   playerCamera: {fileID: 5114838246848122034}
   kickController: {fileID: 0}
   runSEInterval: 1
+  physicsKickOnly: 0
+  kickHitbox: {fileID: 0}
   joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
@@ -252,14 +254,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de320b594dac23b4793924fd18246887, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  physicsPushOnly: 0
   kickCollider: {fileID: 1908864701973021374}
   createColliderIfMissing: 1
   localCenter: {x: 0, y: 0.5, z: 0.4}
   baseRadius: 0.5
   maxRadius: 3
-  expandSpeed: 30
-  shrinkSpeed: 30
-  kickForce: 0
+  expandSpeed: 5
+  shrinkSpeed: 5
+  kickForce: 30
   forceDirectionReference: {fileID: 0}
   affectLayers:
     serializedVersion: 2

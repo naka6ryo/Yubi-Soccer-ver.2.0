@@ -10126,6 +10126,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1373159082}
     m_Modifications:
+    - target: {fileID: 2330167771701634547, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
+      propertyPath: explicitBall
+      value: 
+      objectReference: {fileID: 4935240531098310, guid: 9d27f30a014fce143bb37b8af7497613, type: 3}
     - target: {fileID: 6357684193064924633, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
       propertyPath: m_Name
       value: Blue Goal
@@ -36780,6 +36784,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1373159082}
     m_Modifications:
+    - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+      propertyPath: explicitBall
+      value: 
+      objectReference: {fileID: 4935240531098310, guid: 9d27f30a014fce143bb37b8af7497613, type: 3}
     - target: {fileID: 4779657217022878626, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
       propertyPath: m_Name
       value: Red Goal

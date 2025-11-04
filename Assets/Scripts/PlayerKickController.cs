@@ -3,6 +3,8 @@ using System.Collections;
 using UnityEngine;
 using YubiSoccer.VFX;
 using System.Diagnostics;
+using Photon.Pun;
+using YubiSoccer.Network;
 
 namespace YubiSoccer.Player
 {
@@ -15,7 +17,11 @@ namespace YubiSoccer.Player
     {
         private enum KickState { Idle, Charging, Expanding, Shrinking }
 
-        [Header("Kick Zone (SphereCollider/Trigger)")]
+        [Header("Mode")]
+        [Tooltip("true: AddForce/Lift を使わず、コライダー拡大のみ(非トリガー物理衝突)でボールを飛ばす。false: 旧方式(AddForce/Lift)を使用")]
+        [SerializeField] private bool physicsPushOnly = true;
+
+        [Header("Kick Zone (SphereCollider)")]
         [SerializeField] private SphereCollider kickCollider; // Triggerを想定
         [SerializeField] private bool createColliderIfMissing = true;
         [Tooltip("キック判定(トリガー)のローカル中心")]
@@ -26,7 +32,7 @@ namespace YubiSoccer.Player
         [Tooltip("拡大速度(半径/秒)")][SerializeField] private float expandSpeed = 12f;
         [Tooltip("縮小速度(半径/秒)")][SerializeField] private float shrinkSpeed = 16f;
 
-        [Header("Kick Force")]
+        [Header("Kick Force (旧方式: AddForce)")]
         [Tooltip("基礎キック力(インパルス)")]
         [SerializeField]
         private float kickForce = 10f;
@@ -59,7 +65,7 @@ namespace YubiSoccer.Player
         [Tooltip("チャージ率→半径スケール(0..1)。0でゼロチャージ半径、1でmaxRadiusへ")]
         [SerializeField] private AnimationCurve chargeToRadius = AnimationCurve.Linear(0, 0, 1, 1);
 
-        [Header("Lift (ball arc)")]
+        [Header("Lift (旧方式: 上方向インパルス)")]
         [Tooltip("キック時の上方向インパルスの基礎値")]
         [SerializeField]
         private float liftImpulseBase = 0.5f;
@@ -176,7 +182,7 @@ namespace YubiSoccer.Player
 
             if (kickCollider != null)
             {
-                kickCollider.isTrigger = true;
+                kickCollider.isTrigger = !physicsPushOnly; // 物理衝突で押し出す場合は非トリガー
                 kickCollider.center = localCenter;
                 kickCollider.radius = Mathf.Max(0.001f, baseRadius);
             }
@@ -219,7 +225,7 @@ namespace YubiSoccer.Player
 
             if (kickCollider != null)
             {
-                kickCollider.isTrigger = true;
+                kickCollider.isTrigger = !physicsPushOnly;
                 kickCollider.center = localCenter;
                 kickCollider.radius = Mathf.Max(0.001f, baseRadius);
             }
@@ -538,6 +544,7 @@ namespace YubiSoccer.Player
 
         private void OnTriggerEnter(Collider other)
         {
+            if (physicsPushOnly) return; // 物理押し出しモードでは AddForce を使用しない
             if (kickCollider == null) return;
             if (other == null || other == kickCollider) return;
 
@@ -553,22 +560,55 @@ namespace YubiSoccer.Player
             if (rb == null) return;
             if (kickedThisActivation.Contains(rb)) return; // 多重キック防止
 
-            Vector3 dir;
-            if (forceDirectionReference != null)
-                dir = forceDirectionReference.forward;
-            else
-                dir = (other.transform.position - transform.position).normalized;
+            // Photon 所有権チェック: ネットワーク対象ならオーナーのみ物理インパルス適用
+            if (rb.TryGetComponent<PhotonView>(out var pv))
+            {
+                if (!pv.IsMine)
+                {
+                    // 所有していないクライアントは VFX のみ再生し、AddForce は適用しない
+                    // ただし重複防止のために記録しておく
+                    kickedThisActivation.Add(rb);
+                    // インパクトVFX（★リップル）は以下で処理
+                }
+            }
 
-            float power = kickForce * Mathf.Max(0.05f, lastKickPowerMultiplier);
-            Vector3 impulse = dir.normalized * power;
+            // 旧方式(AddForce/Lift)をネットワークにブロードキャスト
+            // PhotonView があれば全員で同タイミング適用（BallImpulseReceiver が受信して FixedUpdate で AddForce）
+            // もし PhotonView が無い(オフライン/非ネットワーク)ならローカルに即時適用
+            {
+                // キック方向: 指定があれば参照の forward、なければプレイヤー→当たり点(またはボール中心)方向
+                Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+                Vector3 hitPoint = other.ClosestPoint(kickWorldCenter);
+                Vector3 dir;
+                if (forceDirectionReference != null)
+                {
+                    dir = forceDirectionReference.forward;
+                }
+                else
+                {
+                    Vector3 toward = (hitPoint - kickWorldCenter);
+                    dir = toward.sqrMagnitude > 0.000001f ? toward.normalized : (rb.worldCenterOfMass - transform.position).normalized;
+                }
 
-            // 上方向リフト: チャージに応じて増やす
-            float lift = Mathf.Max(0f, liftImpulseBase + liftImpulsePerCharge * Mathf.Clamp01(lastCharge01));
-            impulse += Vector3.up * lift;
-    
-            rb.AddForce(impulse, ForceMode.Impulse);
+                float forceMag = kickForce * Mathf.Max(0f, lastKickPowerMultiplier);
+                float lift = Mathf.Max(0f, liftImpulseBase + liftImpulsePerCharge * Mathf.Clamp01(lastCharge01));
+                Vector3 impulse = dir * forceMag;
 
-            kickedThisActivation.Add(rb);
+                if (pv != null)
+                {
+                    // ネットワーク配信（全クライアントが次の FixedUpdate で AddForce）
+                    Vector3 contact = hitPoint;
+                    BallImpulseBroadcaster.RaiseImpulse(pv.ViewID, impulse, lift, contact);
+                }
+                else
+                {
+                    // ローカルフォールバック
+                    if (impulse != Vector3.zero) rb.AddForce(impulse, ForceMode.Impulse);
+                    if (lift > 0f) rb.AddForce(Vector3.up * lift, ForceMode.Impulse);
+                }
+
+                kickedThisActivation.Add(rb);
+            }
 
             // インパクトVFX（★リップル）
             if (spawnImpactStarRipple)
@@ -607,6 +647,38 @@ namespace YubiSoccer.Player
                 Color rippleColor = GetChargeColor(lastCharge01);
                 ImpactStarRipple.Spawn(hitPos, normal, rippleColor, impactRippleMaxRadius, impactRippleDuration, impactRippleSpikes, impactRippleInnerRatio, impactRippleLineWidth);
             }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (!physicsPushOnly) return;
+            if (kickCollider == null) return;
+            if (!(state == KickState.Expanding)) return;
+
+            var other = collision.collider;
+            if (other == null || other == kickCollider) return;
+
+            // レイヤ/タグチェック
+            int layerMask = 1 << other.gameObject.layer;
+            if ((affectLayers.value & layerMask) == 0) return;
+            if (!string.IsNullOrEmpty(requiredTag) && !other.CompareTag(requiredTag)) return;
+
+            var rb = collision.rigidbody ?? other.attachedRigidbody;
+            if (rb == null) return;
+            if (kickedThisActivation.Contains(rb)) return;
+
+            // 物理エンジンの分離衝突に任せる。VFX のみ生成
+            ContactPoint cp = collision.contacts != null && collision.contactCount > 0 ? collision.contacts[0] : default;
+            Vector3 hitPos = cp.point != default ? cp.point : other.bounds.ClosestPoint(transform.TransformPoint(localCenter));
+            Vector3 normal = cp.normal != default ? cp.normal : (hitPos - other.bounds.center).normalized;
+
+            if (spawnImpactStarRipple)
+            {
+                Color rippleColor = GetChargeColor(lastCharge01);
+                ImpactStarRipple.Spawn(hitPos, normal, rippleColor, impactRippleMaxRadius, impactRippleDuration, impactRippleSpikes, impactRippleInnerRatio, impactRippleLineWidth);
+            }
+
+            kickedThisActivation.Add(rb);
         }
 
         private Color GetChargeColor(float charge01)

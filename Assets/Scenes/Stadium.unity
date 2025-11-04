@@ -4020,7 +4020,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1140175212217321892, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 1821.54
+      value: 1821.56
       objectReference: {fileID: 0}
     - target: {fileID: 1140175212217321892, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_LocalRotation.w
@@ -4050,6 +4050,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1182831760752411901, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: m_Mass
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 1182831760752411901, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: m_IsKinematic
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1182831760752411901, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: m_CenterOfMass.y
+      value: -10
+      objectReference: {fileID: 0}
+    - target: {fileID: 1182831760752411901, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: m_CollisionDetection
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1555769449232906187, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_Name
       value: Player Blue
@@ -4072,15 +4088,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1908864701973021374, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_IsTrigger
-      value: 1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: maxRadius
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: expandSpeed
-      value: 10
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: shrinkSpeed
-      value: 10
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: strongKickWall
@@ -4098,17 +4118,29 @@ PrefabInstance:
       propertyPath: liftImpulsePerCharge
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: expandSpeedChargeMultiplier
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: shrinkSpeedChargeMultiplier
+      value: 10
+      objectReference: {fileID: 0}
     - target: {fileID: 3041053099706313956, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 716639419}
     - target: {fileID: 4444081189068007918, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.42
+      value: 0.396
       objectReference: {fileID: 0}
     - target: {fileID: 4444081189068007918, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.539
+      value: -0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4444081189068007918, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 5667398061297613525, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: m_IsActive
@@ -39196,6 +39228,10 @@ PrefabInstance:
     - target: {fileID: 3426078650965877022, guid: ec3e8f3ed27e2244caaedaf589590a03, type: 3}
       propertyPath: m_Mass
       value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3426078650965877022, guid: ec3e8f3ed27e2244caaedaf589590a03, type: 3}
+      propertyPath: m_CollisionDetection
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
