@@ -77,6 +77,16 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (playerCamera != null)
         {
             playerCamera.gameObject.SetActive(photonView.IsMine);
+
+            // ローカルプレイヤーのカメラを全 BallOffScreenIndicator に配布
+            if (photonView.IsMine)
+            {
+                try
+                {
+                    YubiSoccer.UI.BallOffScreenIndicator.RegisterCameraForAll(playerCamera);
+                }
+                catch { /* 環境により未参照でも問題なし */ }
+            }
         }
         // KickController の自動取得
         if (kickController == null)
