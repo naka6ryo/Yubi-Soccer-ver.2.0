@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace YubiSoccer.UI
 {
@@ -16,6 +17,9 @@ namespace YubiSoccer.UI
         [SerializeField] private Canvas canvas; // 矢印が属するCanvas
         [SerializeField] private Camera referenceCamera; // 投影に使うカメラ(未指定ならMainCamera)
 
+        // 全インスタンスの管理（自動配布用）
+        private static readonly HashSet<BallOffScreenIndicator> s_instances = new HashSet<BallOffScreenIndicator>();
+
         [Header("表示設定")]
         [Tooltip("画面端からどれだけ内側に表示するか(ピクセル)")]
         [SerializeField] private float edgePadding = 32f;
@@ -31,7 +35,14 @@ namespace YubiSoccer.UI
 
         private void Awake()
         {
+            s_instances.Add(this);
+            Debug.Log($"[BallOffScreenIndicator] Awake: インスタンス登録 (合計: {s_instances.Count})");
             EnsureReferences();
+        }
+
+        private void OnDestroy()
+        {
+            s_instances.Remove(this);
         }
 
         private void Reset()
@@ -65,16 +76,37 @@ namespace YubiSoccer.UI
             if (arrowIndicator != null)
                 arrowIndicator.gameObject.SetActive(false);
 
-            if (disableIfReferencesMissing && (arrowIndicator == null || canvas == null || referenceCamera == null))
+            // カメラは後から RegisterCameraForAll で設定される可能性があるため、
+            // arrow と canvas のみチェック（camera は動的に設定される）
+            if (disableIfReferencesMissing && (arrowIndicator == null || canvas == null))
+            {
+                Debug.LogWarning($"[BallOffScreenIndicator] EnsureReferences: 参照不足のためコンポーネント無効化。arrow={arrowIndicator?.name ?? "null"}, canvas={canvas?.name ?? "null"}, camera={referenceCamera?.name ?? "null"}");
                 enabled = false;
+            }
+            else if (referenceCamera == null)
+            {
+                Debug.Log($"[BallOffScreenIndicator] EnsureReferences: カメラ未設定（後から RegisterCameraForAll で設定される）");
+            }
         }
 
         private void LateUpdate()
         {
+            // デバッグ: LateUpdate が実行されているか確認
+            if (Time.frameCount % 120 == 0) // 2秒に1回
+            {
+                Debug.Log($"[BallOffScreenIndicator] LateUpdate実行中: target={target?.name ?? "null"}, arrow={arrowIndicator?.name ?? "null"}, canvas={canvas?.name ?? "null"}, camera={referenceCamera?.name ?? "null"}");
+            }
+
             if (target == null || arrowIndicator == null || canvasRect == null || referenceCamera == null)
             {
                 if (arrowIndicator != null)
                     arrowIndicator.gameObject.SetActive(false);
+
+                // デバッグ: どの参照が欠けているか確認
+                if (Time.frameCount % 120 == 0) // 2秒に1回程度
+                {
+                    Debug.LogWarning($"[BallOffScreenIndicator] 参照不足: target={target?.name ?? "null"}, arrow={arrowIndicator?.name ?? "null"}, canvas={canvas?.name ?? "null"}, camera={referenceCamera?.name ?? "null"}");
+                }
                 return;
             }
 
@@ -89,13 +121,20 @@ namespace YubiSoccer.UI
             if (insideViewport)
             {
                 if (arrowIndicator.gameObject.activeSelf)
+                {
                     arrowIndicator.gameObject.SetActive(false);
+                    Debug.Log($"[BallOffScreenIndicator] 矢印を非表示 (画面内)");
+                }
                 return;
             }
 
             // 画面外: 矢印を表示して位置と向きを更新
             if (!arrowIndicator.gameObject.activeSelf)
+            {
                 arrowIndicator.gameObject.SetActive(true);
+                Debug.Log($"[BallOffScreenIndicator] 矢印を表示 (画面外) viewport={viewport}, behindCamera={behindCamera}");
+            }
+            ;
 
             Vector3 screenPos = referenceCamera.WorldToScreenPoint(target.position);
             float screenW = Screen.width;
@@ -158,6 +197,14 @@ namespace YubiSoccer.UI
         public void SetTarget(Transform newTarget)
         {
             target = newTarget;
+            Debug.Log($"[BallOffScreenIndicator] SetTarget: {newTarget?.name ?? "null"}");
+
+            // 参照が揃ったらコンポーネントを有効化
+            if (target != null && arrowIndicator != null && canvasRect != null && referenceCamera != null)
+            {
+                enabled = true;
+                Debug.Log($"[BallOffScreenIndicator] 全参照が揃ったためコンポーネントを有効化");
+            }
         }
 
         /// <summary>
@@ -177,6 +224,47 @@ namespace YubiSoccer.UI
         public void SetCamera(Camera cam)
         {
             referenceCamera = cam;
+            Debug.Log($"[BallOffScreenIndicator] SetCamera: {cam?.name ?? "null"}");
+
+            // canvasRect が未設定の場合、再取得を試みる
+            if (canvasRect == null && canvas != null)
+            {
+                canvasRect = canvas.transform as RectTransform;
+                Debug.Log($"[BallOffScreenIndicator] canvasRect を再取得: {canvasRect?.name ?? "null"}");
+            }
+
+            // 参照が揃ったらコンポーネントを有効化
+            if (target != null && arrowIndicator != null && canvasRect != null && referenceCamera != null)
+            {
+                enabled = true;
+                Debug.Log($"[BallOffScreenIndicator] 全参照が揃ったためコンポーネントを有効化");
+            }
+        }
+
+        /// <summary>
+        /// シーン内すべての BallOffScreenIndicator にボール Transform を一括配布
+        /// </summary>
+        public static void RegisterBallForAll(Transform ball)
+        {
+            Debug.Log($"[BallOffScreenIndicator] RegisterBallForAll: ボール '{ball?.name}' を {s_instances.Count} インスタンスに配布");
+            foreach (var inst in s_instances)
+            {
+                if (inst == null) continue;
+                inst.SetTarget(ball);
+            }
+        }
+
+        /// <summary>
+        /// シーン内すべての BallOffScreenIndicator にカメラを一括配布
+        /// </summary>
+        public static void RegisterCameraForAll(Camera cam)
+        {
+            Debug.Log($"[BallOffScreenIndicator] RegisterCameraForAll: カメラ '{cam?.name}' を {s_instances.Count} インスタンスに配布");
+            foreach (var inst in s_instances)
+            {
+                if (inst == null) continue;
+                inst.SetCamera(cam);
+            }
         }
     }
 }

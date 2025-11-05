@@ -22,6 +22,10 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     public Camera playerCamera; // assignable in prefab; will be enabled only for local player
     [Header("Kick Control")]
     public PlayerKickController kickController;
+    [Tooltip("true の場合、AddForce を使う KickController を呼ばず、物理衝突用のヒットボックス拡大のみでキックします。")]
+    public bool physicsKickOnly = false;
+    [Tooltip("物理キック専用: コライダー拡大型のコンポーネント。auto-find します。")]
+    public YubiSoccer.Player.KickHitboxExpander kickHitbox;
 
     Vector3 networkPosition;
     Quaternion networkRotation;
@@ -73,6 +77,16 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (playerCamera != null)
         {
             playerCamera.gameObject.SetActive(photonView.IsMine);
+
+            // ローカルプレイヤーのカメラを全 BallOffScreenIndicator に配布
+            if (photonView.IsMine)
+            {
+                try
+                {
+                    YubiSoccer.UI.BallOffScreenIndicator.RegisterCameraForAll(playerCamera);
+                }
+                catch { /* 環境により未参照でも問題なし */ }
+            }
         }
         // KickController の自動取得
         if (kickController == null)
@@ -82,6 +96,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             {
                 kickController = FindFirstObjectByType<PlayerKickController>();
             }
+        }
+        // KickHitboxExpander の自動取得
+        if (kickHitbox == null)
+        {
+            kickHitbox = GetComponentInChildren<YubiSoccer.Player.KickHitboxExpander>();
         }
         // 外部制御は PlayerKickController 側で許可されていれば共存するため、強制切替は不要
 
@@ -112,6 +131,15 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         // KICK / CHARGE への対応
         currentHandState = state ?? "NONE";
         if (!photonView.IsMine) return;
+
+        // 物理キックオンの場合は、KickController を呼ばずにヒットボックス拡大を操作
+        if (physicsKickOnly)
+        {
+            if (kickHitbox == null) return;
+            HandlePhysicsKickByState(currentHandState);
+            return;
+        }
+
         if (kickController == null) return;
 
         var s = currentHandState.ToUpperInvariant();
@@ -144,6 +172,38 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         }
     }
 
+    void HandlePhysicsKickByState(string state)
+    {
+        var s = (state ?? "NONE").ToUpperInvariant();
+        switch (s)
+        {
+            case "KICK":
+                // 単発拡大（Tap）
+                kickHitbox.KickTap();
+                // チャージ解除相当（安全にリセット）
+                if (isCharging)
+                {
+                    kickHitbox.ChargeRelease();
+                    isCharging = false;
+                }
+                break;
+            case "CHARGE":
+                if (!isCharging)
+                {
+                    kickHitbox.ChargeStart();
+                    isCharging = true;
+                }
+                break;
+            default:
+                if (isCharging)
+                {
+                    kickHitbox.ChargeRelease();
+                    isCharging = false;
+                }
+                break;
+        }
+    }
+
     void OnDestroy()
     {
         // イベントリスナーを解除
@@ -159,9 +219,16 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         {
             HandleInput();
             // ハンドステートによる長押しチャージ継続
-            if (isCharging && kickController != null)
+            if (isCharging)
             {
-                kickController.ExternalChargeUpdate(Time.deltaTime);
+                if (physicsKickOnly)
+                {
+                    if (kickHitbox != null) kickHitbox.ChargeUpdate(Time.deltaTime);
+                }
+                else if (kickController != null)
+                {
+                    kickController.ExternalChargeUpdate(Time.deltaTime);
+                }
             }
         }
         else
