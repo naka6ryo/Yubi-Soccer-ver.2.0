@@ -90,6 +90,13 @@ namespace YubiSoccer.Network
                 YubiSoccer.Environment.BreakableProximityGlass.RegisterBallForAll(this.transform);
             }
             catch { /* 環境により未参照でも問題なし */ }
+
+            // BallOffScreenIndicator へも配布
+            try
+            {
+                YubiSoccer.UI.BallOffScreenIndicator.RegisterBallForAll(this.transform);
+            }
+            catch { /* 環境により未参照でも問題なし */ }
         }
 
         // PhotonView の ObservedComponents に自分を登録（未設定だと OnPhotonSerializeView が呼ばれず非オーナーが更新を受け取れない）
