@@ -82,6 +82,16 @@ namespace YubiSoccer.Network
             }
         }
 
+        private void OnEnable()
+        {
+            // ボール生成/有効化時に、ガラス側へボール参照を配布（タグ未定義でも動作させるための導線）
+            try
+            {
+                YubiSoccer.Environment.BreakableProximityGlass.RegisterBallForAll(this.transform);
+            }
+            catch { /* 環境により未参照でも問題なし */ }
+        }
+
         // PhotonView の ObservedComponents に自分を登録（未設定だと OnPhotonSerializeView が呼ばれず非オーナーが更新を受け取れない）
         private void EnsureObservedByPhotonView()
         {

@@ -48,10 +48,11 @@ const CFG = {
 
 
 async function loadTasksVision() {
+  // ローカルUnityサーバは .mjs の MIME を正しく返さないため、CDN優先→ローカルの順に変更
   const candidates = [
-    './vendor/mediapipe/vision_bundle.mjs',
     'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.11/vision_bundle.mjs',
     'https://unpkg.com/@mediapipe/tasks-vision@0.10.11/vision_bundle.mjs',
+    './vendor/mediapipe/vision_bundle.mjs',
   ];
   let lastErr;
   for (const url of candidates) {

@@ -1,5 +1,6 @@
 using UnityEngine;
 using Photon.Pun;
+using YubiSoccer.Environment; // BreakableProximityGlass.RegisterBallForAll
 
 public class SoccerBallCreator : MonoBehaviour
 {
@@ -47,6 +48,11 @@ public class SoccerBallCreator : MonoBehaviour
         {
             soundManager.PlaySE("試合再開");
             localSoccerBallInstance = PhotonNetwork.Instantiate(soccerPrefabName, spawnPos, Quaternion.identity);
+            if (localSoccerBallInstance != null)
+            {
+                // 生成したボールTransformを全BreakableProximityGlassへ配布（タグ検索不要で安全）
+                BreakableProximityGlass.RegisterBallForAll(localSoccerBallInstance.transform);
+            }
         }
         catch (System.Exception ex)
         {
