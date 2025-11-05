@@ -348,8 +348,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  expandSpeedChargeMultiplier: 6
-  shrinkSpeedChargeMultiplier: 6
+  expandSpeedChargeMultiplier: 1
+  shrinkSpeedChargeMultiplier: 1
   enableRecoil: 1
   recoilTransform: {fileID: 1140175212217321892}
   recoilAngleDeg: 5
