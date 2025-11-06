@@ -48,7 +48,6 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (receiver != null)
         {
             receiver.onStateChanged.AddListener(OnHandStateChanged);
-            Debug.Log("[PlayerController] Registered HandStateReceiver event listener");
         }
         else
         {
@@ -59,18 +58,10 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (joystick == null)
         {
             joystick = FindFirstObjectByType<FixedJoystick>();
-            if (joystick != null)
-            {
-                Debug.Log($"[PlayerController] Auto-found FixedJoystick: {joystick.gameObject.name}");
-            }
-            else
+            if (joystick == null)
             {
                 Debug.LogWarning("[PlayerController] FixedJoystick not found in scene!");
             }
-        }
-        else
-        {
-            Debug.Log($"[PlayerController] Joystick assigned: {joystick.gameObject.name}");
         }
 
         // Ensure camera is only active for the local player
@@ -106,15 +97,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         networkPosition = transform.position;
         networkRotation = transform.rotation;
-
-        Debug.Log($"[PlayerController] Initialized. IsMine: {photonView.IsMine}");
     }
 
     // 手の状態が変化したときに呼ばれるコールバック
     void OnHandStateChanged(string state, float confidence)
     {
-        Debug.Log($"[PlayerController] Hand state changed: {state}, confidence: {confidence}");
-
         // RUN 状態の場合は即座にフラグを立てる
         if (state == "RUN")
         {
@@ -249,7 +236,6 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (isRunning && runConfidence > 0.5f)
         {
             forward = 1f;
-            Debug.Log($"[PlayerController] Running with confidence: {runConfidence}");
         }
 
         float turn = 0f;
@@ -260,10 +246,6 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (turn == 0f && joystick != null)
         {
             float joyInput = joystick.Horizontal;
-            if (Mathf.Abs(joyInput) > 0.01f)
-            {
-                Debug.Log($"[PlayerController] Joystick input: {joyInput}");
-            }
             turn = 2 * joyInput;
         }
 

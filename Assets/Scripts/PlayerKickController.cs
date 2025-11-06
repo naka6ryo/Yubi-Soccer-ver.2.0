@@ -278,47 +278,61 @@ namespace YubiSoccer.Player
 
         private void BeginKick()
         {
-            if (kickCollider == null) return;
-
-            // 発動準備
-            kickedThisActivation.Clear();
-            currentRadius = baseRadius;
-            kickCollider.radius = currentRadius;
-            // 今回の到達半径を決定
-            if (scaleHitboxWithCharge)
+            try
             {
-                float t = Mathf.Clamp01(chargeToRadius.Evaluate(Mathf.Clamp01(lastCharge01)));
-                activeMaxRadius = Mathf.Lerp(zeroChargeMaxRadius, maxRadius, t);
-            }
-            else
-            {
-                activeMaxRadius = maxRadius;
-            }
-            activeMaxRadius = Mathf.Max(baseRadius, Mathf.Min(activeMaxRadius, maxRadius));
+                if (kickCollider == null)
+                {
+                    Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
+                    return;
+                }
 
-            // 今回の拡大/縮小速度を決定
-            if (scaleSpeedWithCharge)
-            {
-                float s = Mathf.Clamp01(chargeToSpeed.Evaluate(Mathf.Clamp01(lastCharge01)));
-                float expandMul = Mathf.Lerp(1f, expandSpeedChargeMultiplier, s);
-                float shrinkMul = Mathf.Lerp(1f, shrinkSpeedChargeMultiplier, s);
-                activeExpandSpeed = expandSpeed * expandMul;
-                activeShrinkSpeed = shrinkSpeed * shrinkMul;
-            }
-            else
-            {
-                activeExpandSpeed = expandSpeed;
-                activeShrinkSpeed = shrinkSpeed;
-            }
-            // 視覚的反動を開始
-            StartRecoil();
+                // 発動準備
+                kickedThisActivation.Clear();
+                currentRadius = baseRadius;
+                kickCollider.radius = currentRadius;
 
-            // 発動時に円を隠す
-            if (hideIndicatorOnKick && radiusIndicator != null)
-                radiusIndicator.Hide();
+                // 今回の到達半径を決定
+                if (scaleHitboxWithCharge)
+                {
+                    float t = Mathf.Clamp01(chargeToRadius.Evaluate(Mathf.Clamp01(lastCharge01)));
+                    activeMaxRadius = Mathf.Lerp(zeroChargeMaxRadius, maxRadius, t);
+                }
+                else
+                {
+                    activeMaxRadius = maxRadius;
+                }
+                activeMaxRadius = Mathf.Max(baseRadius, Mathf.Min(activeMaxRadius, maxRadius));
 
-            ActivateKickZone();
-            state = KickState.Expanding;
+                // 今回の拡大/縮小速度を決定
+                if (scaleSpeedWithCharge)
+                {
+                    float s = Mathf.Clamp01(chargeToSpeed.Evaluate(Mathf.Clamp01(lastCharge01)));
+                    float expandMul = Mathf.Lerp(1f, expandSpeedChargeMultiplier, s);
+                    float shrinkMul = Mathf.Lerp(1f, shrinkSpeedChargeMultiplier, s);
+                    activeExpandSpeed = expandSpeed * expandMul;
+                    activeShrinkSpeed = shrinkSpeed * shrinkMul;
+                }
+                else
+                {
+                    activeExpandSpeed = expandSpeed;
+                    activeShrinkSpeed = shrinkSpeed;
+                }
+
+                // 視覚的反動を開始
+                StartRecoil();
+
+                // 発動時に円を隠す
+                if (hideIndicatorOnKick && radiusIndicator != null)
+                    radiusIndicator.Hide();
+
+                ActivateKickZone();
+                state = KickState.Expanding;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
+                state = KickState.Idle;
+            }
         }
 
         private void UpdateKickState(float dt)
@@ -392,11 +406,26 @@ namespace YubiSoccer.Player
         /// </summary>
         public void ExternalKickTap()
         {
-            if (!allowExternalControl) return;
-            if (state != KickState.Idle) return;
-            lastKickPowerMultiplier = 1f;
-            lastCharge01 = 0f;
-            BeginKick();
+            try
+            {
+                if (!allowExternalControl)
+                {
+                    Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
+                    return;
+                }
+                if (state != KickState.Idle)
+                {
+                    Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
+                    return;
+                }
+                lastKickPowerMultiplier = 1f;
+                lastCharge01 = 0f;
+                BeginKick();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
+            }
         }
 
         /// <summary>
@@ -429,12 +458,27 @@ namespace YubiSoccer.Player
         /// </summary>
         public void ExternalChargeRelease()
         {
-            if (!allowExternalControl) return;
-            if (state != KickState.Charging) return;
-            float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
-            lastCharge01 = charge01;
-            lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-            BeginKick();
+            try
+            {
+                if (!allowExternalControl)
+                {
+                    Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
+                    return;
+                }
+                if (state != KickState.Charging)
+                {
+                    Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
+                    return;
+                }
+                float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+                lastCharge01 = charge01;
+                lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+                BeginKick();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
+            }
         }
 
         /// <summary>

@@ -46,6 +46,7 @@ namespace YubiSoccer.Network
         public void OnEvent(EventData photonEvent)
         {
             if (photonEvent.Code != BallImpulseBroadcaster.EventCode) return;
+
             var data = photonEvent.CustomData as object[];
             if (data == null || data.Length < 11) return;
 
@@ -73,6 +74,7 @@ namespace YubiSoccer.Network
         void FixedUpdate()
         {
             if (_rb == null) return;
+
             while (_queue.Count > 0)
             {
                 var qi = _queue.Dequeue();
@@ -86,6 +88,7 @@ namespace YubiSoccer.Network
                 {
                     _rb.AddForce(Vector3.up * qi.lift, ForceMode.Impulse);
                 }
+
                 _appliedSeq.Add(qi.seq);
             }
         }

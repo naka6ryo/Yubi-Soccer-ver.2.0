@@ -18,6 +18,9 @@ namespace YubiSoccer.Network
         // Photon は System.UInt32 をそのまま送れないため int を使用
         private static int _localSeq = 0;
 
+        // デバッグログを有効化するフラグ（Inspector からは設定できないので、必要に応じてコード内で true に）
+        public static bool DebugLog = false;
+
         /// <summary>
         /// インパルスを全クライアントに送信。
         /// </summary>
@@ -44,7 +47,13 @@ namespace YubiSoccer.Network
                 Receivers = ReceiverGroup.All
             };
             var sendOptions = new SendOptions { Reliability = true };
-            PhotonNetwork.RaiseEvent(EventCode, data, options, sendOptions);
+
+            bool success = PhotonNetwork.RaiseEvent(EventCode, data, options, sendOptions);
+
+            if (!success)
+            {
+                Debug.LogWarning($"[BallImpulseBroadcaster] Failed to send impulse event! IsConnected={PhotonNetwork.IsConnected}, InRoom={PhotonNetwork.InRoom}");
+            }
         }
     }
 }
