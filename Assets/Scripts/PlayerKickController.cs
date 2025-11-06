@@ -173,6 +173,10 @@ namespace YubiSoccer.Player
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
             if (radiusIndicator != null)
                 radiusIndicator.SetCenter(transform);
+        }
+
+        void Start()
+        {
             soundManager = SoundManager.Instance;
         }
 
@@ -249,6 +253,7 @@ namespace YubiSoccer.Player
                         if (Input.GetKeyDown(kickKey))
                         {
                             state = KickState.Charging;
+                            if(soundManager == null) UnityEngine.Debug.LogError("[PlayerKickController] SoundManager instance is null.");
                             soundManager.PlaySE("チャージ");
                             chargeTime = 0f;
                         }
