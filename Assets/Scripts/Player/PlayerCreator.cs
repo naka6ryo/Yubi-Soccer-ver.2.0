@@ -1,11 +1,12 @@
 using UnityEngine;
 using Photon.Pun;
+using Photon.Realtime;
 
 /// <summary>
 /// ゲームシーンでローカルプレイヤーを生成するクラス。
 /// Multi Player シーンに配置してください（NetworkManager は GameTitle シーンで DontDestroyOnLoad）。
 /// </summary>
-public class PlayerCreator : MonoBehaviour
+public class PlayerCreator : MonoBehaviourPunCallbacks
 {
     [Header("Spawn Settings")]
     [Tooltip("プレイヤープレハブ名（Resources フォルダ直下）")]
@@ -21,21 +22,30 @@ public class PlayerCreator : MonoBehaviour
 
     void Start()
     {
-        // 部屋に入っていない場合はスキップ
-        if (!PhotonNetwork.IsConnected || !PhotonNetwork.InRoom)
+        // 既にルームにいる場合は即生成（従来の動作を残す）
+        if (PhotonNetwork.IsConnected && PhotonNetwork.InRoom)
         {
-            Debug.LogWarning("PlayerSpawner: Not in a room. Skipping player spawn.");
+            if (localPlayerInstance == null)
+            {
+                SpawnLocalPlayer();
+            }
             return;
         }
 
-        // 既にローカルプレイヤーが存在する場合はスキップ（二重生成防止）
-        if (localPlayerInstance != null)
-        {
-            Debug.LogWarning("PlayerSpawner: Local player already exists.");
-            return;
-        }
+        // ルームに入っていなければ OnJoinedRoom() を待つ
+        Debug.Log("PlayerCreator: Not in room yet. Waiting for OnJoinedRoom...");
+    }
 
-        SpawnLocalPlayer();
+    /// <summary>
+    /// Photon のルーム参加完了コールバック。ここでプレイヤーを生成する。
+    /// </summary>
+    public override void OnJoinedRoom()
+    {
+        Debug.Log($"PlayerCreator: OnJoinedRoom called. PlayerCount={PhotonNetwork.CurrentRoom?.PlayerCount}");
+        if (localPlayerInstance == null)
+        {
+            SpawnLocalPlayer();
+        }
     }
 
     void SpawnLocalPlayer()
