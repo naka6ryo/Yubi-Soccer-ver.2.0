@@ -33480,6 +33480,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  useFadeInsteadOfSlide: 0
+  useCanvasEdge: 1
   startOffsetRight: 800
   endOffsetLeft: 800
   autoToggleActive: 1
