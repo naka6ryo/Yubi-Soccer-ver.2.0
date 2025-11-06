@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using YubiSoccer.Environment; // BreakableProximityGlass.RegisterBallForAll
 using YubiSoccer.UI; // BallOffScreenIndicator.RegisterBallForAll
+using YubiSoccer.Game; // GoalResetManager
 
 public class SoccerBallCreator : MonoBehaviour
 {
@@ -51,6 +52,17 @@ public class SoccerBallCreator : MonoBehaviour
                 BreakableProximityGlass.RegisterBallForAll(localSoccerBallInstance.transform);
                 // 生成したボールTransformを全BallOffScreenIndicatorへ配布
                 BallOffScreenIndicator.RegisterBallForAll(localSoccerBallInstance.transform);
+
+                // GoalResetManager へボールを登録（初期位置として記録）
+                var goalResetManager = FindObjectOfType<GoalResetManager>();
+                if (goalResetManager != null)
+                {
+                    var rb = localSoccerBallInstance.GetComponent<Rigidbody>();
+                    if (rb != null)
+                    {
+                        goalResetManager.RegisterBall(rb);
+                    }
+                }
             }
         }
         catch (System.Exception ex)
