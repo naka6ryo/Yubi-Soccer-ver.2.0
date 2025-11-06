@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
 using YubiSoccer.VFX;
+using System.Diagnostics;
 
 namespace YubiSoccer.Player
 {
@@ -150,6 +151,10 @@ namespace YubiSoccer.Player
         private Coroutine recoilRoutine;
         private readonly HashSet<Rigidbody> kickedThisActivation = new HashSet<Rigidbody>();
 
+        // サウンド用変数
+        private SoundManager soundManager;
+        [SerializeField] private float strongKickWall = 0.7f; // 強いキックの閾値
+
         private void Awake()
         {
             EnsureCollider();
@@ -161,6 +166,7 @@ namespace YubiSoccer.Player
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
             if (radiusIndicator != null)
                 radiusIndicator.SetCenter(transform);
+            soundManager = SoundManager.Instance;
         }
 
         private void OnValidate()
@@ -236,6 +242,7 @@ namespace YubiSoccer.Player
                         if (Input.GetKeyDown(kickKey))
                         {
                             state = KickState.Charging;
+                            soundManager.PlaySE("チャージ");
                             chargeTime = 0f;
                         }
                         break;
@@ -252,6 +259,7 @@ namespace YubiSoccer.Player
                             float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                             lastCharge01 = charge01;
                             lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+                            soundManager.StopSE();
                             BeginKick();
                         }
                         break;
@@ -302,6 +310,11 @@ namespace YubiSoccer.Player
                 activeExpandSpeed = expandSpeed;
                 activeShrinkSpeed = shrinkSpeed;
             }
+
+            // キックの強さで音を切り替えて再生
+            if (lastCharge01 <= strongKickWall)soundManager.PlaySE("強いキック");
+            else soundManager.PlaySE("普通のキック");        
+
             // 視覚的反動を開始
             StartRecoil();
 
@@ -388,6 +401,7 @@ namespace YubiSoccer.Player
             if (state != KickState.Idle) return;
             lastKickPowerMultiplier = 1f;
             lastCharge01 = 0f;
+            soundManager.PlaySE("普通のキック");
             BeginKick();
         }
 
@@ -400,6 +414,8 @@ namespace YubiSoccer.Player
             if (state != KickState.Idle) return;
             state = KickState.Charging;
             chargeTime = 0f;
+            soundManager.PlaySE("チャージ");
+            UnityEngine.Debug.Log("[PlayerKickController] Playing SE: チャージ");
             UpdateChargingVisuals(0f, 0f);
         }
 
@@ -426,6 +442,8 @@ namespace YubiSoccer.Player
             float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
             lastCharge01 = charge01;
             lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+            soundManager.StopSE();
+            UnityEngine.Debug.Log("[PlayerKickController] Stopped SE: チャージ");
             BeginKick();
         }
 
@@ -547,7 +565,7 @@ namespace YubiSoccer.Player
             // 上方向リフト: チャージに応じて増やす
             float lift = Mathf.Max(0f, liftImpulseBase + liftImpulsePerCharge * Mathf.Clamp01(lastCharge01));
             impulse += Vector3.up * lift;
-
+    
             rb.AddForce(impulse, ForceMode.Impulse);
 
             kickedThisActivation.Add(rb);

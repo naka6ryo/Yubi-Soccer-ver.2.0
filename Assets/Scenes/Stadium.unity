@@ -1838,6 +1838,19 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 858747514885235253, guid: 795929fbd2abb1f46bb4b881b5edae5b, type: 3}
   m_PrefabInstance: {fileID: 111369993}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &116121781 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1555769449232906187, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+  m_PrefabInstance: {fileID: 210188017}
+  m_PrefabAsset: {fileID: 0}
+--- !u!81 &116121788
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 116121781}
+  m_Enabled: 1
 --- !u!1001 &125302877
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4074,6 +4087,10 @@ PrefabInstance:
       value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: strongKickWall
+      value: 0.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: impactRippleDuration
       value: 0.15
       objectReference: {fileID: 0}
@@ -4240,6 +4257,9 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1884789320}
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1555769449232906187, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 116121788}
     - targetCorrespondingSourceObject: {fileID: 5667398061297613525, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       insertIndex: -1
       addedObject: {fileID: 0}

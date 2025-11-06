@@ -22,6 +22,10 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     public Camera playerCamera; // assignable in prefab; will be enabled only for local player
     [Header("Kick Control")]
     public PlayerKickController kickController;
+    
+    [Header("Sound")]
+    [Tooltip("走行中に再生するSEの間隔(秒)")]
+    [SerializeField] private float runSEInterval = 1.0f;
 
     Vector3 networkPosition;
     Quaternion networkRotation;
@@ -34,6 +38,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     private float runConfidence = 0f;
     private bool isCharging = false;
     private string currentHandState = "NONE";
+    private SoundManager soundManager;
+    
+    // 移動検出とSE制御
+    private bool isMoving = false;
+    private float runSETimer = 0f;
 
     void Start()
     {
@@ -87,6 +96,8 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         networkPosition = transform.position;
         networkRotation = transform.rotation;
+
+        soundManager = SoundManager.Instance;
 
         Debug.Log($"[PlayerController] Initialized. IsMine: {photonView.IsMine}");
     }
@@ -163,6 +174,22 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             {
                 kickController.ExternalChargeUpdate(Time.deltaTime);
             }
+            // 走行中のSEを 1 秒ごとに再生
+            if (isMoving)
+            {
+                runSETimer -= Time.deltaTime;
+                if (runSETimer <= 0f)
+                {
+                    // サウンドマネージャがあれば再生（null 安全）
+                    soundManager?.PlaySE("走る");
+                    runSETimer = Mathf.Max(0.001f, runSEInterval);
+                }
+            }
+            else
+            {
+                // 停止時はタイマーをリセットして即時再生を防ぐ
+                runSETimer = 0f;
+            }
         }
         else
         {
@@ -202,12 +229,16 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         if (forward != 0f)
         {
+            
             transform.Translate(Vector3.forward * forward * moveSpeed * Time.deltaTime);
         }
         if (turn != 0f)
         {
             transform.Rotate(Vector3.up, turn * rotationSpeed * Time.deltaTime);
         }
+
+        // 移動中フラグを更新
+        isMoving = Mathf.Abs(forward) > 0.001f;
     }
 
     // Photon serialization - send/receive transform

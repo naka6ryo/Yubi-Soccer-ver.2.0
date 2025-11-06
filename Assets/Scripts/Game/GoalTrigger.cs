@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using UnityEngine;
 using YubiSoccer.Game;
 
@@ -23,6 +24,8 @@ namespace YubiSoccer.Field
         private Collider col;
         private bool armed = true;
 
+        private SoundManager soundManager;
+
         private void Reset()
         {
             col = GetComponent<Collider>();
@@ -37,8 +40,37 @@ namespace YubiSoccer.Field
             col = GetComponent<Collider>();
             if (col != null && !col.isTrigger)
             {
-                Debug.LogWarning($"[GoalTrigger] {name}: Collider.isTrigger を true に設定します。");
+                UnityEngine.Debug.LogWarning($"[GoalTrigger] {name}: Collider.isTrigger を true に設定します。");
                 col.isTrigger = true;
+            }
+            soundManager = SoundManager.Instance;
+        }
+
+        private void Update()
+        {
+            // 1キーを押したらSEを再生
+            if (Input.GetKeyDown(KeyCode.Alpha1))
+            {
+                soundManager.PlaySE("決定");
+                UnityEngine.Debug.Log("[GoalTrigger] Played SE: 決定");
+            }
+
+            // 2キーを押したらBGMを再生
+            if (Input.GetKeyDown(KeyCode.Alpha2))
+            {
+                SoundManager.Instance.PlayBGM("タイトル");
+            }
+
+            // 3キーを押したらSEを再生
+            if (Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                SoundManager.Instance.PlayBGM("試合中");
+            }
+
+            // 4キーを押したらBGMを停止
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                SoundManager.Instance.StopBGM();
             }
         }
 
@@ -59,6 +91,17 @@ namespace YubiSoccer.Field
             }
             if (!isBall) return;
 
+            // soundManager.PlaySE("ゴール");
+            SoundManager.Instance.PlaySE("ゴール");
+            if(soundManager != null)
+            {
+                UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール");
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning("[GoalTrigger] soundManager が見つかりません。");
+            }
+
             // スコア加算
             if (ScoreManager.Instance != null)
             {
@@ -66,11 +109,11 @@ namespace YubiSoccer.Field
             }
             else
             {
-                Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
+                UnityEngine.Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
             }
 
             // ゴールイベント通知
-            try { OnGoalScored?.Invoke(awardToTeam); } catch (System.Exception e) { Debug.LogException(e); }
+            try { OnGoalScored?.Invoke(awardToTeam); } catch (System.Exception e) { UnityEngine.Debug.LogException(e); }
 
             // 再武装までのディレイ
             if (rearmDelay > 0f)

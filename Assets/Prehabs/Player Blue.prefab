@@ -165,6 +165,7 @@ MonoBehaviour:
   lerpRate: 10
   playerCamera: {fileID: 5114838246848122034}
   kickController: {fileID: 0}
+  runSEInterval: 1
   joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
@@ -495,6 +496,7 @@ MonoBehaviour:
   impactRippleSpikes: 5
   impactRippleInnerRatio: 0.45
   impactRippleLineWidth: 0.035
+  strongKickWall: 0.7
   allowExternalControl: 1
 --- !u!1 &5882613890568250856
 GameObject:
