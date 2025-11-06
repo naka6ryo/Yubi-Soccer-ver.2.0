@@ -15,11 +15,10 @@ public class StartGameButton : MonoBehaviour
 
     void Awake()
     {
-        button.onClick.AddListener(OnStartGameClicked);
         gameObject.SetActive(false);
     }
 
-    void OnStartGameClicked()
+    public void OnStartGameClicked()
     {
         Debug.Log("ボタンは押せてる");
         if (networkManager != null)
