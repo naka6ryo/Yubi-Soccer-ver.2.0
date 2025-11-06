@@ -8,6 +8,7 @@ public class SoccerBallCreator : MonoBehaviour
 {
     public string soccerPrefabName = "Soccer Ball";
     private GameObject localSoccerBallInstance;
+    private SoundManager soundManager;
     void Start()
     {
         // 部屋に入っていない場合はスキップ
@@ -22,6 +23,8 @@ public class SoccerBallCreator : MonoBehaviour
             Debug.Log("SoccerBallSpawner: I am the Master Client. Spawning soccer ball.");
             SpawnLocalSoccerBall();
         }
+
+        soundManager = SoundManager.Instance;
     }
 
     void SpawnLocalSoccerBall()
@@ -45,6 +48,7 @@ public class SoccerBallCreator : MonoBehaviour
 
         try
         {
+            soundManager.PlaySE("試合再開");
             localSoccerBallInstance = PhotonNetwork.Instantiate(soccerPrefabName, spawnPos, Quaternion.identity);
             if (localSoccerBallInstance != null)
             {

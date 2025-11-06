@@ -167,6 +167,7 @@ MonoBehaviour:
   kickController: {fileID: 0}
   physicsKickOnly: 0
   kickHitbox: {fileID: 0}
+  runSEInterval: 1
   joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
@@ -498,6 +499,7 @@ MonoBehaviour:
   impactRippleSpikes: 5
   impactRippleInnerRatio: 0.45
   impactRippleLineWidth: 0.035
+  strongKickWall: 0.7
   allowExternalControl: 1
 --- !u!1 &4626179171591283358
 GameObject:
