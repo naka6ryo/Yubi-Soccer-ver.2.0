@@ -8,20 +8,20 @@ QualitySettings:
   m_QualitySettings:
   - serializedVersion: 4
     name: Mobile
-    pixelLightCount: 2
-    shadows: 2
+    pixelLightCount: 1
+    shadows: 1
     shadowResolution: 1
     shadowProjection: 1
-    shadowCascades: 2
-    shadowDistance: 40
+    shadowCascades: 1
+    shadowDistance: 20
     shadowNearPlaneOffset: 3
     shadowCascade2Split: 0.33333334
     shadowCascade4Split: {x: 0.06666667, y: 0.2, z: 0.46666667}
     shadowmaskMode: 0
     skinWeights: 1
-    globalTextureMipmapLimit: 0
+    globalTextureMipmapLimit: 1
     textureMipmapLimitSettings: []
-    anisotropicTextures: 1
+    anisotropicTextures: 0
     antiAliasing: 0
     softParticles: 0
     softVegetation: 1

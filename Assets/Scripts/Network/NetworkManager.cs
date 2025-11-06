@@ -33,7 +33,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     [Header("GameScene")]
     [Tooltip("部屋が満員になったらマスターがロードするシーン名。Build Settings に登録してください。")]
-    public string gameSceneName = "Multi Player";
+    public string gameSceneName = "Multi Player Stadium";
 
     [Header("MatchingScene")]
     [Tooltip("マッチングシーンの名前")]

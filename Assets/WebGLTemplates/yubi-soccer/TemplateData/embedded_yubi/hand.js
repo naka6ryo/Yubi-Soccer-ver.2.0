@@ -17,6 +17,8 @@ const CFG = {
     freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
     zeroXMinAmp: 20,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
     minTipSpeedPxPerSec: 20, // 甲から離れた領域での指先速度の下限（RUN 用）
+    // RUN を即座に終了させるための低い閾値（通常の off より低く設定）
+    immediateOffThreshold: 15, // px/s これ以下になったら即座に NONE へ
   },
   kick: {
     minAngVel: 10.0, // rad/s
@@ -46,10 +48,11 @@ const CFG = {
 
 
 async function loadTasksVision() {
+  // ローカルUnityサーバは .mjs の MIME を正しく返さないため、CDN優先→ローカルの順に変更
   const candidates = [
-    './vendor/mediapipe/vision_bundle.mjs',
     'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.11/vision_bundle.mjs',
     'https://unpkg.com/@mediapipe/tasks-vision@0.10.11/vision_bundle.mjs',
+    './vendor/mediapipe/vision_bundle.mjs',
   ];
   let lastErr;
   for (const url of candidates) {
@@ -670,7 +673,12 @@ export class HandTracker {
         nextState = 'KICK';
         conf = kickScore;
         this.lastTriggerTime = now;
+      } else if (tipAmp < CFG.run.immediateOffThreshold) {
+        // 走るのをやめたら即座に NONE へ（指先速度が閾値以下）
+        nextState = 'NONE';
+        conf = 0;
       } else if (runOff) {
+        // 通常のヒステリシスによる OFF
         nextState = 'NONE';
         conf = 0;
       } else {
