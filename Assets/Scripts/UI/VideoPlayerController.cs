@@ -36,6 +36,10 @@ namespace YubiSoccer.UI
         [Tooltip("動画終了後、ローディングパネル表示までの待機時間")]
         [SerializeField] private float loadingDelay = 0.5f;
 
+        [Header("Scene Transition")]
+        [Tooltip("動画終了時に通知する NetworkSceneTransition（シーン遷移制御）")]
+        [SerializeField] private NetworkSceneTransition networkSceneTransition;
+
         [Header("Render Settings")]
         [Tooltip("Camera Far Plane: カメラに直接描画、Render Texture: テクスチャに描画、Material Override: マテリアルに適用")]
         [SerializeField] private VideoRenderMode renderMode = VideoRenderMode.CameraFarPlane;
@@ -45,6 +49,33 @@ namespace YubiSoccer.UI
         [Header("WebGL Settings")]
         [Tooltip("WebGLビルド時に動画をスキップしてすぐにローディングパネルを表示")]
         [SerializeField] private bool skipVideoOnWebGL = false;
+
+        [Header("WebGL Mobile Settings")]
+        [Tooltip("WebGL のモバイル端末向けに再生を許可するために自動でミュートする（画面サイズで判定）")]
+        [SerializeField] private bool muteOnWebGLMobile = true;
+        [Tooltip("モバイル判定のための画面サイズ閾値（幅または高さがこの値以下ならモバイルと判定）")]
+        [SerializeField] private int mobileSizeThreshold = 1024;
+        [Tooltip("最初のタッチ／クリックでアンミュートする（true 推奨）")]
+        [SerializeField] private bool unmuteOnFirstTouch = true;
+
+        [Header("Tap to Start Button (Mobile)")]
+        [Tooltip("モバイル WebGL 用：タップして開始ボタン（CanvasGroup または GameObject）")]
+        [SerializeField] private CanvasGroup tapToStartButton;
+        [Tooltip("タップボタンのフェードイン時間")]
+        [SerializeField] private float buttonFadeInDuration = 0.5f;
+        [Tooltip("タップボタンのフェードアウト時間")]
+        [SerializeField] private float buttonFadeOutDuration = 0.3f;
+        [Tooltip("ボタン点滅のサイクル時間（秒）")]
+        [SerializeField] private float buttonBlinkCycleDuration = 2f;
+        [Tooltip("ボタン点滅時の最小透明度")]
+        [SerializeField, Range(0f, 1f)] private float buttonBlinkMinAlpha = 0.5f;
+        [Tooltip("ボタン点滅時の最大透明度")]
+        [SerializeField, Range(0f, 1f)] private float buttonBlinkMaxAlpha = 1f;
+
+        private bool isMobileWebGL = false;
+        private bool awaitingFirstTouch = false;
+        private bool waitingForTapToStart = false;
+        private Coroutine blinkCoroutine = null; // 点滅コルーチンの参照
 
         private bool isReady = false;
         private bool videoStarted = false;
@@ -102,6 +133,14 @@ namespace YubiSoccer.UI
                 Debug.Log("[VideoPlayerController] Loading panel hidden");
             }
 
+            // タップして開始ボタンを初期状態で非表示（透明）にする
+            if (tapToStartButton != null)
+            {
+                tapToStartButton.alpha = 0f;
+                tapToStartButton.gameObject.SetActive(false);
+                Debug.Log("[VideoPlayerController] Tap to start button hidden");
+            }
+
             SetupVideoPlayer();
         }
 
@@ -126,15 +165,31 @@ namespace YubiSoccer.UI
             if (playOnAwake && !string.IsNullOrEmpty(webGLVideoFileName))
             {
                 Debug.Log("[VideoPlayerController] WebGL: Attempting to play video from URL...");
-                if (fadeInOnStart)
+                
+                // モバイル判定とタップボタン表示判定
+                CheckIfMobileWebGL();
+
+                if (isMobileWebGL && tapToStartButton != null)
                 {
-                    Debug.Log("[VideoPlayerController] WebGL: Preparing video with fade-in...");
-                    videoPlayer.Prepare();
+                    // モバイル: タップボタンを表示して待機
+                    Debug.Log("[VideoPlayerController] WebGL Mobile: Showing tap to start button");
+                    waitingForTapToStart = true;
+                    StartCoroutine(ShowTapToStartButton());
                 }
                 else
                 {
-                    Debug.Log("[VideoPlayerController] WebGL: Playing video without fade...");
-                    Play();
+                    // PC またはボタンなし: 従来通り自動再生
+                    Debug.Log("[VideoPlayerController] WebGL PC: Auto-playing video");
+                    if (fadeInOnStart)
+                    {
+                        Debug.Log("[VideoPlayerController] WebGL: Preparing video with fade-in...");
+                        videoPlayer.Prepare();
+                    }
+                    else
+                    {
+                        Debug.Log("[VideoPlayerController] WebGL: Playing video without fade...");
+                        Play();
+                    }
                 }
             }
             else
@@ -207,6 +262,13 @@ namespace YubiSoccer.UI
                 audioSource.volume = volume;
             }
 
+            // デフォルトではオーディオをミュートしない（必要なら MuteIfMobileWebGL で制御）
+            try
+            {
+                videoPlayer.SetDirectAudioMute(0, false);
+            }
+            catch { }
+
 #if UNITY_WEBGL && !UNITY_EDITOR
             // WebGL用の追加設定
             videoPlayer.skipOnDrop = true; // フレームドロップ時にスキップ
@@ -243,6 +305,156 @@ namespace YubiSoccer.UI
             videoPlayer.errorReceived += OnVideoError;
             videoPlayer.started += OnVideoStarted;
         }
+
+        /// <summary>
+        /// WebGLビルドかつ小画面（モバイル想定）かを判定する
+        /// </summary>
+        private void CheckIfMobileWebGL()
+        {
+            if (Application.platform != RuntimePlatform.WebGLPlayer) return;
+
+            // 簡易モバイル判定：画面サイズが閾値以下ならモバイルと見なす
+            if (Screen.width <= mobileSizeThreshold || Screen.height <= mobileSizeThreshold)
+            {
+                isMobileWebGL = true;
+                Debug.Log($"[VideoPlayerController] WebGL Mobile detected: Screen {Screen.width}x{Screen.height}");
+            }
+            else
+            {
+                isMobileWebGL = false;
+                Debug.Log($"[VideoPlayerController] WebGL PC detected: Screen {Screen.width}x{Screen.height}");
+            }
+        }
+
+        /// <summary>
+        /// タップして開始ボタンをフェードインで表示
+        /// </summary>
+        private System.Collections.IEnumerator ShowTapToStartButton()
+        {
+            if (tapToStartButton == null) yield break;
+
+            tapToStartButton.gameObject.SetActive(true);
+            tapToStartButton.alpha = 0f;
+
+            float elapsed = 0f;
+            while (elapsed < buttonFadeInDuration)
+            {
+                elapsed += Time.deltaTime;
+                tapToStartButton.alpha = Mathf.Clamp01(elapsed / buttonFadeInDuration);
+                yield return null;
+            }
+
+            tapToStartButton.alpha = 1f;
+            Debug.Log("[VideoPlayerController] Tap to start button faded in");
+
+            // フェードイン完了後、点滅アニメーションを開始
+            blinkCoroutine = StartCoroutine(BlinkTapToStartButton());
+        }
+
+        /// <summary>
+        /// タップして開始ボタンをゆっくり点滅させる
+        /// </summary>
+        private System.Collections.IEnumerator BlinkTapToStartButton()
+        {
+            if (tapToStartButton == null) yield break;
+
+            Debug.Log("[VideoPlayerController] Button blink animation started");
+
+            while (true)
+            {
+                // フェードアウト（Max → Min）
+                float elapsed = 0f;
+                float halfCycle = buttonBlinkCycleDuration / 2f;
+
+                while (elapsed < halfCycle)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / halfCycle;
+                    tapToStartButton.alpha = Mathf.Lerp(buttonBlinkMaxAlpha, buttonBlinkMinAlpha, t);
+                    yield return null;
+                }
+
+                // フェードイン（Min → Max）
+                elapsed = 0f;
+                while (elapsed < halfCycle)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / halfCycle;
+                    tapToStartButton.alpha = Mathf.Lerp(buttonBlinkMinAlpha, buttonBlinkMaxAlpha, t);
+                    yield return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// タップして開始ボタンをフェードアウトして非表示
+        /// </summary>
+        private System.Collections.IEnumerator HideTapToStartButton()
+        {
+            if (tapToStartButton == null) yield break;
+
+            float elapsed = 0f;
+            float startAlpha = tapToStartButton.alpha;
+
+            while (elapsed < buttonFadeOutDuration)
+            {
+                elapsed += Time.deltaTime;
+                tapToStartButton.alpha = Mathf.Lerp(startAlpha, 0f, elapsed / buttonFadeOutDuration);
+                yield return null;
+            }
+
+            tapToStartButton.alpha = 0f;
+            tapToStartButton.gameObject.SetActive(false);
+            Debug.Log("[VideoPlayerController] Tap to start button faded out");
+        }
+
+        /// <summary>
+        /// タップボタンがクリック/タップされたときに呼ぶ public メソッド（Button の OnClick から呼ぶ）
+        /// </summary>
+        public void OnTapToStartClicked()
+        {
+            if (!waitingForTapToStart) return;
+
+            Debug.Log("[VideoPlayerController] Tap to start button clicked!");
+            waitingForTapToStart = false;
+
+            // 点滅アニメーションを停止
+            if (blinkCoroutine != null)
+            {
+                StopCoroutine(blinkCoroutine);
+                blinkCoroutine = null;
+                Debug.Log("[VideoPlayerController] Button blink animation stopped");
+            }
+
+            // ボタンをフェードアウト
+            StartCoroutine(HideTapToStartButton());
+
+            // 動画を音ありでフェードイン再生
+            // モバイルでも音を出すため、ミュートしない
+            if (audioSource != null)
+            {
+                audioSource.mute = false;
+            }
+            try
+            {
+                videoPlayer.SetDirectAudioMute(0, false);
+            }
+            catch { }
+
+            // 動画準備＆再生開始
+            if (fadeInOnStart)
+            {
+                Debug.Log("[VideoPlayerController] Mobile: Preparing video with fade-in and audio...");
+                videoPlayer.Prepare();
+            }
+            else
+            {
+                Debug.Log("[VideoPlayerController] Mobile: Playing video with audio...");
+                Play();
+            }
+        }
+
+        // Update は削除（タップボタンの onClick イベントで制御するため不要）
 
         /// <summary>
         /// 動画が開始されたときのコールバック
@@ -287,13 +499,13 @@ namespace YubiSoccer.UI
         /// </summary>
         public void Play()
         {
-            if (videoPlayer != null && videoClip != null)
+            if (videoPlayer != null)
             {
                 videoPlayer.Play();
             }
             else
             {
-                Debug.LogWarning("[VideoPlayerController] VideoPlayer or VideoClip is not set!");
+                Debug.LogWarning("[VideoPlayerController] VideoPlayer is not set!");
             }
         }
 
@@ -350,13 +562,17 @@ namespace YubiSoccer.UI
         {
             Debug.Log("[VideoPlayerController] Video finished!");
 
+            // NetworkSceneTransition に動画終了を通知
+            if (networkSceneTransition != null)
+            {
+                networkSceneTransition.OnVideoFinished();
+            }
+
             // 動画終了後、少し待ってからローディングパネルを表示
             if (loadingPanel != null)
             {
                 StartCoroutine(ShowLoadingPanelAfterDelay());
             }
-
-            // ここで次の処理を実行（例: シーン遷移、UI表示など）
         }
 
         /// <summary>
@@ -443,6 +659,12 @@ namespace YubiSoccer.UI
 
         private void OnDestroy()
         {
+            // 点滅コルーチンを停止
+            if (blinkCoroutine != null)
+            {
+                StopCoroutine(blinkCoroutine);
+            }
+
             // イベント解除
             if (videoPlayer != null)
             {
