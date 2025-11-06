@@ -29,6 +29,8 @@ namespace YubiSoccer.Game
         [Tooltip("自動でシーン内の BreakableProximityGlassSpawner を収集する")]
         [SerializeField] private bool autoFindSpawners = true;
         [SerializeField] private BreakableProximityGlassSpawner[] spawners;
+        [Tooltip("ボールリセット後、ガラス再生成までの遅延時間(秒)")]
+        [SerializeField, Min(0f)] private float glassRespawnDelay = 0.5f;
 
         // 試合タイマー連携は Countdown UI 側に移譲（本クラスでは管理しない）
 
@@ -101,6 +103,25 @@ namespace YubiSoccer.Game
                 if (resetBall)
                 {
                     ResetBall();
+
+                    // ボールリセット後、追加の遅延を待つ
+                    if (glassRespawnDelay > 0f)
+                    {
+                        Debug.Log($"[GoalResetManager] Waiting {glassRespawnDelay} seconds before glass respawn...");
+                        yield return new WaitForSeconds(glassRespawnDelay);
+                    }
+                }
+                else
+                {
+                    // 非ホストも同じタイミングでガラス再生成できるよう、同じだけ待機
+                    float totalWait = delaySeconds + glassRespawnDelay;
+                    float alreadyWaited = delaySeconds;
+                    float remaining = totalWait - alreadyWaited;
+                    if (remaining > 0f)
+                    {
+                        Debug.Log($"[GoalResetManager] Non-host waiting additional {remaining} seconds for sync...");
+                        yield return new WaitForSeconds(remaining);
+                    }
                 }
 
                 // BreakableProximityGlass の復元（全クライアントで実行）
