@@ -172,6 +172,10 @@ namespace YubiSoccer.Player
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
             if (radiusIndicator != null)
                 radiusIndicator.SetCenter(transform);
+        }
+
+        void Start()
+        {
             soundManager = SoundManager.Instance;
         }
 

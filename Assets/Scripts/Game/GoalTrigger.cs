@@ -43,6 +43,10 @@ namespace YubiSoccer.Field
                 UnityEngine.Debug.LogWarning($"[GoalTrigger] {name}: Collider.isTrigger を true に設定します。");
                 col.isTrigger = true;
             }
+        }
+
+        void Start()
+        {
             soundManager = SoundManager.Instance;
         }
 
