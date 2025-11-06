@@ -76,7 +76,7 @@ namespace YubiSoccer.Game
         {
             Debug.Log($"[GoalResetManager] Goal detected. Starting reset countdown... (IsMasterClient={PhotonNetwork.IsMasterClient}, IsConnected={PhotonNetwork.IsConnected})");
             StopAllCoroutines();
-            
+
             // ボールリセットは MasterClient のみ、ガラス再生成は全クライアント
             bool isMaster = !PhotonNetwork.IsConnected || PhotonNetwork.IsMasterClient;
             StartCoroutine(CoResetAfterDelay(isMaster));
