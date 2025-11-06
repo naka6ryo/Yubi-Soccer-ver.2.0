@@ -78,7 +78,7 @@ namespace YubiSoccer.UI
 
         private void Start()
         {
-            if (autoPlayOnStart) Play();
+            //if (autoPlayOnStart) Play();
         }
 
         public void Play()
