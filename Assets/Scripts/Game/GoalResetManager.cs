@@ -29,6 +29,8 @@ namespace YubiSoccer.Game
         [Tooltip("自動でシーン内の BreakableProximityGlassSpawner を収集する")]
         [SerializeField] private bool autoFindSpawners = true;
         [SerializeField] private BreakableProximityGlassSpawner[] spawners;
+        [Tooltip("ボールリセット後、ガラス再生成までの遅延時間(秒)")]
+        [SerializeField, Min(0f)] private float glassRespawnDelay = 0.5f;
 
         // 試合タイマー連携は Countdown UI 側に移譲（本クラスでは管理しない）
 
@@ -59,7 +61,6 @@ namespace YubiSoccer.Game
             initialPos = rb.transform.position;
             initialRot = rb.transform.rotation;
             initialPositionSet = true;
-            Debug.Log($"[GoalResetManager] Ball registered. Initial position: {initialPos}, rotation: {initialRot.eulerAngles}");
         }
 
         private void OnEnable()
@@ -74,7 +75,6 @@ namespace YubiSoccer.Game
 
         private void HandleGoal(Team scoredFor)
         {
-            Debug.Log($"[GoalResetManager] Goal detected. Starting reset countdown... (IsMasterClient={PhotonNetwork.IsMasterClient}, IsConnected={PhotonNetwork.IsConnected})");
             StopAllCoroutines();
 
             // ボールリセットは MasterClient のみ、ガラス再生成は全クライアント
@@ -84,11 +84,8 @@ namespace YubiSoccer.Game
 
         private IEnumerator CoResetAfterDelay(bool resetBall)
         {
-            Debug.Log($"[GoalResetManager] Waiting {delaySeconds} seconds before reset... (resetBall={resetBall})");
             if (delaySeconds > 0f)
                 yield return new WaitForSeconds(delaySeconds);
-
-            Debug.Log($"[GoalResetManager] Delay complete. Starting reset... (reloadScene={reloadScene}, resetBall={resetBall})");
 
             if (reloadScene)
             {
@@ -101,12 +98,29 @@ namespace YubiSoccer.Game
                 if (resetBall)
                 {
                     ResetBall();
+
+                    // ボールリセット後、追加の遅延を待つ
+                    if (glassRespawnDelay > 0f)
+                    {
+                        yield return new WaitForSeconds(glassRespawnDelay);
+                    }
+                }
+                else
+                {
+                    // 非ホストも同じタイミングでガラス再生成できるよう、同じだけ待機
+                    float totalWait = delaySeconds + glassRespawnDelay;
+                    float alreadyWaited = delaySeconds;
+                    float remaining = totalWait - alreadyWaited;
+                    if (remaining > 0f)
+                    {
+                        yield return new WaitForSeconds(remaining);
+                    }
                 }
 
-                // BreakableProximityGlass の復元（全クライアントで実行）
+                // BreakableProximityGlass の復元(全クライアントで実行)
                 ResetExistingGlasses();
 
-                // Spawnerがあれば不足分を再生成（全クライアントで実行）
+                // Spawnerがあれば不足分を再生成(全クライアントで実行)
                 RespawnGlasses();
 
                 // マッチタイマーの開始は PreGameCountdown 等の UI 側で行います
@@ -140,17 +154,12 @@ namespace YubiSoccer.Game
                 }
             }
 
-            Debug.Log($"[GoalResetManager] Resetting ball from {ballRigidbody.transform.position} to {initialPos}");
-            Debug.Log($"[GoalResetManager] Current velocity: {ballRigidbody.linearVelocity}, angularVelocity: {ballRigidbody.angularVelocity}");
-
             // 速度をゼロにする
             ballRigidbody.linearVelocity = Vector3.zero;
             ballRigidbody.angularVelocity = Vector3.zero;
 
             // 位置・回転を初期値に戻す（PhotonTransformView/BallNetworkSync があれば自動で同期される）
             ballRigidbody.transform.SetPositionAndRotation(initialPos, initialRot);
-
-            Debug.Log($"[GoalResetManager] Ball reset complete. New position: {ballRigidbody.transform.position}");
         }
 
         private void ResetExistingGlasses()

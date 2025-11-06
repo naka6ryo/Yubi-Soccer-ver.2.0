@@ -89,8 +89,6 @@ public class JoystickPositionController : MonoBehaviour
         {
             joystickRect.anchoredPosition = targetAnchoredPosition;
         }
-
-        Debug.Log($"JoystickPositionController: Set side to {side} (camera on {side}, joystick on {(side == "left" ? "right" : "left")})");
     }
 
     /// <summary>

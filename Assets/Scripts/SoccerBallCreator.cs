@@ -19,7 +19,6 @@ public class SoccerBallCreator : MonoBehaviour
 
         if (PhotonNetwork.IsMasterClient)
         {
-            Debug.Log("SoccerBallSpawner: I am the Master Client. Spawning soccer ball.");
             SpawnLocalSoccerBall();
         }
     }
@@ -40,8 +39,6 @@ public class SoccerBallCreator : MonoBehaviour
             12.95f,
             1821.66f
         );
-
-        Debug.Log($"SoccerBallSpawner: Instantiating '{soccerPrefabName}' at {spawnPos}");
 
         try
         {
