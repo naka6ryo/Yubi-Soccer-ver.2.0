@@ -99,4 +99,19 @@ public class SoundManager : MonoBehaviour
         bgmSource.Stop();
         bgmSource.clip = null;
     }
+
+    /// <summary>
+    /// SEを停止する
+    /// チャージ中状態のSEを止めるときに使用
+    /// </summary>
+    /// <returns></returns>
+    public bool StopSE()
+    {
+        if (seSource.isPlaying)
+        {
+            seSource.Stop();
+            return true;
+        }
+        return false;
+    }
 }
