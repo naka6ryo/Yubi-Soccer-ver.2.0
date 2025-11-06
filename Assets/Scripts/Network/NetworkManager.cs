@@ -25,6 +25,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool autoConnectOnStart = true;
 
     [Header("UI (optional)")]
+    
+    [Tooltip("ゲーム開始ボタン（マッチングシーンに配置）")]
+    public StartGameButton startGameButton;
     [Tooltip("ステータス表示クラス（オプション）")]
     public StatusDisplay statusDisplay;
 
@@ -38,8 +41,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     bool joinAfterConnect = false;
 
+    void Awake()
+    {
+        PhotonNetwork.AutomaticallySyncScene = true;
+    }
+
     void Start()
     {
+        if (PhotonNetwork.InRoom)
+        {
+            Log($"Already in room: {PhotonNetwork.CurrentRoom.Name}");
+            return;
+        }
+
         // If user provided an AppId in the inspector, override the project's PhotonServerSettings at runtime.
         if (!string.IsNullOrEmpty(appId))
         {
@@ -53,8 +67,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 Debug.LogWarning("NetworkManager: PhotonServerSettings or AppSettings is null. Make sure Photon PUN is imported.");
             }
         }
-
-        PhotonNetwork.AutomaticallySyncScene = true;
 
         if (autoConnectOnStart && !PhotonNetwork.IsConnected)
         {
@@ -127,24 +139,43 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Log($"Player entered: {newPlayer.NickName} ({PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
 
-        // 部屋が満員になったらマスタークライアントがシーンをロード（AutomaticallySyncScene = true 前提）
         if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
         {
-            Log($"Room full. MasterClient loading '{gameSceneName}'...");
-            try
-            {
-                PhotonNetwork.LoadLevel(gameSceneName);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
-            }
+            startGameButton.SetVisible(true);
+            Log("Room is now full. Master client can start the game.");
         }
     }
 
     public override void OnDisconnected(DisconnectCause cause)
     {
         Log($"Disconnected from Photon: {cause}");
+    }
+
+    public void StartGame()
+    {
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            Debug.LogWarning("StartGame can only be called by the Master Client.");
+            return;
+        }
+
+        if (PhotonNetwork.CurrentRoom.PlayerCount < PhotonNetwork.CurrentRoom.MaxPlayers)
+        {
+            Debug.LogWarning("Cannot start game - room is not full yet.");
+            return;
+        }
+
+        try
+        {
+            Log($"Master starting game... Loading '{gameSceneName}'");
+            var props = new ExitGames.Client.Photon.Hashtable { { "gameStarted", true } };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+            PhotonNetwork.LoadLevel(gameSceneName);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
+        }
     }
 
     void Log(string text)
