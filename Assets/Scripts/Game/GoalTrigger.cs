@@ -59,7 +59,10 @@ namespace YubiSoccer.Field
             }
             if (!isBall) return;
 
-            // スコア加算
+            // ゴールイベント通知（スコア加算前に通知して、UIアニメーションを先に開始）
+            OnGoalScored?.Invoke(awardToTeam);
+
+            // スコア加算（点滅アニメーション開始）
             if (ScoreManager.Instance != null)
             {
                 ScoreManager.Instance.AddScore(awardToTeam, 1);
@@ -68,9 +71,6 @@ namespace YubiSoccer.Field
             {
                 Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
             }
-
-            // ゴールイベント通知
-            try { OnGoalScored?.Invoke(awardToTeam); } catch (System.Exception e) { Debug.LogException(e); }
 
             // 再武装までのディレイ
             if (rearmDelay > 0f)
