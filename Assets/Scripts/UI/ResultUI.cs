@@ -15,6 +15,10 @@ namespace YubiSoccer.UI
         [SerializeField] private TMP_Text redScoreText;  // TEAM A (赤)
         [SerializeField] private TMP_Text blueScoreText; // TEAM B (青)
 
+        [Header("Hide on Result")]
+        [Tooltip("リザルト表示時に非表示にするGameObjectのリスト")]
+        [SerializeField] private GameObject[] objectsToHide;
+
         [Header("Display Settings")]
         [SerializeField] private string redWinMessage = "TEAM A WIN!";
         [SerializeField] private string blueWinMessage = "TEAM B WIN!";
@@ -41,6 +45,20 @@ namespace YubiSoccer.UI
             {
                 resultPanel.SetActive(false);
             }
+
+            // テキストも初期化（Panelが非表示でも念のため）
+            if (winnerText != null)
+            {
+                winnerText.text = "";
+            }
+            if (redScoreText != null)
+            {
+                redScoreText.text = "";
+            }
+            if (blueScoreText != null)
+            {
+                blueScoreText.text = "";
+            }
         }
 
         /// <summary>
@@ -55,15 +73,15 @@ namespace YubiSoccer.UI
             }
 
             // ScoreManager からスコア情報を取得
-            var scoreManager = FindFirstObjectByType<ScoreManager>();
+            var scoreManager = ScoreManager.Instance;
             if (scoreManager == null)
             {
                 Debug.LogError("[ResultUI] ScoreManager not found!");
                 return;
             }
 
-            int redScore = scoreManager.redScore;
-            int blueScore = scoreManager.blueScore;
+            int redScore = scoreManager.GetScore(Team.TeamA);
+            int blueScore = scoreManager.GetScore(Team.TeamB);
 
             // 勝敗判定
             string winnerMessage;
@@ -98,8 +116,28 @@ namespace YubiSoccer.UI
                 blueScoreText.color = blueTeamColor;
             }
 
+            // 指定されたオブジェクトを非表示にする
+            HideObjects();
+
             // パネルを表示
             resultPanel.SetActive(true);
+        }
+
+        /// <summary>
+        /// リストに登録されたオブジェクトを非表示にする
+        /// </summary>
+        private void HideObjects()
+        {
+            if (objectsToHide == null || objectsToHide.Length == 0)
+                return;
+
+            foreach (var obj in objectsToHide)
+            {
+                if (obj != null)
+                {
+                    obj.SetActive(false);
+                }
+            }
         }
 
         /// <summary>
