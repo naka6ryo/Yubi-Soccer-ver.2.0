@@ -22,6 +22,14 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     public Camera playerCamera; // assignable in prefab; will be enabled only for local player
     [Header("Kick Control")]
     public PlayerKickController kickController;
+        [Tooltip("true の場合、AddForce を使う KickController を呼ばず、物理衝突用のヒットボックス拡大のみでキックします。")]
+    public bool physicsKickOnly = false;
+    [Tooltip("物理キック専用: コライダー拡大型のコンポーネント。auto-find します。")]
+    public YubiSoccer.Player.KickHitboxExpander kickHitbox;
+
+    [Header("Sound")]
+    [Tooltip("走行中に再生するSEの間隔(秒)")]
+    [SerializeField] private float runSEInterval = 1.0f;
 
     Vector3 networkPosition;
     Quaternion networkRotation;

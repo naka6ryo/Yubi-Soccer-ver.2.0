@@ -5,6 +5,7 @@ using YubiSoccer.VFX;
 using System.Diagnostics;
 using Photon.Pun;
 using YubiSoccer.Network;
+using System.Diagnostics;
 
 namespace YubiSoccer.Player
 {
