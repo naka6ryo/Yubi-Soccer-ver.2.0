@@ -41,6 +41,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     bool joinAfterConnect = false;
 
+    void Awake()
+    {
+        PhotonNetwork.AutomaticallySyncScene = true;
+    }
+
     void Start()
     {
         if (PhotonNetwork.InRoom)
@@ -49,8 +54,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             // Matching シーンにいて満員なら StartGameButton を表示
             return;
         }
-
-        PhotonNetwork.AutomaticallySyncScene = true;
 
         if (autoConnectOnStart && !PhotonNetwork.IsConnected)
         {
@@ -170,9 +173,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        Log($"Master starting game... Loading '{gameSceneName}'");
         try
         {
+            Log($"Master starting game... Loading '{gameSceneName}'");
+            var props = new ExitGames.Client.Photon.Hashtable { { "gameStarted", true } };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
             PhotonNetwork.LoadLevel(gameSceneName);
         }
         catch (Exception ex)
