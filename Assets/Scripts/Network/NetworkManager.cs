@@ -68,8 +68,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             }
         }
 
-        PhotonNetwork.AutomaticallySyncScene = true;
-
         if (autoConnectOnStart && !PhotonNetwork.IsConnected)
         {
             Log("Connecting to Photon...");
