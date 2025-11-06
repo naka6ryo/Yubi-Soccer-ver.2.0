@@ -51,15 +51,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.InRoom)
         {
             Log($"Already in room: {PhotonNetwork.CurrentRoom.Name}");
-            // Matching シーンにいて満員なら StartGameButton を表示
             return;
         }
 
-        if (autoConnectOnStart && !PhotonNetwork.IsConnected)
-        {
-            Log("Connecting to Photon...");
-            PhotonNetwork.ConnectUsingSettings();
-        }
         // If user provided an AppId in the inspector, override the project's PhotonServerSettings at runtime.
         if (!string.IsNullOrEmpty(appId))
         {
