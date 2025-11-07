@@ -27,6 +27,8 @@ namespace YubiSoccer.UI
         [SerializeField] private GameObject loadingPanel; // 遷移時に非表示にする
 
         private bool isTransitioning = false;
+        private bool videoFinished = false; // 動画終了フラグ
+        private bool connectedToMaster = false; // サーバー接続完了フラグ
 
         private void Awake()
         {
@@ -43,10 +45,37 @@ namespace YubiSoccer.UI
         public override void OnConnectedToMaster()
         {
             Debug.Log("[NetworkSceneTransition] Connected to Master Server!");
+            connectedToMaster = true;
 
-            if (transitionOnConnected && !isTransitioning)
+            // 動画終了済みかつ接続完了したらシーン遷移
+            if (transitionOnConnected && !isTransitioning && videoFinished)
             {
+                Debug.Log("[NetworkSceneTransition] Video finished and connected. Starting transition...");
                 StartCoroutine(TransitionToScene());
+            }
+            else if (!videoFinished)
+            {
+                Debug.Log("[NetworkSceneTransition] Waiting for video to finish...");
+            }
+        }
+
+        /// <summary>
+        /// 動画終了時に VideoPlayerController から呼ばれる
+        /// </summary>
+        public void OnVideoFinished()
+        {
+            Debug.Log("[NetworkSceneTransition] Video finished!");
+            videoFinished = true;
+
+            // 接続済みならシーン遷移開始
+            if (connectedToMaster && transitionOnConnected && !isTransitioning)
+            {
+                Debug.Log("[NetworkSceneTransition] Connected and video finished. Starting transition...");
+                StartCoroutine(TransitionToScene());
+            }
+            else if (!connectedToMaster)
+            {
+                Debug.Log("[NetworkSceneTransition] Waiting for connection to Master Server...");
             }
         }
 
