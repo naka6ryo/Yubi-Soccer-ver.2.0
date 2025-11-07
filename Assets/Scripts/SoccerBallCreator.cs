@@ -11,6 +11,8 @@ public class SoccerBallCreator : MonoBehaviour
     private SoundManager soundManager;
     void Start()
     {
+        soundManager = SoundManager.Instance;
+        
         // 部屋に入っていない場合はスキップ
         if (!PhotonNetwork.IsConnected || !PhotonNetwork.InRoom)
         {
@@ -22,8 +24,6 @@ public class SoccerBallCreator : MonoBehaviour
         {
             SpawnLocalSoccerBall();
         }
-
-        soundManager = SoundManager.Instance;
     }
 
     void SpawnLocalSoccerBall()
