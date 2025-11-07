@@ -108,6 +108,28 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         networkRotation = transform.rotation;
 
         soundManager = SoundManager.Instance;
+
+        // リモートプレイヤーの AudioListener を無効化（念のため）
+    if (!photonView.IsMine)
+    {
+        var audioListener = GetComponent<AudioListener>();
+        if (audioListener != null)
+        {
+            audioListener.enabled = false;
+            Debug.Log("[PlayerController] Disabled AudioListener for remote player");
+        }
+        
+        // カメラにも AudioListener がある場合は無効化
+        if (playerCamera != null)
+        {
+            var cameraListener = playerCamera.GetComponent<AudioListener>();
+            if (cameraListener != null)
+            {
+                cameraListener.enabled = false;
+                Debug.Log("[PlayerController] Disabled camera AudioListener for remote player");
+            }
+        }
+    }
     }
 
     // 手の状態が変化したときに呼ばれるコールバック
