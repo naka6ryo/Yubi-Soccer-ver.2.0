@@ -96,6 +96,20 @@ public class HandStateReceiver : MonoBehaviour
 
         // Always log raw incoming payload so we can see it in the browser console for WebGL builds
         try { Debug.Log("HandStateReceiver.OnEmbeddedState raw: " + (json ?? "(null)")); } catch { }
+
+        // Diagnostic: log which local Photon actor (if any) is processing this embedded input.
+        try
+        {
+            string actorInfo = "-not-in-room-";
+            try
+            {
+                if (Photon.Pun.PhotonNetwork.InRoom && Photon.Pun.PhotonNetwork.LocalPlayer != null)
+                    actorInfo = Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber.ToString();
+            }
+            catch { /* ignore if Photon not available at runtime */ }
+            Debug.Log($"HandStateReceiver: processed on local actor={actorInfo}");
+        }
+        catch { }
         ;
         if (string.IsNullOrEmpty(json)) return;
         EmbeddedStatePayload payload = null;

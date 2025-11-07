@@ -11,6 +11,11 @@ using YubiSoccer.Player;
 [RequireComponent(typeof(PhotonView))]
 public class PlayerController : MonoBehaviourPun, IPunObservable
 {
+    // デバッグログを詳細に出すかどうか（Inspector から切り替え可能）
+    [SerializeField]
+    [Tooltip("詳細ログを有効にすると HandState イベント受信などのデバッグログを出します。通常は OFF にしてください。")]
+    private bool verboseLog = false;
+
     [Header("Movement")]
     public float moveSpeed = 3f; // units per second
     public float rotationSpeed = 120f; // degrees per second
@@ -20,13 +25,16 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
     [Header("Runtime refs")]
     public Camera playerCamera; // assignable in prefab; will be enabled only for local player
+
     [Header("Kick Control")]
     public PlayerKickController kickController;
+
     [Tooltip("true の場合、AddForce を使う KickController を呼ばず、物理衝突用のヒットボックス拡大のみでキックします。")]
     public bool physicsKickOnly = false;
+
     [Tooltip("物理キック専用: コライダー拡大型のコンポーネント。auto-find します。")]
     public YubiSoccer.Player.KickHitboxExpander kickHitbox;
-    
+
     [Header("Sound")]
     [Tooltip("走行中に再生するSEの間隔(秒)")]
     [SerializeField] private float runSEInterval = 1.0f;
@@ -43,27 +51,41 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     private bool isCharging = false;
     private string currentHandState = "NONE";
     private SoundManager soundManager;
-    
+
     // 移動検出とSE制御
     private bool isMoving = false;
     private float runSETimer = 0f;
 
     void Start()
     {
-        // Find HandStateReceiver in the scene
+        // Start は必ずログを出してインスタンスの所有状態を確認しやすくする
+        Debug.Log($"[PlayerController] Start called on {gameObject.name} IsMine={photonView.IsMine}");
+
+        // Find HandStateReceiver in the scene（購読はローカルのみ）
         receiver = FindFirstObjectByType<HandStateReceiver>();
 
-        // イベントリスナーを登録
+        // イベントリスナーはローカルプレイヤーのインスタンスにのみ登録する
+        // これにより、ブラウザ埋め込み等から来る手の入力が全プレイヤーのコントローラに
+        // 伝播してしまい、他プレイヤーのキックが勝手に発動する問題を防ぐ
         if (receiver != null)
         {
-            receiver.onStateChanged.AddListener(OnHandStateChanged);
+            if (photonView.IsMine)
+            {
+                receiver.onStateChanged.AddListener(OnHandStateChanged);
+                if (verboseLog) Debug.Log($"[PlayerController] Registered HandStateReceiver listener on {gameObject.name} (IsMine=true)");
+            }
+            else
+            {
+                if (verboseLog) Debug.Log($"[PlayerController] Skipped registering HandStateReceiver on {gameObject.name} (IsMine=false)");
+            }
         }
         else
         {
-            Debug.LogWarning("[PlayerController] HandStateReceiver not found in scene!");
+            if (photonView.IsMine)
+                Debug.LogWarning("[PlayerController] HandStateReceiver not found in scene!");
         }
 
-        // ジョイスティックが見つからない場合は自動検索
+        // ジョイスティックが見つからない場合は自動検索（UI入力なのでシーン検索OK）
         if (joystick == null)
         {
             joystick = FindFirstObjectByType<FixedJoystick>();
@@ -88,31 +110,59 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
                 catch { /* 環境により未参照でも問題なし */ }
             }
         }
-        // KickController の自動取得
+
+        // --- KickController / KickHitbox の安全な自動取得（自分のルート配下限定）---
+        var myRoot = photonView.transform.root;
+
         if (kickController == null)
-        {
-            kickController = GetComponent<PlayerKickController>();
-            if (kickController == null)
-            {
-                kickController = FindFirstObjectByType<PlayerKickController>();
-            }
-        }
-        // KickHitboxExpander の自動取得
+            kickController = myRoot.GetComponentInChildren<PlayerKickController>(true);
+
         if (kickHitbox == null)
+            kickHitbox = myRoot.GetComponentInChildren<YubiSoccer.Player.KickHitboxExpander>(true);
+
+        // 所有者一致チェック（誤配線検出）
+        if (kickController != null && !BelongsToThisPlayer(kickController))
         {
-            kickHitbox = GetComponentInChildren<YubiSoccer.Player.KickHitboxExpander>();
+            var other = kickController.GetComponentInParent<PhotonView>();
+            Debug.LogError($"[PlayerController] Miswired kickController (mine={photonView.ViewID}, theirs={(other ? other.ViewID : -1)}). Clearing reference.");
+            kickController = null;
         }
-        // 外部制御は PlayerKickController 側で許可されていれば共存するため、強制切替は不要
+        if (kickHitbox != null && !BelongsToThisPlayer(kickHitbox))
+        {
+            var other = kickHitbox.GetComponentInParent<PhotonView>();
+            Debug.LogError($"[PlayerController] Miswired kickHitbox (mine={photonView.ViewID}, theirs={(other ? other.ViewID : -1)}). Clearing reference.");
+            kickHitbox = null;
+        }
 
         networkPosition = transform.position;
         networkRotation = transform.rotation;
 
         soundManager = SoundManager.Instance;
+
+        // AudioListener の設定（非所有インスタンスでは無効化）
+        ConfigureAudioListenerForOwnership();
+
+        // 開発時や外部から明示的にログを有効化できるようにする (PlayerCreator などから呼ぶ)
+        // 注意: デフォルトは Inspector の値を尊重します。
+    }
+
+    /// <summary>
+    /// 外部から詳細ログの有効/無効を切り替えるための公開メソッド。
+    /// PlayerCreator などがインスタンス化直後に呼び出してデバッグログを出せるようにします。
+    /// </summary>
+    public void SetVerboseLogging(bool enabled)
+    {
+        verboseLog = enabled;
+        if (verboseLog)
+        {
+            Debug.Log($"[PlayerController] Verbose logging enabled on {gameObject.name} IsMine={photonView.IsMine}");
+        }
     }
 
     // 手の状態が変化したときに呼ばれるコールバック
     void OnHandStateChanged(string state, float confidence)
     {
+        if (verboseLog) Debug.Log($"[PlayerController] OnHandStateChanged called on {gameObject.name} IsMine={photonView.IsMine} state={state} confidence={confidence}");
         // RUN 状態の場合は即座にフラグを立てる
         if (state == "RUN")
         {
@@ -205,7 +255,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     void OnDestroy()
     {
         // イベントリスナーを解除
-        if (receiver != null)
+        if (receiver != null && photonView.IsMine)
         {
             receiver.onStateChanged.RemoveListener(OnHandStateChanged);
         }
@@ -278,7 +328,6 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         if (forward != 0f)
         {
-            
             transform.Translate(Vector3.forward * forward * moveSpeed * Time.deltaTime);
         }
         if (turn != 0f)
@@ -288,6 +337,28 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
         // 移動中フラグを更新
         isMoving = Mathf.Abs(forward) > 0.001f;
+    }
+
+    // AudioListener の多重存在による警告を抑制するため、プレイヤー(prefab)に含まれる AudioListener を
+    // 非オーナーでは無効化、オーナーのみ有効化する。これにより "There are 2 audio listeners" の警告を回避する。
+    // （シーン側の Main Camera に AudioListener がある前提）
+    private void ConfigureAudioListenerForOwnership()
+    {
+        var al = GetComponentInChildren<AudioListener>(true);
+        if (al != null)
+        {
+            // Let the centralized manager decide which listener should be enabled to guarantee exactly one.
+            try
+            {
+                AudioListenerManager.Instance.RegisterLocalListener(al, photonView.IsMine);
+            }
+            catch
+            {
+                // Fallback to previous behavior if the manager is not available for some reason
+                al.enabled = photonView.IsMine;
+            }
+            if (verboseLog) Debug.Log($"[PlayerController] AudioListener on {gameObject.name} enabled={al.enabled}");
+        }
     }
 
     // Photon serialization - send/receive transform
@@ -303,5 +374,14 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             networkPosition = (Vector3)stream.ReceiveNext();
             networkRotation = (Quaternion)stream.ReceiveNext();
         }
+    }
+
+    // ---- Helper ----
+    // 渡されたコンポーネントが「このプレイヤー（同じ PhotonView ルート）」に属しているか検証
+    private bool BelongsToThisPlayer(Component c)
+    {
+        if (c == null) return false;
+        var pv = c.GetComponentInParent<PhotonView>();
+        return pv != null && pv == photonView;
     }
 }

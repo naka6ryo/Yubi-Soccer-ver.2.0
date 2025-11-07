@@ -161,14 +161,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0344aabda963d08438a614a22175027c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  verboseLog: 1
   moveSpeed: 8
   rotationSpeed: 120
   lerpRate: 10
   playerCamera: {fileID: 5114838246848122034}
-  kickController: {fileID: 0}
+  kickController: {fileID: 2819337833356735152}
   physicsKickOnly: 0
   kickHitbox: {fileID: 0}
-  runSEInterval: 1
+  runSEInterval: 0.2
   joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
@@ -509,7 +510,7 @@ AudioListener:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1555769449232906187}
-  m_Enabled: 1
+  m_Enabled: 0
 --- !u!1 &4626179171591283358
 GameObject:
   m_ObjectHideFlags: 0
