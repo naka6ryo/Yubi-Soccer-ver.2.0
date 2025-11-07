@@ -76,11 +76,6 @@ namespace YubiSoccer.UI
             if (autoToggleActive) targetRect.gameObject.SetActive(false);
         }
 
-        private void Start()
-        {
-            //if (autoPlayOnStart) Play();
-        }
-
         public void Play()
         {
             if (playing != null) StopCoroutine(playing);
