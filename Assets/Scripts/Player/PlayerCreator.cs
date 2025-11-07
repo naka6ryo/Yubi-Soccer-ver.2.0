@@ -17,6 +17,9 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
 
     [Tooltip("スポーン高さ（Y）")]
     public float spawnHeight = 4.0f;
+    [Header("Audio Settings")]
+    [Tooltip("ローカルプレイヤーに AudioListener を追加する（カメラに付ける場合は true）")]
+    public bool addAudioListenerToCamera = true;
 
     private GameObject localPlayerInstance;
 
@@ -70,10 +73,94 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         try
         {
             localPlayerInstance = PhotonNetwork.Instantiate(playerPrefabName, spawnPos, Quaternion.identity);
+            SetupAudioListener(localPlayerInstance);
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"PlayerSpawner: Failed to instantiate player: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// ローカルプレイヤーに AudioListener を追加・有効化する
+    /// </summary>
+    void SetupAudioListener(GameObject playerInstance)
+    {
+        if (playerInstance == null)
+        {
+            Debug.LogWarning("[PlayerCreator] playerInstance is null - skipping AudioListener setup");
+            return;
+        }
+
+        // PhotonView の確認（念のため）
+        var pv = playerInstance.GetComponent<PhotonView>();
+        if (pv == null || !pv.IsMine)
+        {
+            Debug.LogWarning("[PlayerCreator] Player is not mine - skipping AudioListener setup");
+            return;
+        }
+
+        GameObject targetObject = playerInstance;
+
+        // カメラに AudioListener を付ける場合
+        if (addAudioListenerToCamera)
+        {
+            // PlayerController から PlayerCamera を取得
+            var controller = playerInstance.GetComponent<PlayerController>();
+            if (controller != null && controller.playerCamera != null)
+            {
+                targetObject = controller.playerCamera.gameObject;
+                Debug.Log("[PlayerCreator] AudioListener will be added to PlayerCamera");
+            }
+            else
+            {
+                // フォールバック: "PlayerCamera" という名前の子オブジェクトを探す
+                var cameraTransform = playerInstance.transform.Find("PlayerCamera");
+                if (cameraTransform != null)
+                {
+                    targetObject = cameraTransform.gameObject;
+                    Debug.Log("[PlayerCreator] AudioListener will be added to PlayerCamera (found by name)");
+                }
+                else
+                {
+                    Debug.LogWarning("[PlayerCreator] PlayerCamera not found - adding AudioListener to player root");
+                }
+            }
+        }
+
+        // 既存の AudioListener を確認
+        var existingListener = targetObject.GetComponent<AudioListener>();
+        if (existingListener != null)
+        {
+            // 既に存在する場合は有効化のみ
+            existingListener.enabled = true;
+            Debug.Log($"[PlayerCreator] AudioListener already exists on {targetObject.name} - enabled it");
+        }
+        else
+        {
+            // 存在しない場合は追加
+            var listener = targetObject.AddComponent<AudioListener>();
+            listener.enabled = true;
+            Debug.Log($"[PlayerCreator] Added AudioListener to {targetObject.name}");
+        }
+
+        // シーン内の他の AudioListener を無効化（安全のため）
+        DisableOtherAudioListeners(targetObject);
+    }
+
+    /// <summary>
+    /// シーン内の他の AudioListener を無効化する（複数存在を防ぐ）
+    /// </summary>
+    void DisableOtherAudioListeners(GameObject excludeTarget)
+    {
+        var allListeners = FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
+        foreach (var listener in allListeners)
+        {
+            if (listener.gameObject != excludeTarget)
+            {
+                listener.enabled = false;
+                Debug.Log($"[PlayerCreator] Disabled AudioListener on {listener.gameObject.name}");
+            }
         }
     }
 
