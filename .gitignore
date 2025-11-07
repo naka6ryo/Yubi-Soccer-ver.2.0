@@ -1,4 +1,4 @@
-# ===== Unity =====
+﻿# ===== Unity =====
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -64,3 +64,9 @@ Assets/WebGLTemplates/yubi-soccer/TemplateData/embedded_yubi/.git/
 # Large files (over 100MB GitHub limit)
 Assets/Scenes/Stadium/LightingData.asset
 Assets/Fonts/CC Running With Scissors Medium SDF.asset
+Assets/Fonts/Kaisotai-Next-UP-B.otf
+Assets/Fonts/Kaisotai-Next-UP-B.otf.meta
+Assets/Fonts/Kaisotai-Next-UP-B SDF.asset
+
+# 大きなファイルを無視（GitHub 100MB制限対策）
+Assets/Fonts/Kaisotai-Next-UP-B SDF.asset.meta

@@ -4,6 +4,7 @@ using UnityEngine;
 using YubiSoccer.VFX;
 using Photon.Pun;
 using YubiSoccer.Network;
+using System.Diagnostics;
 
 namespace YubiSoccer.Player
 {
@@ -156,6 +157,10 @@ namespace YubiSoccer.Player
         private Coroutine recoilRoutine;
         private readonly HashSet<Rigidbody> kickedThisActivation = new HashSet<Rigidbody>();
 
+        // サウンド用変数
+        private SoundManager soundManager;
+        [SerializeField] private float strongKickWall = 0.7f; // 強いキックの閾値
+
         private void Awake()
         {
             EnsureCollider();
@@ -167,8 +172,11 @@ namespace YubiSoccer.Player
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
             if (radiusIndicator != null)
                 radiusIndicator.SetCenter(transform);
-            // 注意: プレイヤーの Rigidbody 設定(Use Gravity / isKinematic)は本コンポーネントで変更しません。
-            // 必要であれば、別オブジェクト(足)に Kinematic RB を付与して運用してください。
+        }
+
+        void Start()
+        {
+            soundManager = SoundManager.Instance;
         }
 
         private void OnValidate()
@@ -244,6 +252,7 @@ namespace YubiSoccer.Player
                         if (Input.GetKeyDown(kickKey))
                         {
                             state = KickState.Charging;
+                            soundManager.PlaySE("チャージ");
                             chargeTime = 0f;
                         }
                         break;
@@ -260,6 +269,7 @@ namespace YubiSoccer.Player
                             float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                             lastCharge01 = charge01;
                             lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+                            soundManager.StopSE();
                             BeginKick();
                         }
                         break;
@@ -282,10 +292,32 @@ namespace YubiSoccer.Player
             {
                 if (kickCollider == null)
                 {
-                    Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
+
+                    UnityEngine.Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
                     return;
                 }
 
+                // 今回の拡大/縮小速度を決定
+                if (scaleSpeedWithCharge)
+                {
+                    float s = Mathf.Clamp01(chargeToSpeed.Evaluate(Mathf.Clamp01(lastCharge01)));
+                    float expandMul = Mathf.Lerp(1f, expandSpeedChargeMultiplier, s);
+                    float shrinkMul = Mathf.Lerp(1f, shrinkSpeedChargeMultiplier, s);
+                    activeExpandSpeed = expandSpeed * expandMul;
+                    activeShrinkSpeed = shrinkSpeed * shrinkMul;
+                }
+                else
+                {
+                    activeExpandSpeed = expandSpeed;
+                    activeShrinkSpeed = shrinkSpeed;
+                }
+
+                // キックの強さで音を切り替えて再生
+                if (lastCharge01 <= strongKickWall)soundManager.PlaySE("強いキック");
+                else soundManager.PlaySE("普通のキック");        
+
+                // 視覚的反動を開始
+                StartRecoil();
                 // 発動準備
                 kickedThisActivation.Clear();
                 currentRadius = baseRadius;
@@ -330,7 +362,7 @@ namespace YubiSoccer.Player
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
+                UnityEngine.Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
                 state = KickState.Idle;
             }
         }
@@ -410,21 +442,23 @@ namespace YubiSoccer.Player
             {
                 if (!allowExternalControl)
                 {
-                    Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
+
+                    UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
                     return;
                 }
                 if (state != KickState.Idle)
                 {
-                    Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
+                    UnityEngine.Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
                     return;
                 }
                 lastKickPowerMultiplier = 1f;
                 lastCharge01 = 0f;
+                soundManager.PlaySE("普通のキック");
                 BeginKick();
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
+                UnityEngine.Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
@@ -437,6 +471,8 @@ namespace YubiSoccer.Player
             if (state != KickState.Idle) return;
             state = KickState.Charging;
             chargeTime = 0f;
+            soundManager.PlaySE("チャージ");
+            UnityEngine.Debug.Log("[PlayerKickController] Playing SE: チャージ");
             UpdateChargingVisuals(0f, 0f);
         }
 
@@ -462,22 +498,24 @@ namespace YubiSoccer.Player
             {
                 if (!allowExternalControl)
                 {
-                    Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
+
+                    UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
                     return;
                 }
                 if (state != KickState.Charging)
                 {
-                    Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
+                    UnityEngine.Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
                     return;
                 }
                 float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                 lastCharge01 = charge01;
                 lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+                soundManager.StopSE();
                 BeginKick();
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
+                UnityEngine.Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
