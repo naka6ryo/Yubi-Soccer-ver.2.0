@@ -292,6 +292,7 @@ namespace YubiSoccer.Player
             {
                 if (kickCollider == null)
                 {
+
                     UnityEngine.Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
                     return;
                 }
@@ -441,6 +442,7 @@ namespace YubiSoccer.Player
             {
                 if (!allowExternalControl)
                 {
+
                     UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
                     return;
                 }
@@ -496,6 +498,7 @@ namespace YubiSoccer.Player
             {
                 if (!allowExternalControl)
                 {
+
                     UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
                     return;
                 }

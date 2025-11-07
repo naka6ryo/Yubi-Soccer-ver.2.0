@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,6 +14,10 @@ namespace YubiSoccer.Game
     /// </summary>
     public class MatchTimer : MonoBehaviour
     {
+        /// <summary>
+        /// 試合終了時に発火するイベント
+        /// </summary>
+        public static event Action OnMatchFinished;
         [Header("Timer Settings")]
         [Tooltip("タイマーの長さ（秒）。StartTimer() で使用されます")]
         [SerializeField, Min(0f)] private float durationSeconds = 60f;
@@ -88,6 +93,10 @@ namespace YubiSoccer.Game
                 SetText("");
             }
             try { Debug.Log("[MatchTimer] Finished"); } catch { }
+
+            // 試合終了イベントを発火
+            OnMatchFinished?.Invoke();
+
             timerRoutine = null;
         }
 
