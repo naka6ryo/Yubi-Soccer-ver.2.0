@@ -122,6 +122,7 @@ GameObject:
   - component: {fileID: 5974142199750279750}
   - component: {fileID: 1182831760752411901}
   - component: {fileID: 2819337833356735152}
+  - component: {fileID: -7725693663168602268}
   m_Layer: 0
   m_Name: Player Blue
   m_TagString: Untagged
@@ -167,6 +168,7 @@ MonoBehaviour:
   kickController: {fileID: 0}
   physicsKickOnly: 0
   kickHitbox: {fileID: 0}
+  runSEInterval: 1
   joystick: {fileID: 0}
 --- !u!114 &569121856484202705
 MonoBehaviour:
@@ -498,7 +500,16 @@ MonoBehaviour:
   impactRippleSpikes: 5
   impactRippleInnerRatio: 0.45
   impactRippleLineWidth: 0.035
+  strongKickWall: 0.7
   allowExternalControl: 1
+--- !u!81 &-7725693663168602268
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555769449232906187}
+  m_Enabled: 1
 --- !u!1 &4626179171591283358
 GameObject:
   m_ObjectHideFlags: 0

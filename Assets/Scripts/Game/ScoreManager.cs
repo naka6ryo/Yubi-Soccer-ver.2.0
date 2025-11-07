@@ -39,6 +39,8 @@ namespace YubiSoccer.Game
         private Coroutine blinkCoA;
         private Coroutine blinkCoB;
 
+        private SoundManager soundManager;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -47,6 +49,7 @@ namespace YubiSoccer.Game
                 return;
             }
             Instance = this;
+            soundManager = SoundManager.Instance;
             UpdateUI();
         }
 
@@ -60,6 +63,7 @@ namespace YubiSoccer.Game
         public void AddScore(Team team, int delta = 1)
         {
             delta = Mathf.Max(0, delta);
+            soundManager.PlaySE("スコア増加");
             switch (team)
             {
                 case Team.TeamA:
