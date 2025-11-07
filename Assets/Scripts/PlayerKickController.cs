@@ -292,7 +292,7 @@ namespace YubiSoccer.Player
             {
                 if (kickCollider == null)
                 {
-                    Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
+                    UnityEngine.Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
                     return;
                 }
 
@@ -361,7 +361,7 @@ namespace YubiSoccer.Player
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
+                UnityEngine.Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
                 state = KickState.Idle;
             }
         }
@@ -441,12 +441,12 @@ namespace YubiSoccer.Player
             {
                 if (!allowExternalControl)
                 {
-                    Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
+                    UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
                     return;
                 }
                 if (state != KickState.Idle)
                 {
-                    Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
+                    UnityEngine.Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
                     return;
                 }
                 lastKickPowerMultiplier = 1f;
@@ -456,7 +456,7 @@ namespace YubiSoccer.Player
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
+                UnityEngine.Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
@@ -496,12 +496,12 @@ namespace YubiSoccer.Player
             {
                 if (!allowExternalControl)
                 {
-                    Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
+                    UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
                     return;
                 }
                 if (state != KickState.Charging)
                 {
-                    Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
+                    UnityEngine.Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
                     return;
                 }
                 float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
@@ -512,7 +512,7 @@ namespace YubiSoccer.Player
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
+                UnityEngine.Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
