@@ -166,6 +166,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
+        // ルームを閉じて新規参加を防止
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+        PhotonNetwork.CurrentRoom.IsVisible = false;
+        Log("Room closed - game starting");
+
         try
         {
             Log($"Master starting game... Loading '{gameSceneName}'");
