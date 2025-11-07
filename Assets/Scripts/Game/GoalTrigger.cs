@@ -52,6 +52,10 @@ namespace YubiSoccer.Field
 
         private void Update()
         {
+            // SoundManagerが存在しない場合は処理をスキップ
+            if (soundManager == null || SoundManager.Instance == null)
+                return;
+
             // 1キーを押したらSEを再生
             if (Input.GetKeyDown(KeyCode.Alpha1))
             {
@@ -99,7 +103,7 @@ namespace YubiSoccer.Field
             OnGoalScored?.Invoke(awardToTeam);
             // soundManager.PlaySE("ゴール");
             SoundManager.Instance.PlaySE("ゴール");
-            if(soundManager != null)
+            if (soundManager != null)
             {
                 UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール");
             }
