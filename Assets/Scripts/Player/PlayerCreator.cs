@@ -79,6 +79,21 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         {
             Debug.LogError($"PlayerSpawner: Failed to instantiate player: {ex}");
         }
+
+        // Instantiate の直後にローカルプレイヤーの詳細ログをオンにする (エディタ/デバッグ用)
+        if (localPlayerInstance != null)
+        {
+            var pc = localPlayerInstance.GetComponent<PlayerController>();
+            if (pc != null)
+            {
+                pc.SetVerboseLogging(true);
+                Debug.Log("PlayerSpawner: Enabled verbose logging on local player instance.");
+            }
+            else
+            {
+                Debug.LogWarning("PlayerSpawner: Instantiated player has no PlayerController component.");
+            }
+        }
     }
 
     /// <summary>

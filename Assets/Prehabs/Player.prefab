@@ -164,6 +164,7 @@ MonoBehaviour:
   lerpRate: 10
   playerCamera: {fileID: 5114838246848122034}
   joystick: {fileID: 0}
+  verboseLog: 0
 --- !u!114 &569121856484202705
 MonoBehaviour:
   m_ObjectHideFlags: 0

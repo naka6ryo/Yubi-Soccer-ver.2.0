@@ -4,13 +4,19 @@ using UnityEngine;
 using YubiSoccer.VFX;
 using Photon.Pun;
 using YubiSoccer.Network;
-using System.Diagnostics;
+// ↓ これを追加（Unity の Debug を明示）
+using Debug = UnityEngine.Debug;
 
 namespace YubiSoccer.Player
 {
     /// <summary>
     /// スペースキー入力でプレイヤーのキック判定(トリガー)を急拡大し、ボールへインパルスを与える。
     /// 将来の長押し(チャージ)拡張に対応できるよう、簡易ステートとチャージ係数を用意。
+    /// 【修正点】
+    /// - ルートの PhotonView 所有者が自分(IsMine)のときだけ、入力処理/外部制御/インパルス送出を実行
+    /// - 速度決定と反動開始の重複を解消
+    /// - 強/普通キックSEの条件を是正
+    /// - SoundManager を null 安全に
     /// </summary>
     [DisallowMultipleComponent]
     public class PlayerKickController : MonoBehaviour
@@ -144,6 +150,9 @@ namespace YubiSoccer.Player
         [SerializeField, Range(0.1f, 0.99f)] private float impactRippleInnerRatio = 0.45f;
         [SerializeField] private float impactRippleLineWidth = 0.035f;
 
+        private enum OwnerState { Unknown, Mine, NotMine }
+        private OwnerState ownerState = OwnerState.Unknown;
+
         private KickState state = KickState.Idle;
         private float currentRadius;
         private float chargeTime;
@@ -161,8 +170,24 @@ namespace YubiSoccer.Player
         private SoundManager soundManager;
         [SerializeField] private float strongKickWall = 0.7f; // 強いキックの閾値
 
+        // --- 所有者ガード用 ---
+        private PhotonView ownerView;
+        private bool IsMine => ownerState == OwnerState.Mine;
+        private int OwnerViewID => ownerView ? ownerView.ViewID : -1;
+
         private void Awake()
         {
+            ownerView = GetComponentInParent<PhotonView>();
+            if (ownerView == null)
+            {
+                Debug.unityLogger.LogWarning("[PlayerKickController]", "No PhotonView found in parent. Ownership guard disabled.");
+                ownerState = OwnerState.Unknown;
+            }
+            else
+            {
+                ownerState = ownerView.IsMine ? OwnerState.Mine : OwnerState.NotMine;
+            }
+
             EnsureCollider();
             DeactivateKickZone();
             if (recoilTransform == null) recoilTransform = transform;
@@ -237,13 +262,18 @@ namespace YubiSoccer.Player
 
         private void Update()
         {
-            // キーボード入力は常に受け付ける（手の認識と共存）
-            HandleInput();
+            // ローカル所有者のみ入力を処理（外部制御は呼び出し側がガードするが、念のため本体でも二重に防御）
+            if (IsMine)
+            {
+                HandleInput();
+            }
             UpdateKickState(Time.deltaTime);
         }
 
         private void HandleInput()
         {
+            if (!IsMine) return; // 念のため
+
             if (enableCharge)
             {
                 switch (state)
@@ -252,8 +282,9 @@ namespace YubiSoccer.Player
                         if (Input.GetKeyDown(kickKey))
                         {
                             state = KickState.Charging;
-                            soundManager.PlaySE("チャージ");
+                            soundManager?.PlaySE("チャージ");
                             chargeTime = 0f;
+                            UpdateChargingVisuals(0f, 0f);
                         }
                         break;
                     case KickState.Charging:
@@ -269,7 +300,7 @@ namespace YubiSoccer.Player
                             float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                             lastCharge01 = charge01;
                             lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-                            soundManager.StopSE();
+                            soundManager?.StopSE();
                             BeginKick();
                         }
                         break;
@@ -290,14 +321,14 @@ namespace YubiSoccer.Player
         {
             try
             {
+                if (!IsMine) return; // 所有者のみ発動
                 if (kickCollider == null)
                 {
-
-                    UnityEngine.Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
+                    Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
                     return;
                 }
 
-                // 今回の拡大/縮小速度を決定
+                // 今回の拡大/縮小速度を決定（※重複計算を解消）
                 if (scaleSpeedWithCharge)
                 {
                     float s = Mathf.Clamp01(chargeToSpeed.Evaluate(Mathf.Clamp01(lastCharge01)));
@@ -313,11 +344,12 @@ namespace YubiSoccer.Player
                 }
 
                 // キックの強さで音を切り替えて再生
-                if (lastCharge01 <= strongKickWall)soundManager.PlaySE("強いキック");
-                else soundManager.PlaySE("普通のキック");        
+                if (lastCharge01 >= strongKickWall) soundManager?.PlaySE("強いキック");
+                else soundManager?.PlaySE("普通のキック");
 
-                // 視覚的反動を開始
+                // 視覚的反動を開始（1回のみ）
                 StartRecoil();
+
                 // 発動準備
                 kickedThisActivation.Clear();
                 currentRadius = baseRadius;
@@ -335,24 +367,6 @@ namespace YubiSoccer.Player
                 }
                 activeMaxRadius = Mathf.Max(baseRadius, Mathf.Min(activeMaxRadius, maxRadius));
 
-                // 今回の拡大/縮小速度を決定
-                if (scaleSpeedWithCharge)
-                {
-                    float s = Mathf.Clamp01(chargeToSpeed.Evaluate(Mathf.Clamp01(lastCharge01)));
-                    float expandMul = Mathf.Lerp(1f, expandSpeedChargeMultiplier, s);
-                    float shrinkMul = Mathf.Lerp(1f, shrinkSpeedChargeMultiplier, s);
-                    activeExpandSpeed = expandSpeed * expandMul;
-                    activeShrinkSpeed = shrinkSpeed * shrinkMul;
-                }
-                else
-                {
-                    activeExpandSpeed = expandSpeed;
-                    activeShrinkSpeed = shrinkSpeed;
-                }
-
-                // 視覚的反動を開始
-                StartRecoil();
-
                 // 発動時に円を隠す
                 if (hideIndicatorOnKick && radiusIndicator != null)
                     radiusIndicator.Hide();
@@ -362,7 +376,7 @@ namespace YubiSoccer.Player
             }
             catch (System.Exception ex)
             {
-                UnityEngine.Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
                 state = KickState.Idle;
             }
         }
@@ -405,7 +419,8 @@ namespace YubiSoccer.Player
         {
             if (kickCollider != null)
             {
-                kickCollider.enabled = true; // enabledは維持、半径を最小に保つ方式
+                // enabledは維持、半径を最小に保つ方式（誤検出を避けたいなら false にしてもOK）
+                kickCollider.enabled = true;
                 kickCollider.radius = baseRadius;
             }
             kickedThisActivation.Clear();
@@ -433,55 +448,44 @@ namespace YubiSoccer.Player
         [Tooltip("外部(ハンドステート等)からの制御を許可。キーボードと共存可能")]
         [SerializeField] private bool allowExternalControl = true;
 
-        /// <summary>
-        /// 外部制御: タップ(短押し)キックを即発動。
-        /// </summary>
         public void ExternalKickTap()
         {
             try
             {
-                if (!allowExternalControl)
-                {
-
-                    UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false");
-                    return;
-                }
+                if (!allowExternalControl) { Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false"); return; }
+                if (!IsMine) { Debug.LogWarning($"[PlayerKickController] ExternalKickTap ignored (owner IsMine=false, ownerViewID={OwnerViewID})"); return; }
                 if (state != KickState.Idle)
                 {
-                    UnityEngine.Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
+                    Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
                     return;
                 }
                 lastKickPowerMultiplier = 1f;
                 lastCharge01 = 0f;
-                soundManager.PlaySE("普通のキック");
+                soundManager?.PlaySE("普通のキック");
                 BeginKick();
             }
             catch (System.Exception ex)
             {
-                UnityEngine.Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
-        /// <summary>
-        /// 外部制御: チャージ開始。
-        /// </summary>
         public void ExternalChargeStart()
         {
             if (!allowExternalControl) return;
+            if (!IsMine) return;
             if (state != KickState.Idle) return;
             state = KickState.Charging;
             chargeTime = 0f;
-            soundManager.PlaySE("チャージ");
-            UnityEngine.Debug.Log("[PlayerKickController] Playing SE: チャージ");
+            soundManager?.PlaySE("チャージ");
+            Debug.Log($"[PlayerKickController] Playing SE: チャージ (ownerViewID={OwnerViewID})");
             UpdateChargingVisuals(0f, 0f);
         }
 
-        /// <summary>
-        /// 外部制御: チャージ継続。毎フレーム呼び出しを想定。
-        /// </summary>
         public void ExternalChargeUpdate(float dt)
         {
             if (!allowExternalControl) return;
+            if (!IsMine) return;
             if (state != KickState.Charging) return;
             chargeTime += Mathf.Max(0f, dt);
             chargeTime = Mathf.Min(chargeTime, maxChargeTime);
@@ -489,39 +493,29 @@ namespace YubiSoccer.Player
             UpdateChargingVisuals(c01, dt);
         }
 
-        /// <summary>
-        /// 外部制御: チャージ解放(発動)。
-        /// </summary>
         public void ExternalChargeRelease()
         {
             try
             {
-                if (!allowExternalControl)
-                {
-
-                    UnityEngine.Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false");
-                    return;
-                }
+                if (!allowExternalControl) { Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false"); return; }
+                if (!IsMine) { Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease ignored (owner IsMine=false, ownerViewID={OwnerViewID})"); return; }
                 if (state != KickState.Charging)
                 {
-                    UnityEngine.Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
+                    Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
                     return;
                 }
                 float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                 lastCharge01 = charge01;
                 lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-                soundManager.StopSE();
+                soundManager?.StopSE();
                 BeginKick();
             }
             catch (System.Exception ex)
             {
-                UnityEngine.Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
-        /// <summary>
-        /// チャージ中のプレビュー(半径/幅/色/パルス)を更新
-        /// </summary>
         private void UpdateChargingVisuals(float c01, float dt)
         {
             if (!(showIndicatorWhileCharging && radiusIndicator != null)) return;
@@ -533,7 +527,6 @@ namespace YubiSoccer.Player
             radiusIndicator.Show();
             radiusIndicator.SetRadius(previewRadius);
 
-            // 線幅
             if (scaleIndicatorWidthWithCharge)
             {
                 float wt = Mathf.Clamp01(chargeToIndicatorWidth.Evaluate(c01));
@@ -541,7 +534,6 @@ namespace YubiSoccer.Player
                 radiusIndicator.SetWidth(w);
             }
 
-            // 色
             Color currentColor = radiusIndicator.GetCurrentColor();
             if (colorIndicatorWithCharge)
             {
@@ -553,7 +545,6 @@ namespace YubiSoccer.Player
                 currentColor = col;
             }
 
-            // パルス
             radiusIndicator.UpdatePulseEffect(previewRadius, currentColor, c01, Mathf.Max(0f, dt));
         }
 
@@ -568,7 +559,6 @@ namespace YubiSoccer.Player
                 recoilRoutine = null;
             }
 
-            // 現在の向きを基準にピッチのみ加える(ヨーは保持)
             recoilBaseLocalRotation = recoilTransform.localRotation;
 
             float angle = recoilAngleDeg;
@@ -585,7 +575,6 @@ namespace YubiSoccer.Player
         {
             if (recoilTransform == null) yield break;
 
-            // 行き(素早く傾ける)
             float t = 0f;
             while (t < recoilDuration)
             {
@@ -597,95 +586,69 @@ namespace YubiSoccer.Player
             }
             ApplyTilt(angleDeg);
 
-            // 行きのみ：最大角で停止（戻りは行わない）
             recoilRoutine = null;
         }
 
         private void ApplyTilt(float angleDeg)
         {
             if (recoilTransform == null) return;
-            Quaternion q = Quaternion.Euler(-angleDeg, 0f, 0f); // 後ろに倒す: ローカルX負方向
+            Quaternion q = Quaternion.Euler(-angleDeg, 0f, 0f);
             recoilTransform.localRotation = recoilBaseLocalRotation * q;
         }
 
         private void OnTriggerEnter(Collider other)
         {
-            if (physicsPushOnly) return; // 物理押し出しモードでは AddForce を使用しない
+            if (!IsMine) return;
+            if (physicsPushOnly) return;
             if (kickCollider == null) return;
             if (other == null || other == kickCollider) return;
+            if (!(state == KickState.Expanding)) return;
 
-            if (!(state == KickState.Expanding)) return; // 拡大中のみ有効
-
-            // レイヤーチェック
             int layerMask = 1 << other.gameObject.layer;
             if ((affectLayers.value & layerMask) == 0) return;
-
             if (!string.IsNullOrEmpty(requiredTag) && !other.CompareTag(requiredTag)) return;
 
             Rigidbody rb = other.attachedRigidbody;
             if (rb == null) return;
-            if (kickedThisActivation.Contains(rb)) return; // 多重キック防止
+            if (kickedThisActivation.Contains(rb)) return;
 
-            // Photon 所有権チェック: ネットワーク対象ならオーナーのみ物理インパルス適用
-            if (rb.TryGetComponent<PhotonView>(out var pv))
+            PhotonView ballPv = null;
+            rb.TryGetComponent<PhotonView>(out ballPv);
+
+            Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+            Vector3 hitPoint = other.ClosestPoint(kickWorldCenter);
+            Vector3 dir = forceDirectionReference != null
+                ? forceDirectionReference.forward
+                : ((hitPoint - kickWorldCenter).sqrMagnitude > 0.000001f
+                    ? (hitPoint - kickWorldCenter).normalized
+                    : (rb.worldCenterOfMass - transform.position).normalized);
+
+            float forceMag = kickForce * Mathf.Max(0f, lastKickPowerMultiplier);
+            float lift = Mathf.Max(0f, liftImpulseBase + liftImpulsePerCharge * Mathf.Clamp01(lastCharge01));
+            Vector3 impulse = dir * forceMag;
+
+            if (ballPv != null)
             {
-                if (!pv.IsMine)
+                if (IsMine)
                 {
-                    // 所有していないクライアントは VFX のみ再生し、AddForce は適用しない
-                    // ただし重複防止のために記録しておく
-                    kickedThisActivation.Add(rb);
-                    // インパクトVFX（★リップル）は以下で処理
-                }
-            }
-
-            // 旧方式(AddForce/Lift)をネットワークにブロードキャスト
-            // PhotonView があれば全員で同タイミング適用（BallImpulseReceiver が受信して FixedUpdate で AddForce）
-            // もし PhotonView が無い(オフライン/非ネットワーク)ならローカルに即時適用
-            {
-                // キック方向: 指定があれば参照の forward、なければプレイヤー→当たり点(またはボール中心)方向
-                Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
-                Vector3 hitPoint = other.ClosestPoint(kickWorldCenter);
-                Vector3 dir;
-                if (forceDirectionReference != null)
-                {
-                    dir = forceDirectionReference.forward;
-                }
-                else
-                {
-                    Vector3 toward = (hitPoint - kickWorldCenter);
-                    dir = toward.sqrMagnitude > 0.000001f ? toward.normalized : (rb.worldCenterOfMass - transform.position).normalized;
-                }
-
-                float forceMag = kickForce * Mathf.Max(0f, lastKickPowerMultiplier);
-                float lift = Mathf.Max(0f, liftImpulseBase + liftImpulsePerCharge * Mathf.Clamp01(lastCharge01));
-                Vector3 impulse = dir * forceMag;
-
-                if (pv != null)
-                {
-                    // ネットワーク配信（全クライアントが次の FixedUpdate で AddForce）
                     Vector3 contact = hitPoint;
-                    BallImpulseBroadcaster.RaiseImpulse(pv.ViewID, impulse, lift, contact);
+                    BallImpulseBroadcaster.RaiseImpulse(ballPv.ViewID, impulse, lift, contact);
                 }
-                else
-                {
-                    // ローカルフォールバック
-                    if (impulse != Vector3.zero) rb.AddForce(impulse, ForceMode.Impulse);
-                    if (lift > 0f) rb.AddForce(Vector3.up * lift, ForceMode.Impulse);
-                }
-
-                kickedThisActivation.Add(rb);
+            }
+            else
+            {
+                if (impulse != Vector3.zero) rb.AddForce(impulse, ForceMode.Impulse);
+                if (lift > 0f) rb.AddForce(Vector3.up * lift, ForceMode.Impulse);
             }
 
-            // インパクトVFX（★リップル）
+            kickedThisActivation.Add(rb);
+
             if (spawnImpactStarRipple)
             {
-                // キックゾーンのワールド中心
-                Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
                 Vector3 center = other.bounds.center;
                 Vector3 hitPos;
                 Vector3 normal;
 
-                // SphereColliderの場合は幾何的に厳密な接触面を計算
                 var sphere = other as SphereCollider;
                 if (sphere != null)
                 {
@@ -694,13 +657,11 @@ namespace YubiSoccer.Player
                     Vector3 towardKick = (kickWorldCenter - sphereCenter).sqrMagnitude > 0.000001f
                         ? (kickWorldCenter - sphereCenter).normalized
                         : (center - transform.position).normalized;
-                    // ボール側表面の点（プレイヤー側に向いた表面）
                     hitPos = sphereCenter + towardKick * worldR;
-                    normal = towardKick; // 球の法線は中心→表面
+                    normal = towardKick;
                 }
                 else
                 {
-                    // 一般コライダ: ClosestPoint から法線を近似
                     hitPos = other.ClosestPoint(kickWorldCenter);
                     if ((hitPos - kickWorldCenter).sqrMagnitude < 0.000001f)
                     {
@@ -709,7 +670,6 @@ namespace YubiSoccer.Player
                     normal = (hitPos - center).sqrMagnitude > 0.000001f ? (hitPos - center).normalized : (center - transform.position).normalized;
                 }
 
-                // 色はチャージ色を流用
                 Color rippleColor = GetChargeColor(lastCharge01);
                 ImpactStarRipple.Spawn(hitPos, normal, rippleColor, impactRippleMaxRadius, impactRippleDuration, impactRippleSpikes, impactRippleInnerRatio, impactRippleLineWidth);
             }
@@ -717,6 +677,7 @@ namespace YubiSoccer.Player
 
         private void OnCollisionEnter(Collision collision)
         {
+            if (!IsMine) return;
             if (!physicsPushOnly) return;
             if (kickCollider == null) return;
             if (!(state == KickState.Expanding)) return;
@@ -724,7 +685,6 @@ namespace YubiSoccer.Player
             var other = collision.collider;
             if (other == null || other == kickCollider) return;
 
-            // レイヤ/タグチェック
             int layerMask = 1 << other.gameObject.layer;
             if ((affectLayers.value & layerMask) == 0) return;
             if (!string.IsNullOrEmpty(requiredTag) && !other.CompareTag(requiredTag)) return;
@@ -733,7 +693,6 @@ namespace YubiSoccer.Player
             if (rb == null) return;
             if (kickedThisActivation.Contains(rb)) return;
 
-            // 物理エンジンの分離衝突に任せる。VFX のみ生成
             ContactPoint cp = collision.contacts != null && collision.contactCount > 0 ? collision.contacts[0] : default;
             Vector3 hitPos = cp.point != default ? cp.point : other.bounds.ClosestPoint(transform.TransformPoint(localCenter));
             Vector3 normal = cp.normal != default ? cp.normal : (hitPos - other.bounds.center).normalized;
@@ -766,7 +725,6 @@ namespace YubiSoccer.Player
             }
             else
             {
-                // 配置目安
                 Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.3f);
                 Gizmos.matrix = transform.localToWorldMatrix;
                 Gizmos.DrawWireSphere(localCenter, baseRadius);

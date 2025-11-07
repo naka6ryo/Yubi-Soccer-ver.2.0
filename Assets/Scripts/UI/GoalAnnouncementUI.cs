@@ -63,11 +63,20 @@ namespace YubiSoccer.UI
                 return;
             }
 
-            // 親Canvasを取得
+            // 親Canvasを取得。無ければシーン内の最初の Canvas をフォールバックとして試す
             parentCanvas = GetComponentInParent<Canvas>();
             if (parentCanvas == null)
             {
-                Debug.LogWarning("[GoalAnnouncementUI] 親Canvasが見つかりません。useCanvasEdge は機能しません。");
+                // シーン内に Canvas が存在する場合は最初のものをフォールバックに使う
+                parentCanvas = FindObjectOfType<Canvas>();
+                if (parentCanvas != null)
+                {
+                    Debug.LogWarning($"[GoalAnnouncementUI] 親Canvasが見つからなかったため、シーン内の最初の Canvas をフォールバックとして使用します: {parentCanvas.name}");
+                }
+                else
+                {
+                    Debug.LogWarning("[GoalAnnouncementUI] 親Canvasが見つかりません。useCanvasEdge は機能しません。");
+                }
             }
 
             // Animator コンポーネントが干渉する可能性があるため無効化
