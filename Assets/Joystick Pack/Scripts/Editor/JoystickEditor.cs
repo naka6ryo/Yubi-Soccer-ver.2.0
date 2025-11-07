@@ -18,6 +18,10 @@ public class JoystickEditor : Editor
 
     protected virtual void OnEnable()
     {
+        // targetがnullの場合は処理をスキップ
+        if (target == null)
+            return;
+
         handleRange = serializedObject.FindProperty("handleRange");
         deadZone = serializedObject.FindProperty("deadZone");
         axisOptions = serializedObject.FindProperty("axisOptions");
@@ -37,7 +41,7 @@ public class JoystickEditor : Editor
 
         serializedObject.ApplyModifiedProperties();
 
-        if(handle != null)
+        if (handle != null)
         {
             RectTransform handleRect = (RectTransform)handle.objectReferenceValue;
             handleRect.anchorMax = center;
