@@ -50,16 +50,8 @@ namespace YubiSoccer.UI
         [Tooltip("WebGLビルド時に動画をスキップしてすぐにローディングパネルを表示")]
         [SerializeField] private bool skipVideoOnWebGL = false;
 
-        [Header("WebGL Mobile Settings")]
-        [Tooltip("WebGL のモバイル端末向けに再生を許可するために自動でミュートする（画面サイズで判定）")]
-        [SerializeField] private bool muteOnWebGLMobile = true;
-        [Tooltip("モバイル判定のための画面サイズ閾値（幅または高さがこの値以下ならモバイルと判定）")]
-        [SerializeField] private int mobileSizeThreshold = 1024;
-        [Tooltip("最初のタッチ／クリックでアンミュートする（true 推奨）")]
-        [SerializeField] private bool unmuteOnFirstTouch = true;
-
-        [Header("Tap to Start Button (Mobile)")]
-        [Tooltip("モバイル WebGL 用：タップして開始ボタン（CanvasGroup または GameObject）")]
+        [Header("Tap to Start Button")]
+        [Tooltip("タップして開始ボタン（CanvasGroup）")]
         [SerializeField] private CanvasGroup tapToStartButton;
         [Tooltip("タップボタンのフェードイン時間")]
         [SerializeField] private float buttonFadeInDuration = 0.5f;
@@ -72,8 +64,6 @@ namespace YubiSoccer.UI
         [Tooltip("ボタン点滅時の最大透明度")]
         [SerializeField, Range(0f, 1f)] private float buttonBlinkMaxAlpha = 1f;
 
-        private bool isMobileWebGL = false;
-        private bool awaitingFirstTouch = false;
         private bool waitingForTapToStart = false;
         private Coroutine blinkCoroutine = null; // 点滅コルーチンの参照
 
@@ -166,20 +156,17 @@ namespace YubiSoccer.UI
             {
                 Debug.Log("[VideoPlayerController] WebGL: Attempting to play video from URL...");
                 
-                // モバイル判定とタップボタン表示判定
-                CheckIfMobileWebGL();
-
-                if (isMobileWebGL && tapToStartButton != null)
+                // タップして開始ボタンがあれば表示して待機
+                if (tapToStartButton != null)
                 {
-                    // モバイル: タップボタンを表示して待機
-                    Debug.Log("[VideoPlayerController] WebGL Mobile: Showing tap to start button");
+                    Debug.Log("[VideoPlayerController] WebGL: Showing tap to start button");
                     waitingForTapToStart = true;
                     StartCoroutine(ShowTapToStartButton());
                 }
                 else
                 {
-                    // PC またはボタンなし: 従来通り自動再生
-                    Debug.Log("[VideoPlayerController] WebGL PC: Auto-playing video");
+                    // ボタンなし: 従来通り自動再生
+                    Debug.Log("[VideoPlayerController] WebGL: Auto-playing video");
                     if (fadeInOnStart)
                     {
                         Debug.Log("[VideoPlayerController] WebGL: Preparing video with fade-in...");
@@ -209,15 +196,27 @@ namespace YubiSoccer.UI
             if (playOnAwake && videoClip != null)
             {
                 Debug.Log("[VideoPlayerController] Attempting to play video...");
-                if (fadeInOnStart)
+
+                // タップして開始ボタンがあれば表示して待機
+                if (tapToStartButton != null)
                 {
-                    Debug.Log("[VideoPlayerController] Preparing video with fade-in...");
-                    videoPlayer.Prepare();
+                    Debug.Log("[VideoPlayerController] Showing tap to start button");
+                    waitingForTapToStart = true;
+                    StartCoroutine(ShowTapToStartButton());
                 }
                 else
                 {
-                    Debug.Log("[VideoPlayerController] Playing video without fade...");
-                    Play();
+                    // ボタンなし: 従来通り自動再生
+                    if (fadeInOnStart)
+                    {
+                        Debug.Log("[VideoPlayerController] Preparing video with fade-in...");
+                        videoPlayer.Prepare();
+                    }
+                    else
+                    {
+                        Debug.Log("[VideoPlayerController] Playing video without fade...");
+                        Play();
+                    }
                 }
             }
             else
@@ -304,26 +303,6 @@ namespace YubiSoccer.UI
             videoPlayer.prepareCompleted += OnVideoPrepared;
             videoPlayer.errorReceived += OnVideoError;
             videoPlayer.started += OnVideoStarted;
-        }
-
-        /// <summary>
-        /// WebGLビルドかつ小画面（モバイル想定）かを判定する
-        /// </summary>
-        private void CheckIfMobileWebGL()
-        {
-            if (Application.platform != RuntimePlatform.WebGLPlayer) return;
-
-            // 簡易モバイル判定：画面サイズが閾値以下ならモバイルと見なす
-            if (Screen.width <= mobileSizeThreshold || Screen.height <= mobileSizeThreshold)
-            {
-                isMobileWebGL = true;
-                Debug.Log($"[VideoPlayerController] WebGL Mobile detected: Screen {Screen.width}x{Screen.height}");
-            }
-            else
-            {
-                isMobileWebGL = false;
-                Debug.Log($"[VideoPlayerController] WebGL PC detected: Screen {Screen.width}x{Screen.height}");
-            }
         }
 
         /// <summary>
@@ -429,8 +408,7 @@ namespace YubiSoccer.UI
             // ボタンをフェードアウト
             StartCoroutine(HideTapToStartButton());
 
-            // 動画を音ありでフェードイン再生
-            // モバイルでも音を出すため、ミュートしない
+            // 動画を音ありで再生
             if (audioSource != null)
             {
                 audioSource.mute = false;
@@ -444,17 +422,15 @@ namespace YubiSoccer.UI
             // 動画準備＆再生開始
             if (fadeInOnStart)
             {
-                Debug.Log("[VideoPlayerController] Mobile: Preparing video with fade-in and audio...");
+                Debug.Log("[VideoPlayerController] Preparing video with fade-in and audio...");
                 videoPlayer.Prepare();
             }
             else
             {
-                Debug.Log("[VideoPlayerController] Mobile: Playing video with audio...");
+                Debug.Log("[VideoPlayerController] Playing video with audio...");
                 Play();
             }
         }
-
-        // Update は削除（タップボタンの onClick イベントで制御するため不要）
 
         /// <summary>
         /// 動画が開始されたときのコールバック
@@ -599,17 +575,25 @@ namespace YubiSoccer.UI
             Debug.Log("[VideoPlayerController] Video prepared and ready to play!");
             isReady = true;
 
-            // フェードイン設定が有効な場合、動画再生とフェードインを開始
-            if (fadeInOnStart && playOnAwake)
+            // タップ待機中でない場合のみ自動再生
+            if (!waitingForTapToStart)
             {
-                videoPlayer.Play();
-                StartCoroutine(FadeIn());
-            }
+                // フェードイン設定が有効な場合、動画再生とフェードインを開始
+                if (fadeInOnStart && playOnAwake)
+                {
+                    videoPlayer.Play();
+                    StartCoroutine(FadeIn());
+                }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            // WebGLでは準備完了後に再生開始されない場合があるため、タイムアウト設定
-            StartCoroutine(CheckVideoPlayback());
+                // WebGLでは準備完了後に再生開始されない場合があるため、タイムアウト設定
+                StartCoroutine(CheckVideoPlayback());
 #endif
+            }
+            else
+            {
+                Debug.Log("[VideoPlayerController] Video prepared, waiting for tap to start...");
+            }
         }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
