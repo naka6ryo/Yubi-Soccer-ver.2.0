@@ -48,6 +48,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     void Start()
     {
+        PhotonNetwork.GameVersion = "1"; 
         if (PhotonNetwork.InRoom)
         {
             Log($"Already in room: {PhotonNetwork.CurrentRoom.Name}");
