@@ -48,6 +48,12 @@ public class SoundManager : MonoBehaviour
     /// <param name="name">SoundDatabaseに登録したSEの名前</param>
     public void PlaySE(string name)
     {
+        if (seSource == null || soundDatabase == null)
+        {
+            Debug.LogWarning("[SoundManager] seSource または soundDatabase が null です。");
+            return;
+        }
+
         // データベースから名前で検索
         SoundData data = soundDatabase.seList.Find(x => x.name == name);
 
@@ -69,6 +75,12 @@ public class SoundManager : MonoBehaviour
     /// <param name="name">SoundDatabaseに登録したBGMの名前</param>
     public void PlayBGM(string name)
     {
+        if (bgmSource == null || soundDatabase == null)
+        {
+            Debug.LogWarning("[SoundManager] bgmSource または soundDatabase が null です。");
+            return;
+        }
+
         // データベースから名前で検索
         SoundData data = soundDatabase.bgmList.Find(x => x.name == name);
 
@@ -96,8 +108,11 @@ public class SoundManager : MonoBehaviour
     /// </summary>
     public void StopBGM()
     {
-        bgmSource.Stop();
-        bgmSource.clip = null;
+        if (bgmSource != null)
+        {
+            bgmSource.Stop();
+            bgmSource.clip = null;
+        }
     }
 
     /// <summary>
@@ -107,7 +122,7 @@ public class SoundManager : MonoBehaviour
     /// <returns></returns>
     public bool StopSE()
     {
-        if (seSource.isPlaying)
+        if (seSource != null && seSource.isPlaying)
         {
             seSource.Stop();
             return true;
