@@ -5,3 +5,59 @@
 [dev]
   # Local dev server can be configured if you use Netlify Dev
   port = 8888
+
+## Headers to ensure pre-compressed (brotli) Unity WebGL build files are
+## served with the correct Content-Type and Content-Encoding so browsers
+## (and the Unity loader) can properly decompress and use them.
+
+[[headers]]
+for = "/Build/*.js.br"
+  [headers.values]
+  Content-Type = "application/javascript"
+  Content-Encoding = "br"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.framework.js.br"
+  [headers.values]
+  Content-Type = "application/javascript"
+  Content-Encoding = "br"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.data.br"
+  [headers.values]
+  Content-Type = "application/octet-stream"
+  Content-Encoding = "br"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.wasm.br"
+  [headers.values]
+  Content-Type = "application/wasm"
+  Content-Encoding = "br"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.mem.br"
+  [headers.values]
+  Content-Type = "application/octet-stream"
+  Content-Encoding = "br"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+## Fallback: ensure uncompressed variants have correct types too
+[[headers]]
+for = "/Build/*.js"
+  [headers.values]
+  Content-Type = "application/javascript"
+
+[[headers]]
+for = "/Build/*.data"
+  [headers.values]
+  Content-Type = "application/octet-stream"
+
+[[headers]]
+for = "/Build/*.wasm"
+  [headers.values]
+  Content-Type = "application/wasm"
+
