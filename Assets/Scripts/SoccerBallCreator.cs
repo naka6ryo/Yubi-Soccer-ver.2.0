@@ -8,11 +8,9 @@ public class SoccerBallCreator : MonoBehaviour
 {
     public string soccerPrefabName = "Soccer Ball";
     private GameObject localSoccerBallInstance;
-    private SoundManager soundManager;
     void Start()
     {
         soundManager = SoundManager.Instance;
-
         // 部屋に入っていない場合はスキップ
         if (!PhotonNetwork.IsConnected || !PhotonNetwork.InRoom)
         {
