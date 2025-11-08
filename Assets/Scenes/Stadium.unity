@@ -2192,8 +2192,11 @@ MonoBehaviour:
   reloadScene: 0
   delaySeconds: 3
   ballRigidbody: {fileID: 3595070269344119584, guid: 9d27f30a014fce143bb37b8af7497613, type: 3}
+  onlyMasterClientResets: 1
+  enableBallReset: 1
   autoFindSpawners: 0
   spawners: []
+  glassRespawnDelay: 0.5
 --- !u!114 &137890521
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2261,6 +2264,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  useFadeInsteadOfSlide: 0
+  useCanvasEdge: 1
   startOffsetRight: 800
   endOffsetLeft: 800
   autoToggleActive: 1
@@ -4105,8 +4110,6 @@ PrefabInstance:
     - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: liftImpulseBase
       value: 0
-      propertyPath: strongKickWall
-      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 2819337833356735152, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: impactRippleDuration
@@ -18587,7 +18590,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 25.35
+  m_fontSize: 21
   m_fontSizeBase: 70
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -25452,6 +25455,7 @@ RectTransform:
   - {fileID: 355522175}
   - {fileID: 1427445363}
   - {fileID: 69302989}
+  - {fileID: 1563506593}
   - {fileID: 1969012026}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -29276,12 +29280,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1563506591}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.6533813, y: -324.5996, z: -247.94836}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -404.25455, y: -469.5768, z: -226.69566}
+  m_LocalScale: {x: 0.9142858, y: 0.9142858, z: 0.9142858}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1380575697}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1575160297
 PrefabInstance:
@@ -39635,7 +39639,6 @@ SceneRoots:
   - {fileID: 2142109556}
   - {fileID: 1838092312}
   - {fileID: 1380575697}
-  - {fileID: 1563506593}
   - {fileID: 235059604}
   - {fileID: 210188017}
   - {fileID: 734142375}

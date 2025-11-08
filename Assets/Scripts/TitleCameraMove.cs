@@ -88,6 +88,8 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
     public Camera playerCamera;
 
     bool _running;
+    // Tracks cameras we disabled when switching to player camera so we can safely re-enable them later
+    private System.Collections.Generic.List<Camera> _disabledByPlayerSwitch = new System.Collections.Generic.List<Camera>();
 
     /// <summary>UIボタンの OnClick から呼ぶ</summary>
     public void Play()
@@ -190,12 +192,14 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
 
     private void TrySwitchToPlayerCamera()
     {
+        Debug.Log("[TitleCameraMove] TrySwitchToPlayerCamera invoked");
+
+        // Ensure we have a valid playerCamera reference; try multiple fallbacks
         if (playerCamera == null)
         {
-            // try find by name
+            Debug.Log("[TitleCameraMove] playerCamera field is null, attempting to find by name/tag/main camera...");
             var go = GameObject.Find("PlayerCamera");
             if (go != null) playerCamera = go.GetComponent<Camera>();
-            // try find by tag
             if (playerCamera == null)
             {
                 var byTag = GameObject.FindWithTag("Player");
@@ -205,6 +209,11 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
                     if (cam != null) playerCamera = cam;
                 }
             }
+            if (playerCamera == null && Camera.main != null)
+            {
+                Debug.Log("[TitleCameraMove] Falling back to Camera.main");
+                playerCamera = Camera.main;
+            }
         }
 
         if (playerCamera == null)
@@ -213,17 +222,91 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[TitleCameraMove] Enabling PlayerCamera (wasActive={playerCamera.gameObject.activeInHierarchy}, enabled={playerCamera.enabled}) name={playerCamera.name}");
+
         // Disable Cinemachine brain so the player camera can render directly
         if (brain != null)
         {
-            brain.enabled = false;
+            try
+            {
+                brain.enabled = false;
+                Debug.Log("[TitleCameraMove] CinemachineBrain disabled to allow PlayerCamera to render");
+            }
+            catch { Debug.LogWarning("[TitleCameraMove] Failed to disable CinemachineBrain"); }
         }
 
         // Activate player camera
-        playerCamera.gameObject.SetActive(true);
-        playerCamera.enabled = true;
+        try
+        {
+            playerCamera.gameObject.SetActive(true);
+            playerCamera.enabled = true;
+            _playerCameraWasDeactivated = false;
+            Debug.Log("[TitleCameraMove] Switched to PlayerCamera: " + playerCamera.name);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[TitleCameraMove] Failed to activate PlayerCamera: " + ex);
+        }
 
-        Debug.Log("[TitleCameraMove] Switched to PlayerCamera: " + playerCamera.name);
+        // Ensure no other Camera is still rendering on top of the player camera.
+        try
+        {
+            // Find all cameras (including inactive) and canvases to avoid disabling UI render cameras
+            var camsAll = Object.FindObjectsOfType<Camera>(true);
+            var canvases = Object.FindObjectsOfType<Canvas>(true);
+            float maxDepth = float.MinValue;
+            foreach (var c in camsAll)
+            {
+                if (c == null) continue;
+                if (c == playerCamera) continue;
+
+                // Skip cameras that are explicitly used by any Canvas (ScreenSpace - Camera)
+                bool usedByCanvas = false;
+                foreach (var canvas in canvases)
+                {
+                    try
+                    {
+                        if (canvas.renderMode == RenderMode.ScreenSpaceCamera && canvas.worldCamera == c)
+                        {
+                            usedByCanvas = true;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
+                if (usedByCanvas)
+                {
+                    Debug.Log($"[TitleCameraMove] Skipping disabling camera used by Canvas: {c.name}");
+                    if (c.depth > maxDepth) maxDepth = c.depth;
+                    continue;
+                }
+
+                // disable camera and record it to re-enable later
+                Debug.Log($"[TitleCameraMove] Disabling other Camera: {c.name} (enabled={c.enabled}, depth={c.depth})");
+                try
+                {
+                    if (!_disabledByPlayerSwitch.Contains(c)) _disabledByPlayerSwitch.Add(c);
+                    c.enabled = false;
+                }
+                catch { }
+                if (c.depth > maxDepth) maxDepth = c.depth;
+            }
+
+            // Bring player camera to front by increasing its depth if needed
+            if (playerCamera != null)
+            {
+                float desired = maxDepth + 1f;
+                if (playerCamera.depth < desired)
+                {
+                    Debug.Log($"[TitleCameraMove] Raising PlayerCamera depth from {playerCamera.depth} to {desired}");
+                    playerCamera.depth = desired;
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[TitleCameraMove] Error while disabling other cameras: " + ex);
+        }
 
         // NOTE: ball spawn logic removed. This method now only activates the player camera.
     }
@@ -451,6 +534,45 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
             }
         }
         catch { }
+
+        // Re-enable any Cameras that we explicitly disabled when switching to the player camera.
+        // Also ensure Cinemachine virtual cameras are active so brain can blend between them.
+        try
+        {
+            foreach (var c in _disabledByPlayerSwitch)
+            {
+                if (c == null) continue;
+                try
+                {
+                    c.enabled = true;
+                    Debug.Log($"[TitleCameraMove] Re-enabled Camera (was disabled by player switch): {c.name}");
+                }
+                catch { }
+            }
+            _disabledByPlayerSwitch.Clear();
+
+            if (cams != null)
+            {
+                foreach (var v in cams)
+                {
+                    if (v == null) continue;
+                    if (!v.gameObject.activeInHierarchy)
+                    {
+                        v.gameObject.SetActive(true);
+                        Debug.Log($"[TitleCameraMove] Re-activated vcam GameObject: {v.name}");
+                    }
+                    if (!v.enabled)
+                    {
+                        v.enabled = true;
+                        Debug.Log($"[TitleCameraMove] Enabled vcam component: {v.name}");
+                    }
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[TitleCameraMove] Error re-enabling cameras/vcams: " + ex);
+        }
 
         // Before switching cameras: invert UIInteractableSwitchers and swap fade durations on NetworkSceneTransition
         // We'll restore these after the camera sequence completes.
