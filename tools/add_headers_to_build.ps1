@@ -10,7 +10,6 @@ Usage:
   .\tools\add_headers_to_build.ps1 -BuildPath .\Build -Force
 
 #>
-
 param(
     [string]$BuildPath = ".\Build",
     [switch]$Force
@@ -88,11 +87,13 @@ if ((Test-Path $destHeaders) -and (-not $Force)) {
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($destHeaders, $headersContent, $utf8NoBom)
 
+Copy-Item -Path $template -Destination $destHeaders -Force:$Force
 if ($?) {
     Write-Host "_headers installed to $destHeaders" -ForegroundColor Green
     Write-Host "Now drag & drop the $BuildPath folder into Netlify (Deploys -> Drag and drop)" -ForegroundColor Cyan
     exit 0
 } else {
     Write-Error "Failed to write _headers to $destHeaders"
+    Write-Error "Failed to copy _headers to $destHeaders"
     exit 1
 }

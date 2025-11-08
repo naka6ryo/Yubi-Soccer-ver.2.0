@@ -1,0 +1,46 @@
+# _headers template for Netlify manual (drag-and-drop) deploys
+# Usage:
+# 1. Copy or rename this file to the root of the folder you will drag-and-drop to Netlify
+#    e.g. copy to your Build/ folder as: Build\_headers  -> then rename to Build\_headers to _headers (remove extension).
+#    On PowerShell:
+#      Copy-Item tools\_headers_build_template.txt Build\_headers
+#      Rename-Item Build\_headers _headers
+# 2. Drag-and-drop the folder (which contains `_headers` at its root) to Netlify UI.
+# This ensures Netlify applies the listed response headers to matching files.
+
+# Brotli-compressed JS (framework and regular)
+/Build/*.js.br
+  Content-Type: application/javascript
+  Content-Encoding: br
+  Cache-Control: public, max-age=31536000, immutable
+
+/Build/*.framework.js.br
+  Content-Type: application/javascript
+  Content-Encoding: br
+  Cache-Control: public, max-age=31536000, immutable
+
+# Brotli-compressed binary/data
+/Build/*.data.br
+  Content-Type: application/octet-stream
+  Content-Encoding: br
+  Cache-Control: public, max-age=31536000, immutable
+
+/Build/*.wasm.br
+  Content-Type: application/wasm
+  Content-Encoding: br
+  Cache-Control: public, max-age=31536000, immutable
+
+/Build/*.mem.br
+  Content-Type: application/octet-stream
+  Content-Encoding: br
+  Cache-Control: public, max-age=31536000, immutable
+
+# Fallback uncompressed variants (optional)
+/Build/*.js
+  Content-Type: application/javascript
+
+/Build/*.data
+  Content-Type: application/octet-stream
+
+/Build/*.wasm
+  Content-Type: application/wasm
