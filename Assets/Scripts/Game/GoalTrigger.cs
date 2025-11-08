@@ -103,6 +103,8 @@ namespace YubiSoccer.Field
             OnGoalScored?.Invoke(awardToTeam);
             // soundManager.PlaySE("ゴール");
             SoundManager.Instance.PlaySE("ゴール");
+            SoundManager.Instance.PlaySE("歓声01");
+            SoundManager.Instance.PlaySE("歓声02");
             if (soundManager != null)
             {
                 UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール");
