@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Cinemachine;
 using UnityEngine.SceneManagement;
+using Photon.Pun;
+using YubiSoccer;
 
 public class CM2_SwitchNearEndSmooth : MonoBehaviour
 {
@@ -221,6 +223,199 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
         playerCamera.enabled = true;
 
         Debug.Log("[TitleCameraMove] Switched to PlayerCamera: " + playerCamera.name);
+
+        // Try spawn ball when switching to player camera (only master client should spawn)
+        try
+        {
+            bool canSpawn = !PhotonNetwork.IsConnected || PhotonNetwork.IsMasterClient;
+            Debug.Log($"[TitleCameraMove] Photon connected={PhotonNetwork.IsConnected}, IsMasterClient={PhotonNetwork.IsMasterClient}, canSpawn={canSpawn}");
+
+            if (canSpawn)
+            {
+                // Try find active SoccerBallCreator first
+                var soccerCreator = Object.FindObjectOfType<SoccerBallCreator>();
+                if (soccerCreator == null)
+                {
+                    Debug.Log("[TitleCameraMove] SoccerBallCreator not found with FindObjectOfType. Searching including inactive objects...");
+                    try
+                    {
+                        // include inactive: may be available depending on Unity version
+                        var all = Object.FindObjectsOfType<SoccerBallCreator>(true);
+                        if (all != null && all.Length > 0)
+                        {
+                            soccerCreator = all[0];
+                            Debug.Log("[TitleCameraMove] Found SoccerBallCreator in inactive objects: " + soccerCreator.name);
+                        }
+                    }
+                    catch
+                    {
+                        // Fallback: try Resources search (may return assets too)
+                        var any = Resources.FindObjectsOfTypeAll(typeof(SoccerBallCreator));
+                        if (any != null && any.Length > 0)
+                        {
+                            soccerCreator = any[0] as SoccerBallCreator;
+                            if (soccerCreator != null)
+                                Debug.Log("[TitleCameraMove] Found SoccerBallCreator via Resources.FindObjectsOfTypeAll: " + soccerCreator.name);
+                        }
+                    }
+                }
+
+                if (soccerCreator != null)
+                {
+                    soccerCreator.SpawnLocalSoccerBall();
+                    Debug.Log("[TitleCameraMove] Triggered SoccerBallCreator.SpawnLocalSoccerBall()");
+                }
+                else
+                {
+                    Debug.LogWarning("[TitleCameraMove] SoccerBallCreator not found in scene; attempting direct spawn fallback...");
+                    // fallback: try to directly spawn the soccer prefab (same logic as SoccerBallCreator)
+                    TrySpawnBallFallback();
+                }
+            }
+            else
+            {
+                Debug.Log("[TitleCameraMove] Skipping ball spawn because not master client and connected.");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[TitleCameraMove] Failed to spawn ball on switch: " + ex);
+        }
+    }
+
+    private void TrySpawnBallFallback()
+    {
+        const string defaultPrefabName = "Soccer Ball";
+        var prefab = Resources.Load<GameObject>(defaultPrefabName);
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[TitleCameraMove] Fallback prefab '{defaultPrefabName}' not found in Resources. Cannot spawn ball.");
+            return;
+        }
+
+        // spawn position - reuse same default coordinates used elsewhere
+        var spawnPos = new Vector3(1826.69f, 12.95f, 1821.66f);
+
+        GameObject inst = null;
+        try
+        {
+            if (Photon.Pun.PhotonNetwork.IsConnected && Photon.Pun.PhotonNetwork.InRoom)
+            {
+                if (Photon.Pun.PhotonNetwork.IsMasterClient)
+                {
+                    inst = Photon.Pun.PhotonNetwork.Instantiate(defaultPrefabName, spawnPos, Quaternion.identity);
+                    Debug.Log("[TitleCameraMove] Fallback: PhotonNetwork.Instantiate used to spawn ball.");
+                }
+                else
+                {
+                    Debug.Log("[TitleCameraMove] Fallback: Not MasterClient, skipping network instantiate.");
+                }
+            }
+            else
+            {
+                inst = Instantiate(prefab, spawnPos, Quaternion.identity);
+                Debug.Log("[TitleCameraMove] Fallback: Local Instantiate used to spawn ball.");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[TitleCameraMove] Fallback spawn failed: " + ex);
+        }
+
+        if (inst != null)
+        {
+            // Get Rigidbody once and reuse
+            Rigidbody rbRef = null;
+            try
+            {
+                rbRef = inst.GetComponent<Rigidbody>();
+                // If this was a local Instantiate (not PhotonNetwork.Instantiate), the BallNetworkSync
+                // component may treat this object as a non-owner and continuously zero velocities
+                // (followVelocities). When Photon is not connected, disable the network sync so
+                // physics runs normally.
+                try
+                {
+                    if (!Photon.Pun.PhotonNetwork.IsConnected)
+                    {
+                        var bns = inst.GetComponent<YubiSoccer.Network.BallNetworkSync>();
+                        if (bns != null)
+                        {
+                            bns.enabled = false;
+                            Debug.Log("[TitleCameraMove] Disabled BallNetworkSync on locally-instantiated ball to allow physics.");
+                        }
+                    }
+                }
+                catch { }
+                if (rbRef != null)
+                {
+                    // Force physics-on state to avoid runtime scripts or networking components leaving it kinematic
+                    rbRef.isKinematic = false;
+                    rbRef.useGravity = true;
+                    rbRef.constraints = RigidbodyConstraints.None;
+                    rbRef.WakeUp();
+                    Debug.Log($"[TitleCameraMove] Spawned ball Rigidbody state: isKinematic={rbRef.isKinematic}, useGravity={rbRef.useGravity}, velocity={rbRef.linearVelocity}");
+                }
+                else
+                {
+                    Debug.LogWarning("[TitleCameraMove] Spawned ball has no Rigidbody component.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[TitleCameraMove] Error while enforcing Rigidbody settings on spawned ball: " + ex);
+            }
+
+            // Register with systems similar to SoccerBallCreator
+            try
+            {
+                var glassType = typeof(YubiSoccer.Environment.BreakableProximityGlass);
+                var rm = inst.transform;
+                YubiSoccer.Environment.BreakableProximityGlass.RegisterBallForAll(rm);
+            }
+            catch { }
+            try { YubiSoccer.UI.BallOffScreenIndicator.RegisterBallForAll(inst.transform); } catch { }
+            try
+            {
+                var goalResetManager = Object.FindObjectOfType<YubiSoccer.Game.GoalResetManager>();
+                if (goalResetManager != null && rbRef != null)
+                {
+                    goalResetManager.RegisterBall(rbRef);
+                }
+            }
+            catch { }
+
+            // Workaround: some components may overwrite Rigidbody state on their Enable/Start.
+            // Re-apply desired physics settings for a few FixedUpdate frames to override later changes.
+            if (rbRef != null)
+            {
+                StartCoroutine(EnforcePhysicsForFrames(rbRef, 30)); // ~0.5s at 60Hz
+            }
+        }
+    }
+
+    private IEnumerator EnforcePhysicsForFrames(Rigidbody rb, int frames)
+    {
+        if (rb == null || frames <= 0) yield break;
+        int i = 0;
+        while (i < frames)
+        {
+            try
+            {
+                if (rb == null) yield break;
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.constraints = RigidbodyConstraints.None;
+                rb.WakeUp();
+                // Log only occasionally to avoid spamming
+                if (i == 0 || i == frames - 1)
+                {
+                    Debug.Log($"[TitleCameraMove] EnforcePhysicsForFrames #{i} on {rb.name}: isKinematic={rb.isKinematic}, useGravity={rb.useGravity}, pos={rb.position}");
+                }
+            }
+            catch { }
+            i++;
+            yield return new WaitForFixedUpdate();
+        }
     }
 
     void SetHighest(int index)
