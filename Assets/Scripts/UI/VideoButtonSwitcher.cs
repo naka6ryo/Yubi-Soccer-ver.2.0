@@ -37,10 +37,10 @@ namespace YubiSoccer.UI
         private Coroutine fadeRoutine;
         // If we need to tint a Renderer, cache an instantiated material so we don't keep creating instances
         private Material _instancedRendererMaterial;
-    // If the VideoPlayer is managed by a VideoPlayerController, keep reference to it
-    private VideoPlayerController _videoPlayerController;
-    // If RenderTexture is used, try to find the RawImage that displays it so we can fade that
-    private RawImage _targetRawImage;
+        // If the VideoPlayer is managed by a VideoPlayerController, keep reference to it
+        private VideoPlayerController _videoPlayerController;
+        // If RenderTexture is used, try to find the RawImage that displays it so we can fade that
+        private RawImage _targetRawImage;
 
         void Awake()
         {
