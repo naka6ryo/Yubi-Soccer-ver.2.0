@@ -224,63 +224,7 @@ public class CM2_SwitchNearEndSmooth : MonoBehaviour
 
         Debug.Log("[TitleCameraMove] Switched to PlayerCamera: " + playerCamera.name);
 
-        // Try spawn ball when switching to player camera (only master client should spawn)
-        try
-        {
-            bool canSpawn = !PhotonNetwork.IsConnected || PhotonNetwork.IsMasterClient;
-            Debug.Log($"[TitleCameraMove] Photon connected={PhotonNetwork.IsConnected}, IsMasterClient={PhotonNetwork.IsMasterClient}, canSpawn={canSpawn}");
-
-            if (canSpawn)
-            {
-                // Try find active SoccerBallCreator first
-                var soccerCreator = Object.FindObjectOfType<SoccerBallCreator>();
-                if (soccerCreator == null)
-                {
-                    Debug.Log("[TitleCameraMove] SoccerBallCreator not found with FindObjectOfType. Searching including inactive objects...");
-                    try
-                    {
-                        // include inactive: may be available depending on Unity version
-                        var all = Object.FindObjectsOfType<SoccerBallCreator>(true);
-                        if (all != null && all.Length > 0)
-                        {
-                            soccerCreator = all[0];
-                            Debug.Log("[TitleCameraMove] Found SoccerBallCreator in inactive objects: " + soccerCreator.name);
-                        }
-                    }
-                    catch
-                    {
-                        // Fallback: try Resources search (may return assets too)
-                        var any = Resources.FindObjectsOfTypeAll(typeof(SoccerBallCreator));
-                        if (any != null && any.Length > 0)
-                        {
-                            soccerCreator = any[0] as SoccerBallCreator;
-                            if (soccerCreator != null)
-                                Debug.Log("[TitleCameraMove] Found SoccerBallCreator via Resources.FindObjectsOfTypeAll: " + soccerCreator.name);
-                        }
-                    }
-                }
-
-                if (soccerCreator != null)
-                {
-                    soccerCreator.SpawnLocalSoccerBall();
-                    Debug.Log("[TitleCameraMove] Triggered SoccerBallCreator.SpawnLocalSoccerBall()");
-                }
-                else
-                {
-                    Debug.LogWarning("[TitleCameraMove] SoccerBallCreator not found in scene; attempting direct spawn fallback...");
-                    // fallback: try to directly spawn the soccer prefab (same logic as SoccerBallCreator)
-                    TrySpawnBallFallback();
-                }
-            }
-            else
-            {
-                Debug.Log("[TitleCameraMove] Skipping ball spawn because not master client and connected.");
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogWarning("[TitleCameraMove] Failed to spawn ball on switch: " + ex);
-        }
+        // NOTE: ball spawn logic removed. This method now only activates the player camera.
     }
 
     private void TrySpawnBallFallback()
