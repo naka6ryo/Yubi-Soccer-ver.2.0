@@ -41,6 +41,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public string matchingSceneName = "Matching";
 
     bool joinAfterConnect = false;
+    string pendingRoomName = null; // オリジナルルーム作成/参加用のルーム名を保持
+    byte pendingRoomMaxPlayers = 0; // オリジナルルーム作成時の最大人数を保持
+    bool isCreatingCustomRoom = false; // ルーム作成中かどうかのフラグ
 
     void Awake()
     {
@@ -113,6 +116,72 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.JoinRandomRoom(null, maxPlayers);
     }
 
+    /// <summary>
+    /// オリジナルルームを作成（UI の InputField から呼ぶ）
+    /// オリジナルルームを作成（UI の InputField から呼ぶ）
+    /// </summary>
+    /// <param name="roomName">作成するルーム名（英数字推奨）</param>
+    /// <param name="maxPlayersForRoom">最大人数（2, 4, 6 など）</param>
+    public void CreateCustomRoom(string roomName, byte maxPlayersForRoom)
+    {
+        if (string.IsNullOrEmpty(roomName))
+        {
+            Debug.LogError("CreateCustomRoom: Room name cannot be empty!");
+            Log("エラー: ルーム名を入力してください");
+            return;
+        }
+
+        pendingRoomName = roomName;
+        pendingRoomMaxPlayers = maxPlayersForRoom;
+        isCreatingCustomRoom = true;
+
+        if (!PhotonNetwork.IsConnected || !PhotonNetwork.IsConnectedAndReady)
+        {
+            joinAfterConnect = true;
+            Log($"接続中... ルーム '{roomName}' を作成します（{maxPlayersForRoom}人部屋）");
+            PhotonNetwork.ConnectUsingSettings();
+            return;
+        }
+
+        Log($"オリジナルルーム '{roomName}' を作成中...（{maxPlayersForRoom}人部屋）");
+        RoomOptions roomOptions = new RoomOptions
+        {
+            MaxPlayers = maxPlayersForRoom,
+            IsVisible = false, // ★ ロビーに表示しない（ルーム名を知っている人のみ参加可能）
+            IsOpen = true
+        };
+        PhotonNetwork.CreateRoom(roomName, roomOptions);
+    }
+    
+    /// <summary>
+    /// オリジナルルームに参加
+    /// </summary>
+    /// <param name="roomName">参加するルーム名</param>
+    public void JoinCustomRoom(string roomName)
+    {
+        if (string.IsNullOrEmpty(roomName))
+        {
+            Debug.LogError("JoinCustomRoom: Room name cannot be empty!");
+            Log("エラー: ルーム名を入力してください");
+            return;
+        }
+
+        pendingRoomName = roomName;
+        pendingRoomMaxPlayers = 0;
+        isCreatingCustomRoom = false;
+
+        if (!PhotonNetwork.IsConnected || !PhotonNetwork.IsConnectedAndReady)
+        {
+            joinAfterConnect = true;
+            Log($"接続中... ルーム '{roomName}' に参加します");
+            PhotonNetwork.ConnectUsingSettings();
+            return;
+        }
+
+        Log($"オリジナルルーム '{roomName}' に参加中...");
+        PhotonNetwork.JoinRoom(roomName);
+    }
+
     // Photon callbacks
     public override void OnConnectedToMaster()
     {
@@ -131,14 +200,32 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CreateRoom(null, opt);
     }
 
+    public override void OnJoinRoomFailed(short returnCode, string message)
+    {
+        Log($"オリジナルルームへの参加失敗 ({returnCode}): {message}");
+        Debug.LogError($"ルーム '{pendingRoomName}' に参加できませんでした。ルーム名が間違っているか、ルームが存在しません。");
+        pendingRoomName = null;
+    }
+
+    public override void OnCreateRoomFailed(short returnCode, string message)
+    {
+        Log($"オリジナルルームの作成失敗 ({returnCode}): {message}");
+        Debug.LogError($"ルーム '{pendingRoomName}' を作成できませんでした。同じ名前のルームが既に存在する可能性があります。");
+        pendingRoomName = null;
+    }
+
     public override void OnCreatedRoom()
     {
-        Log("Room created.");
+        Log($"Room created: {PhotonNetwork.CurrentRoom.Name} ({PhotonNetwork.CurrentRoom.MaxPlayers} max players)");
+        pendingRoomName = null;
+        pendingRoomMaxPlayers = 0;
     }
 
     public override void OnJoinedRoom()
     {
-        Log($"Joined room. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
+        Log($"Joined room: {PhotonNetwork.CurrentRoom.Name}. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
+        pendingRoomName = null;
+        pendingRoomMaxPlayers = 0;
 
         // マスタークライアントのみがシーン遷移を実行（AutomaticallySyncScene = true により全クライアントが同期）
         if (PhotonNetwork.IsMasterClient)
