@@ -1,6 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
+using YubiSoccer.Game;
 
 /// <summary>
 /// ゲームシーンでローカルプレイヤーを生成するクラス。
@@ -17,6 +18,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
 
     [Tooltip("スポーン高さ（Y）")]
     public float spawnHeight = 4.0f;
+
     [Header("Audio Settings")]
     [Tooltip("ローカルプレイヤーに AudioListener を追加する（カメラに付ける場合は true）")]
     public bool addAudioListenerToCamera = true;
@@ -53,12 +55,29 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
 
     void SpawnLocalPlayer()
     {
-        // プレハブ存在確認
-        var prefab = Resources.Load<GameObject>(playerPrefabName);
-        if (prefab == null)
+        if (TeamManager.Instance == null)
         {
-            Debug.LogError($"PlayerSpawner: Prefab '{playerPrefabName}' not found in Resources folder.");
+            Debug.LogError("[PlayerCreator] TeamManager not found!");
             return;
+        }
+
+        // チームに応じたプレハブ名を取得
+        Team team = TeamManager.Instance.GetLocalPlayerTeam();
+        string prefabName = TeamManager.Instance.GetTeamPrefabName(team);
+
+        // プレハブ存在確認
+        var teamPrefab = Resources.Load<GameObject>(prefabName);
+        if (teamPrefab == null)
+        {
+            Debug.LogWarning($"[PlayerCreator] Team prefab '{prefabName}' not found in Resources. Falling back to base '{playerPrefabName}'.");
+
+            // フォールバック: 共通プレハブ
+            teamPrefab = Resources.Load<GameObject>(playerPrefabName);
+            if (teamPrefab == null)
+            {
+                Debug.LogError($"[PlayerCreator] Base prefab '{playerPrefabName}' also not found in Resources. Abort spawn.");
+                return;
+            }
         }
 
         // ランダムスポーン位置
@@ -72,7 +91,8 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
 
         try
         {
-            localPlayerInstance = PhotonNetwork.Instantiate(playerPrefabName, spawnPos, Quaternion.identity);
+            localPlayerInstance = PhotonNetwork.Instantiate(teamPrefab.name, spawnPos, Quaternion.identity);
+            Debug.Log($"[PlayerCreator] Spawned player as {team} using prefab '{teamPrefab.name}'");
             SetupAudioListener(localPlayerInstance);
         }
         catch (System.Exception ex)
@@ -95,6 +115,36 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
             }
         }
     }
+
+    /// <summary>
+    /// ユニフォームの色を設定
+    /// </summary>
+    // void SetUniformColor(GameObject playerInstance, Team team)
+    // {
+    //     if (playerInstance == null || TeamManager.Instance == null) return;
+
+    //     Renderer[] renderers = playerInstance.GetComponentsInChildren<Renderer>();
+
+    //     foreach (var renderer in renderers)
+    //     {
+    //         if (renderer.gameObject.name == uniformRendererName)
+    //         {
+    //             Material teamMaterial = TeamManager.Instance.GetTeamMaterial(team);
+
+    //             if (teamMaterial != null)
+    //             {
+    //                 renderer.material = teamMaterial;
+    //                 Debug.Log($"[PlayerCreator] Set {renderer.name} to {team} material");
+    //             }
+    //             else
+    //             {
+    //                 Debug.LogWarning($"[PlayerCreator] {team} material is not assigned in TeamManager!");
+    //             }
+
+    //             break; // 最初に見つかったRendererのみ変更
+    //         }
+    //     }
+    // }
 
     /// <summary>
     /// ローカルプレイヤーに AudioListener を追加・有効化する
