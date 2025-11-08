@@ -821,7 +821,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e0edc906d5d350a46b708a2363f59a98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  targetSceneName: GameTitle
+  targetSceneName: GameTitleEdition
   transitionOnConnected: 1
   fadeImage: {fileID: 975113985}
   fadeColor: {r: 1, g: 1, b: 1, a: 1}
@@ -1182,7 +1182,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e0edc906d5d350a46b708a2363f59a98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  targetSceneName: GameTitle
+  targetSceneName: GameTitleEdition
   transitionOnConnected: 1
   fadeImage: {fileID: 975113985}
   fadeColor: {r: 1, g: 1, b: 1, a: 1}
