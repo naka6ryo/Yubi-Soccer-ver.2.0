@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 
 namespace YubiSoccer.Utilities
 {
@@ -19,122 +20,153 @@ namespace YubiSoccer.Utilities
     [DisallowMultipleComponent]
     public class SpawnController : MonoBehaviour
     {
-        [Header("Spawn Settings")]
-        [Tooltip("生成する Prefab（GameObject）")]
-        public GameObject prefab;
+        [Header("Camera Switch Settings")]
+        [Tooltip("Player Camera to watch for activation. If null the script will try to find 'PlayerCamera' by name or by Player tag.")]
+        public Camera playerCamera;
 
-        [Tooltip("生成位置（未設定の場合は this.transform の位置に生成）")]
-        public Transform spawnPoint;
+        [Tooltip("Only run the kinematic-off action once after the first camera switch (recommended).")]
+        public bool runOnce = true;
 
-        [Tooltip("生成したインスタンスを保持するか（true の場合、既に生成済みなら再生成しません）")]
-        public bool keepInstance = true;
+        // internal state
+        private bool _hasRun = false;
+        private bool _prevPlayerCameraActive = false;
 
-        [Tooltip("起動時に自動で Spawn を実行するか")]
-        public bool spawnOnStart = false;
-
-        [Header("Auto Respawn")]
-        [Tooltip("Despawn 後に自動で再生成する遅延時間（秒）。0 は自動再生成なし。")]
-        public float autoRespawnDelay = 0f;
-
-        [Header("Events")]
-        public UnityEvent onSpawned;
-        public UnityEvent onDespawned;
-
-        // 生成されたインスタンス参照
-        private GameObject _instance;
-
-        void Start()
+        void Awake()
         {
-            if (spawnOnStart)
+            if (playerCamera == null)
             {
-                Spawn();
+                var go = GameObject.Find("PlayerCamera");
+                if (go != null) playerCamera = go.GetComponent<Camera>();
+
+                if (playerCamera == null)
+                {
+                    var byTag = GameObject.FindWithTag("Player");
+                    if (byTag != null)
+                    {
+                        var cam = byTag.GetComponentInChildren<Camera>(true);
+                        if (cam != null) playerCamera = cam;
+                    }
+                }
             }
+
+            _prevPlayerCameraActive = IsPlayerCameraActive();
+        }
+
+        void Update()
+        {
+            if (_hasRun && runOnce) return;
+
+            bool isActive = IsPlayerCameraActive();
+            // detect transition from inactive -> active
+            if (!_prevPlayerCameraActive && isActive)
+            {
+                // PlayerCamera became active: perform kinematic-off on soccer ball(s)
+                DisableKinematicOnSceneBalls();
+                _hasRun = true;
+                if (runOnce) enabled = false; // stop updating
+            }
+            _prevPlayerCameraActive = isActive;
+        }
+
+        private bool IsPlayerCameraActive()
+        {
+            if (playerCamera == null) return false;
+            try
+            {
+                return playerCamera.gameObject.activeInHierarchy && playerCamera.enabled;
+            }
+            catch { return false; }
         }
 
         /// <summary>
-        /// インスタンスが存在するか
+        /// Find soccer ball(s) in the current scene and set their Rigidbody.isKinematic = false.
+        /// This method is conservative: it tries tag-based lookup first, then name-based fallback,
+        /// then finally checks all Rigidbodies and picks likely candidates by name.
         /// </summary>
-        public bool IsSpawned() => _instance != null;
-
-        /// <summary>
-        /// 生成済みインスタンスを返します（存在しなければ null）
-        /// </summary>
-        public GameObject GetInstance() => _instance;
-
-        /// <summary>
-        /// Prefab を生成します。既にインスタンスがあり keepInstance=true の場合は何もしません。
-        /// </summary>
-        public GameObject Spawn()
+        private void DisableKinematicOnSceneBalls()
         {
-            if (prefab == null)
+            Debug.Log("[SpawnController] PlayerCamera activated — disabling kinematic on soccer ball(s)");
+            var handled = false;
+
+            // Try common tags first
+            string[] tagsToTry = new[] { "SoccerBall", "Ball" };
+            foreach (var tag in tagsToTry)
             {
-                Debug.LogWarning("[SpawnController] prefab is not assigned.");
-                return null;
+                try
+                {
+                    var objs = GameObject.FindGameObjectsWithTag(tag);
+                    if (objs != null && objs.Length > 0)
+                    {
+                        foreach (var o in objs)
+                        {
+                            TryDisableKinematic(o);
+                        }
+                        handled = true;
+                    }
+                }
+                catch { /* tag may not exist; ignore */ }
             }
 
-            if (keepInstance && _instance != null)
+            if (handled) return;
+
+            // Fallback: search by name patterns
+            var candidates = new System.Collections.Generic.List<GameObject>();
+            var allRoots = SceneManager.GetActiveScene().GetRootGameObjects();
+            foreach (var root in allRoots)
             {
-                return _instance;
+                foreach (var rb in root.GetComponentsInChildren<Rigidbody>(true))
+                {
+                    var go = rb.gameObject;
+                    var name = go.name.ToLower();
+                    if (name.Contains("soccer") || name.Contains("soccer ball") || name.Contains("ball"))
+                    {
+                        candidates.Add(go);
+                    }
+                }
             }
 
-            Vector3 pos = spawnPoint != null ? spawnPoint.position : transform.position;
-            Quaternion rot = spawnPoint != null ? spawnPoint.rotation : transform.rotation;
-
-            var go = Instantiate(prefab, pos, rot);
-            _instance = go;
-
-            onSpawned?.Invoke();
-            Debug.Log("[SpawnController] Spawned: " + prefab.name);
-            return go;
-        }
-
-        /// <summary>
-        /// 生成物を破棄（完全削除）。autoRespawnDelay が設定されていれば再生成をスケジュールします。
-        /// </summary>
-        public void Despawn()
-        {
-            if (_instance == null)
+            if (candidates.Count > 0)
             {
+                foreach (var g in candidates)
+                {
+                    TryDisableKinematic(g);
+                }
                 return;
             }
 
-            Destroy(_instance);
-            _instance = null;
-            onDespawned?.Invoke();
-            Debug.Log("[SpawnController] Despawned");
-
-            if (autoRespawnDelay > 0f)
+            // Last resort: find any Rigidbody that looks like a ball by having a SphereCollider and a reasonable mass
+            foreach (var rb in Object.FindObjectsOfType<Rigidbody>())
             {
-                StartCoroutine(CoRespawnAfter(autoRespawnDelay));
+                try
+                {
+                    var sc = rb.GetComponent<SphereCollider>();
+                    if (sc != null && rb.mass > 0f)
+                    {
+                        TryDisableKinematic(rb.gameObject);
+                    }
+                }
+                catch { }
             }
         }
 
-        /// <summary>
-        /// 既にあれば消す、なければ生成するトグル
-        /// </summary>
-        public void Toggle()
+        private void TryDisableKinematic(GameObject go)
         {
-            if (IsSpawned()) Despawn();
-            else Spawn();
-        }
-
-        /// <summary>
-        /// Despawn してから指定秒後に Spawn します（現在のインスタンスが存在するなら先に破棄します）
-        /// </summary>
-        public void Respawn(float delaySeconds)
-        {
-            if (_instance != null)
+            if (go == null) return;
+            try
             {
-                Destroy(_instance);
-                _instance = null;
+                var rb = go.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = false;
+                    rb.useGravity = true;
+                    rb.WakeUp();
+                    Debug.Log($"[SpawnController] Disabled kinematic on: {go.name}");
+                }
             }
-            StartCoroutine(CoRespawnAfter(delaySeconds));
-        }
-
-        private IEnumerator CoRespawnAfter(float seconds)
-        {
-            if (seconds > 0f) yield return new WaitForSeconds(seconds);
-            Spawn();
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[SpawnController] Failed to disable kinematic on " + go.name + ": " + ex);
+            }
         }
     }
 }
