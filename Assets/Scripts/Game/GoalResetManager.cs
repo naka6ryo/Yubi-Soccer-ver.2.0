@@ -167,7 +167,9 @@ namespace YubiSoccer.Game
             ballRigidbody.linearVelocity = Vector3.zero;
             ballRigidbody.angularVelocity = Vector3.zero;
 
+            soundManager.SetSEVolume(10.0f);
             soundManager.PlaySE("ホイッスル01");
+            soundManager.SetSEVolume(1.0f);
 
             // 位置・回転を初期値に戻す（PhotonTransformView/BallNetworkSync があれば自動で同期される）
             ballRigidbody.transform.SetPositionAndRotation(initialPos, initialRot);
