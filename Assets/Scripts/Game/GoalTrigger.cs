@@ -104,7 +104,7 @@ namespace YubiSoccer.Field
             // soundManager.PlaySE("ゴール");
             soundManager.PlaySE("ゴール");
             // サウンドマネージャーの音量を上げる
-            soundManager.SetSEVolume(2.0f);
+            soundManager.SetSEVolume(10.0f);
             soundManager.PlaySE("歓声01");
             soundManager.PlaySE("歓声02");
             soundManager.SetSEVolume(1.0f);
