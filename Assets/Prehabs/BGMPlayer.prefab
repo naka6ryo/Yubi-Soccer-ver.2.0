@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 2554394121043171161}
   - component: {fileID: 8552821608549177318}
   m_Layer: 0
-  m_Name: OpningBGMPlayer
+  m_Name: BGMPlayer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

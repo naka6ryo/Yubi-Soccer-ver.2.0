@@ -1026,6 +1026,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2100000, guid: 446a06e13466c2e40892bd720fc6a9bb, type: 2}
     - target: {fileID: 6778632355985981360, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 6778632355985981360, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
       propertyPath: m_textAlignment
       value: 65535
       objectReference: {fileID: 0}
