@@ -941,7 +941,7 @@ MonoBehaviour:
   enableOnClick: 1
   startDisabled: 1
   useFade: 1
-  fadeDuration: 1
+  fadeDuration: 1.5
   controlButton: {fileID: 144327689}
 --- !u!114 &50152027
 MonoBehaviour:
@@ -20548,6 +20548,14 @@ MonoBehaviour:
   twoToThreeBlendTime: 1.5
   twoToThreeStyle: 5
   brain: {fileID: 1068584016}
+  preferNamedInitialCamera: 1
+  preferredInitialCameraName: Camera
+  applyNamedPreferenceOnlyForScene: 0
+  targetSceneName: 
+  initialCamera: {fileID: 1068584013}
+  deactivatePlayerCameraAtStart: 1
+  switchToPlayerCameraOnComplete: 1
+  playerCamera: {fileID: 1597911350}
 --- !u!1001 &1068657937
 PrefabInstance:
   m_ObjectHideFlags: 0
