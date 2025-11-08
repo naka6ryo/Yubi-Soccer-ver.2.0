@@ -24,6 +24,8 @@ namespace YubiSoccer.Game
         [SerializeField] private Rigidbody ballRigidbody; // Transformでも可
         [Tooltip("マルチプレイヤー時、MasterClient のみがボールをリセットする")]
         [SerializeField] private bool onlyMasterClientResets = true;
+        [Tooltip("true の場合、ゴール後にボールを初期位置にリセットします。Inspector でオフにするとボールはリセットされません（既定: true）")]
+        [SerializeField] private bool enableBallReset = true;
 
         [Header("Breakable Glass Respawn")]
         [Tooltip("自動でシーン内の BreakableProximityGlassSpawner を収集する")]
@@ -94,8 +96,8 @@ namespace YubiSoccer.Game
             }
             else
             {
-                // ボールを初期位置へ移動（MasterClient のみ）
-                if (resetBall)
+                // ボールを初期位置へ移動（MasterClient のみ） — Inspector で無効化可能
+                if (resetBall && enableBallReset)
                 {
                     ResetBall();
 
