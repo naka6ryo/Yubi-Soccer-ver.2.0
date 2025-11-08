@@ -8,8 +8,11 @@ public class SoccerBallCreator : MonoBehaviour
 {
     public string soccerPrefabName = "Soccer Ball";
     private GameObject localSoccerBallInstance;
+    private SoundManager soundManager;
     void Start()
     {
+        soundManager = SoundManager.Instance;
+
         // 部屋に入っていない場合はスキップ
         if (!PhotonNetwork.IsConnected || !PhotonNetwork.InRoom)
         {
@@ -23,7 +26,7 @@ public class SoccerBallCreator : MonoBehaviour
         }
     }
 
-    void SpawnLocalSoccerBall()
+    public void SpawnLocalSoccerBall()
     {
         // プレハブ存在確認
         var prefab = Resources.Load<GameObject>(soccerPrefabName);
