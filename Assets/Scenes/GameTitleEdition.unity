@@ -93,7 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 112000000, guid: 0508223cf03772446b25de9a1a25024e, type: 2}
+  m_LightingDataAsset: {fileID: 112000000, guid: 65ca514dd02cb4328bcc3a0bd278df10, type: 2}
   m_LightingSettings: {fileID: 4890085278179872738, guid: 3ca8f44dee0c7324cb028c26c246fd98, type: 2}
 --- !u!196 &4
 NavMeshSettings:
@@ -4254,6 +4254,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5667398061297613528, guid: 960738f0bb961154982fec3acaff0170, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 7860255057112292797, guid: 960738f0bb961154982fec3acaff0170, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -34535,6 +34539,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 858747514885235253, guid: 795929fbd2abb1f46bb4b881b5edae5b, type: 3}
   m_PrefabInstance: {fileID: 1806949743}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &1813195050 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4935240531098310, guid: ec3e8f3ed27e2244caaedaf589590a03, type: 3}
+  m_PrefabInstance: {fileID: 1634003960}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1828350450
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -37490,7 +37499,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6adbcadf298077c4c918088fb1d134e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  target: {fileID: 0}
+  target: {fileID: 1813195050}
   arrowIndicator: {fileID: 159468588}
   canvas: {fileID: 1380575700}
   referenceCamera: {fileID: 1597911350}
