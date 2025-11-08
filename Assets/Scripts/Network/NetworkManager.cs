@@ -219,6 +219,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Log($"Room created: {PhotonNetwork.CurrentRoom.Name} ({PhotonNetwork.CurrentRoom.MaxPlayers} max players)");
         pendingRoomName = null;
         pendingRoomMaxPlayers = 0;
+
+        // ルームタイプを設定
+        if (TeamManager.Instance != null)
+        {
+            TeamManager.Instance.SetRoomType("quick");
+        }
     }
 
     public override void OnJoinedRoom()
@@ -226,6 +232,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Log($"Joined room: {PhotonNetwork.CurrentRoom.Name}. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
         pendingRoomName = null;
         pendingRoomMaxPlayers = 0;
+
+        // チーム自動割り当て
+        if (TeamManager.Instance != null)
+        {
+            TeamManager.Instance.AssignTeamOnJoinRoom();
+        }
 
         // マスタークライアントのみがシーン遷移を実行（AutomaticallySyncScene = true により全クライアントが同期）
         if (PhotonNetwork.IsMasterClient)
