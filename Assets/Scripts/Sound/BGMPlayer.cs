@@ -1,16 +1,14 @@
 using UnityEngine;
 
-public class OpeningBGMPlayer : MonoBehaviour
+public class BGMPlayer : MonoBehaviour
 {
+    [SerializeField] private string bgmName = "タイトル";
     private SoundManager soundManager;
 
     void Start()
     {
         soundManager = SoundManager.Instance;
-        if (soundManager != null)
-        {
-            soundManager.PlayBGM("タイトル");
-        }
+        soundManager.PlayBGM(bgmName);
     }
 
     void OnDestroy()
