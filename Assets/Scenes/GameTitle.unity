@@ -362,6 +362,7 @@ MonoBehaviour:
   appId: 94d602f9-f0c0-4010-b408-0b47e8bc3d67
   maxPlayers: 2
   autoConnectOnStart: 1
+  startGameButton: {fileID: 0}
   statusDisplay: {fileID: 874583757}
   gameSceneName: Multi Player Stadium
   matchingSceneName: Matching

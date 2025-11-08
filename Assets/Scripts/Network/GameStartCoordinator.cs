@@ -19,12 +19,15 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
     [SerializeField] private float countdownStartDelay = 1.0f;
     public CountdownUI countDown;
 
+    private SoundManager soundManager;
+
     void Start()
     {
         // 自分の読み込み完了をルームのプレイヤープロパティに設定
         var props = new ExitGames.Client.Photon.Hashtable { { PROP_PLAYER_LOADED, true } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         Debug.Log("[GameStartCoordinator] Set playerLoaded=true");
+        soundManager = SoundManager.Instance;
 
         // マスターは即チェック（既に全員揃っている可能性がある）
         if (PhotonNetwork.IsMasterClient)
@@ -105,6 +108,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
             if (remainMs <= 0)
             {
+                soundManager.PlayBGM("試合中");
                 // 既に開始時刻を過ぎている → 即座に開始
                 Debug.Log("[GameStartCoordinator] Start time already passed - starting immediately");
                 if (countDown != null) countDown.Play();
