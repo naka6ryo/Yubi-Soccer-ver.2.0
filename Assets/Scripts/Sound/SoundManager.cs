@@ -36,7 +36,6 @@ public class SoundManager : MonoBehaviour
         // AudioSourceコンポーネントを取得
         // BGM用とSE用でAudioSourceを分けるため、2つ目のAudioSourceを追加する
         bgmSource = GetComponent<AudioSource>();
-        seSource = gameObject.AddComponent<AudioSource>(); // SE用のSourceを追加
 
         // BGMはループ再生を基本とする
         bgmSource.loop = true;
@@ -128,5 +127,24 @@ public class SoundManager : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    public void SetSEVolume(float volume)
+    {
+        if (seSource != null)
+        {
+            seSource.volume = volume;
+        }
+    }
+
+    /// <summary>
+    /// BGM の音量を設定する（0.0 - 1.0）
+    /// </summary>
+    public void SetBGMVolume(float volume)
+    {
+        if (bgmSource != null)
+        {
+            bgmSource.volume = Mathf.Clamp01(volume);
+        }
     }
 }
