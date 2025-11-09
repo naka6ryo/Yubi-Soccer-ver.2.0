@@ -1,3 +1,4 @@
+using System.Diagnostics.Contracts;
 using UnityEngine;
 
 // AudioSourceコンポーネントが必須であることを示す
@@ -136,7 +137,7 @@ public class SoundManager : MonoBehaviour
             seSource.volume = volume;
         }
     }
-
+    
     /// <summary>
     /// BGM の音量を設定する（0.0 - 1.0）
     /// </summary>
