@@ -1,3 +1,4 @@
+using System.Diagnostics.Contracts;
 using UnityEngine;
 
 // AudioSourceコンポーネントが必須であることを示す
@@ -128,5 +129,13 @@ public class SoundManager : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    public void SetSEVolume(float volume)
+    {
+        if (seSource != null)
+        {
+            seSource.volume = volume;
+        }
     }
 }
