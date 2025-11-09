@@ -40,6 +40,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [Tooltip("マッチングシーンの名前")]
     public string matchingSceneName = "Matching";
 
+    [Header("TitleScene")]
+    [Tooltip("タイトル（ホーム）シーン名")]
+    public string titleSceneName = "GameTitle";
+
     bool joinAfterConnect = false;
     string pendingRoomName = null; // オリジナルルーム作成/参加用のルーム名を保持
     byte pendingRoomMaxPlayers = 0; // オリジナルルーム作成時の最大人数を保持
@@ -300,6 +304,36 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
         }
+    }
+
+    // タイトルへ戻る公開API（ボタンから呼ぶ）
+    public void ReturnToTitleAndDisconnect()
+    {
+        StartCoroutine(CoReturnToTitle());
+    }
+
+    // MOD: 切断＋シーン戻りコルーチン
+    private IEnumerator CoReturnToTitle()
+    {
+        // 以後自動再接続を防ぐ
+        joinAfterConnect = false;
+
+        // ルーム離脱
+        if (PhotonNetwork.InRoom)
+        {
+            Log("Leaving room...");
+            PhotonNetwork.LeaveRoom();
+            float t = 0f;
+            while (PhotonNetwork.InRoom && t < 5f)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        // タイトルへ遷移
+        Log("Loading title scene: " + titleSceneName);
+        SceneManager.LoadScene(titleSceneName);
     }
 
     void Log(string text)
