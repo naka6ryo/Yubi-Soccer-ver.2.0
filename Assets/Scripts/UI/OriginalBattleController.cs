@@ -27,8 +27,9 @@ namespace YubiSoccer.UI
         [SerializeField] private Button addedButton;
         [Tooltip("表示する Button (Inspectorで割当て)")]
         [SerializeField] private Button addedButton2;
-        [Tooltip("表示する Button (Inspectorで割当て)")]
-        [SerializeField] private Button addedButton3;
+        [SerializeField] private GameObject inputField;
+        [SerializeField] private GameObject dropdown;
+
 
         private void Awake()
         {
@@ -36,7 +37,8 @@ namespace YubiSoccer.UI
             if (addedImage != null) addedImage.gameObject.SetActive(false);
             if (addedButton != null) addedButton.gameObject.SetActive(false);
             if (addedButton2 != null) addedButton2.gameObject.SetActive(false);
-            if (addedButton3 != null) addedButton3.gameObject.SetActive(false);
+            if (inputField != null) inputField.gameObject.SetActive(false);
+            if (dropdown != null) dropdown.gameObject.SetActive(false);
         }
 
         private void Start()
@@ -58,7 +60,8 @@ namespace YubiSoccer.UI
             if (addedImage != null) addedImage.gameObject.SetActive(true);
             if (addedButton != null) addedButton.gameObject.SetActive(true);
             if (addedButton2 != null) addedButton2.gameObject.SetActive(true);
-            if (addedButton3 != null) addedButton3.gameObject.SetActive(true);
+            if (inputField != null) inputField.gameObject.SetActive(true);
+            if (dropdown != null) dropdown.gameObject.SetActive(true);
         }
     }
 }
