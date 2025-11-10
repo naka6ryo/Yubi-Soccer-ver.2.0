@@ -1839,6 +1839,10 @@ PrefabInstance:
       propertyPath: 'renderers.Array.data[0]'
       value: 
       objectReference: {fileID: 551702090}
+    - target: {fileID: 5984326108749194054, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
+      propertyPath: awardToTeam
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6357684193064924633, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
       propertyPath: m_Name
       value: Blue Goal
@@ -5368,7 +5372,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01fcde435abcc5a4eaf19f30802e1c38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  durationSeconds: 60
+  durationSeconds: 120
   clearTextWhenFinished: 1
   tmpTextUGUI: {fileID: 916091096}
   tmpText3D: {fileID: 0}
@@ -6487,6 +6491,10 @@ PrefabInstance:
       propertyPath: 'renderers.Array.data[0]'
       value: 
       objectReference: {fileID: 2039649967}
+    - target: {fileID: 2828259323003679772, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+      propertyPath: awardToTeam
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4779657217022878626, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
       propertyPath: m_Name
       value: Red Goal
