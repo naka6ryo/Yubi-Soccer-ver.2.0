@@ -3007,7 +3007,7 @@ MonoBehaviour:
   arrowIndicator: {fileID: 639957804}
   canvas: {fileID: 1013196551}
   referenceCamera: {fileID: 1411125666}
-  edgePadding: {x: 150, y: 80}
+  edgePadding: {x: 170, y: 80}
   viewportMargin: 0.02
   player: {fileID: 0}
   showIfFartherThan: 15
