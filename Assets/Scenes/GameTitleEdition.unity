@@ -12176,19 +12176,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 588267532}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 904940057}
-        m_TargetAssemblyTypeName: NetworkManager, Assembly-CSharp
-        m_MethodName: QuickMatch2Players
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &588267532
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17061,7 +17049,8 @@ MonoBehaviour:
   addedImage: {fileID: 339117637}
   addedButton: {fileID: 1225881788}
   addedButton2: {fileID: 588267531}
-  addedButton3: {fileID: 0}
+  inputField: {fileID: 2099206297}
+  dropdown: {fileID: 1666836899}
 --- !u!1001 &829827066
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -24880,19 +24869,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1225881789}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 904940057}
-        m_TargetAssemblyTypeName: NetworkManager, Assembly-CSharp
-        m_MethodName: QuickMatch2Players
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &1225881789
 MonoBehaviour:
   m_ObjectHideFlags: 0
