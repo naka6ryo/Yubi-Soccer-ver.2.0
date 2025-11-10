@@ -890,7 +890,7 @@ GameObject:
   - component: {fileID: 50152027}
   - component: {fileID: 50152026}
   m_Layer: 5
-  m_Name: PlayBottun
+  m_Name: ButtonSwicher
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -23346,7 +23346,7 @@ GameObject:
   - component: {fileID: 1158374474}
   - component: {fileID: 1158374473}
   m_Layer: 5
-  m_Name: Button (2)
+  m_Name: BackButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -31822,7 +31822,7 @@ GameObject:
   - component: {fileID: 1554501039}
   - component: {fileID: 1554501038}
   m_Layer: 5
-  m_Name: Button (1)
+  m_Name: HowToPlayButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
