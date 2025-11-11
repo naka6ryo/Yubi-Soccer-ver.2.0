@@ -12,13 +12,12 @@ const CFG = {
   hysteresis: { on: 0.65, off: 0.45 },
   run: {
     minAbsCorr: 0.5,
-    minSpeedAmp: 80, // px/s 相当（指振りの速度閾値）
+    minSpeedAmp: 50, // px/s 相当（指振りの速度閾値）
     // 代替: 手首の上下速度のゼロ交差から走動作（周期運動）を検出
-    freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
-    zeroXMinAmp: 80,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
-    minTipSpeedPxPerSec: 80, // 甲から離れた領域での指先速度の下限（RUN 用）
+    zeroXMinAmp: 50,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
+    minTipSpeedPxPerSec: 50, // 甲から離れた領域での指先速度の下限（RUN 用）
     // RUN を即座に終了させるための低い閾値（通常の off より低く設定）
-    immediateOffThreshold: 80, // px/s これ以下になったら即座に NONE へ
+    immediateOffThreshold: 50, // px/s これ以下になったら即座に NONE へ
   },
   kick: {
     minAngVel: 10.0, // rad/s
@@ -633,16 +632,11 @@ export class HandTracker {
     const tipSpeedPeak = Math.max(...tipIndexSpeed, ...tipMidSpeed);
     const tipForwardMin = Math.min(...tipIndexVz, ...tipMidVz);
 
-  // KICK（簡素化）: 指先の速度ピークのみで判定
-  // tipSpeedPeak と tipForwardMin は index/middle 両方のピーク/最小値を既に計算済み
+  // KICK 判定（速度による自動遷移）を無効化。
+  // 仕様変更: KICK へ遷移するのは CHARGE が終了したときのみとするため、
+  // ここでの tipSpeed による自動 KICK 判定は行わない。
+  // tipSpeedPeak と tipForwardMin は保持しておくが、自動判定は無効。
     let kickScore = 0;
-    // suppressKick が指定されている場合は KICK 判定を抑止する
-    if (!suppressKick) {
-      // 2D の速度ピークが閾値を超え、かつ前方への z 速度が閾値以上であることを要求する
-      if (tipSpeedPeak > CFG.kick.minTipSpeedPxPerSec && tipForwardMin <= -CFG.kick.minTipForwardZ) {
-        kickScore = clamp((tipSpeedPeak - CFG.kick.minTipSpeedPxPerSec) / CFG.kick.minTipSpeedPxPerSec, 0, 1);
-      }
-    }
 
     // RUN（簡素化）: KICK でない限りすべて RUN。加速用の confidence は指先速度RMSから算出。
     const tipAmp = rms(tipSpeed);
