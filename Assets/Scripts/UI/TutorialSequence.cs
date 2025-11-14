@@ -26,6 +26,13 @@ namespace YubiSoccer.UI
         [Header("Options")]
         [Tooltip("最初に表示するページのインデックス（0-based）")]
         public int startIndex = 0;
+        [Header("Mission UI")]
+        [Tooltip("チュートリアル終了後に表示するミッション用 UI パネル（任意）。")]
+        public GameObject missionPanel;
+        [Tooltip("ミッションパネル内の『もう一度読む』ボタン（任意）。割当があれば自動でチュートリアルを再表示します。")]
+        public Button missionReadAgainButton;
+        [Tooltip("チュートリアル終了時にミッションパネルを自動表示するか")]
+        public bool showMissionOnClose = true;
         [Tooltip("キー入力での操作を有効化するか（Esc/←/→）")]
         public bool enableKeyboardControls = true;
 
@@ -50,6 +57,7 @@ namespace YubiSoccer.UI
 
         private int currentIndex = -1;
         private bool isOpen = false;
+        private UnityEngine.Events.UnityAction missionOpenAction;
 
         private void Awake()
         {
@@ -63,6 +71,13 @@ namespace YubiSoccer.UI
             if (nextButton != null) nextButton.onClick.AddListener(Next);
             if (prevButton != null) prevButton.onClick.AddListener(Prev);
             if (closeButton != null) closeButton.onClick.AddListener(Close);
+
+            // Hook up mission panel read-again button if provided (store action so we can remove it later)
+            if (missionReadAgainButton != null)
+            {
+                missionOpenAction = new UnityEngine.Events.UnityAction(() => Open());
+                missionReadAgainButton.onClick.AddListener(missionOpenAction);
+            }
 
             // Ensure CanvasGroup exists if fade is enabled
             if (useFade && canvasGroup == null)
@@ -100,6 +115,7 @@ namespace YubiSoccer.UI
             if (nextButton != null) nextButton.onClick.RemoveListener(Next);
             if (prevButton != null) prevButton.onClick.RemoveListener(Prev);
             if (closeButton != null) closeButton.onClick.RemoveListener(Close);
+            if (missionReadAgainButton != null && missionOpenAction != null) missionReadAgainButton.onClick.RemoveListener(missionOpenAction);
         }
 
         private void Update()
@@ -129,6 +145,8 @@ namespace YubiSoccer.UI
             int idx = (index >= 0) ? index : startIndex;
             idx = Mathf.Clamp(idx, 0, pages.Count - 1);
             isOpen = true;
+            // Hide mission panel when opening tutorial
+            if (missionPanel != null) missionPanel.SetActive(false);
             ShowPage(idx);
             // Pause game if option set
             if (pauseGameWhileOpen) Time.timeScale = 0f;
@@ -166,6 +184,35 @@ namespace YubiSoccer.UI
                 }
                 if (pauseGameWhileOpen) Time.timeScale = 1f;
                 OnClosed?.Invoke();
+                // Show mission panel if configured
+                if (showMissionOnClose && missionPanel != null)
+                {
+                    try
+                    {
+                        // If missionPanel is a child of the fading CanvasGroup, move it out so parent alpha doesn't hide it
+                        if (canvasGroup != null && missionPanel.transform.IsChildOf(canvasGroup.transform))
+                        {
+                            var newParent = canvasGroup.transform.parent;
+                            missionPanel.transform.SetParent(newParent, false);
+                        }
+
+                        // Ensure missionPanel has its own CanvasGroup visible
+                        var mpCg = missionPanel.GetComponent<CanvasGroup>();
+                        if (mpCg == null) mpCg = missionPanel.AddComponent<CanvasGroup>();
+                        mpCg.alpha = 1f;
+                        mpCg.interactable = true;
+                        mpCg.blocksRaycasts = true;
+
+                        // If missionPanel has a Canvas, bring it to front by increasing sorting order
+                        var mpCanvas = missionPanel.GetComponent<Canvas>();
+                        if (mpCanvas == null) mpCanvas = missionPanel.AddComponent<Canvas>();
+                        mpCanvas.overrideSorting = true;
+                        mpCanvas.sortingOrder = 1000;
+
+                        missionPanel.SetActive(true);
+                    }
+                    catch { missionPanel.SetActive(true); }
+                }
             }
         }
 
@@ -198,6 +245,29 @@ namespace YubiSoccer.UI
             cg.blocksRaycasts = false;
             if (pauseGameWhileOpen) Time.timeScale = 1f;
             OnClosed?.Invoke();
+            // Show mission panel if configured
+            if (showMissionOnClose && missionPanel != null)
+            {
+                try
+                {
+                    if (canvasGroup != null && missionPanel.transform.IsChildOf(canvasGroup.transform))
+                    {
+                        var newParent = canvasGroup.transform.parent;
+                        missionPanel.transform.SetParent(newParent, false);
+                    }
+                    var mpCg = missionPanel.GetComponent<CanvasGroup>();
+                    if (mpCg == null) mpCg = missionPanel.AddComponent<CanvasGroup>();
+                    mpCg.alpha = 1f;
+                    mpCg.interactable = true;
+                    mpCg.blocksRaycasts = true;
+                    var mpCanvas = missionPanel.GetComponent<Canvas>();
+                    if (mpCanvas == null) mpCanvas = missionPanel.AddComponent<Canvas>();
+                    mpCanvas.overrideSorting = true;
+                    mpCanvas.sortingOrder = 1000;
+                    missionPanel.SetActive(true);
+                }
+                catch { missionPanel.SetActive(true); }
+            }
         }
 
         public void Next()
