@@ -29,21 +29,21 @@ namespace YubiSoccer.UI
         [Tooltip("キー入力での操作を有効化するか（Esc/←/→）")]
         public bool enableKeyboardControls = true;
 
-    [Header("Auto Open / Fade")]
-    [Tooltip("シーン起動時に自動でチュートリアルを開くか")]
-    public bool autoOpenOnStart = false;
-    [Tooltip("自動オープン時の遅延(秒)")]
-    public float autoOpenDelay = 0.5f;
-    [Tooltip("チュートリアル開閉でゲームを一時停止するか（Time.timeScale = 0）")]
-    public bool pauseGameWhileOpen = true;
-    [Tooltip("フェードを使用するか（CanvasGroup が必要）")]
-    public bool useFade = true;
-    [Tooltip("フェード時間（秒）")]
-    public float fadeDuration = 0.25f;
+        [Header("Auto Open / Fade")]
+        [Tooltip("シーン起動時に自動でチュートリアルを開くか")]
+        public bool autoOpenOnStart = false;
+        [Tooltip("自動オープン時の遅延(秒)")]
+        public float autoOpenDelay = 0.5f;
+        [Tooltip("チュートリアル開閉でゲームを一時停止するか（Time.timeScale = 0）")]
+        public bool pauseGameWhileOpen = true;
+        [Tooltip("フェードを使用するか（CanvasGroup が必要）")]
+        public bool useFade = true;
+        [Tooltip("フェード時間（秒）")]
+        public float fadeDuration = 0.25f;
 
-    [Header("Optional CanvasGroup")]
-    [Tooltip("フェード用の CanvasGroup を割り当てます。未設定時はこのコンポーネントの GameObject に追加します。")]
-    public CanvasGroup canvasGroup;
+        [Header("Optional CanvasGroup")]
+        [Tooltip("フェード用の CanvasGroup を割り当てます。未設定時はこのコンポーネントの GameObject に追加します。")]
+        public CanvasGroup canvasGroup;
 
         public event Action OnOpened;
         public event Action OnClosed;
