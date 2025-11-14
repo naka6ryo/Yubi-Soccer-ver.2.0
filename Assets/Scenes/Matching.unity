@@ -299,8 +299,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: State
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 2c1a10eeaaf62b24085f1b6c9e2f0afd, type: 2}
-  m_sharedMaterial: {fileID: -7801576114924202401, guid: 2c1a10eeaaf62b24085f1b6c9e2f0afd, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: a55c4edaeac3c1846b692e8ac2c2666b, type: 2}
+  m_sharedMaterial: {fileID: 6024109715677104685, guid: a55c4edaeac3c1846b692e8ac2c2666b, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -2811,6 +2811,7 @@ MonoBehaviour:
   reloadScene: 0
   delaySeconds: 3
   ballRigidbody: {fileID: 3595070269344119584, guid: 9d27f30a014fce143bb37b8af7497613, type: 3}
+  explicitInitialTransform: {fileID: 0}
   onlyMasterClientResets: 1
   enableBallReset: 1
   autoFindSpawners: 0
