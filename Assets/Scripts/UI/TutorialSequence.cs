@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 namespace YubiSoccer.UI
 {
@@ -52,6 +53,18 @@ namespace YubiSoccer.UI
         [Tooltip("フェード用の CanvasGroup を割り当てます。未設定時はこのコンポーネントの GameObject に追加します。")]
         public CanvasGroup canvasGroup;
 
+        [Header("Page Video (optional)")]
+        [Tooltip("このインデックスのページ表示時に再生するビデオのページインデックス（-1 = 無効）")]
+        public int videoPageIndex = -1;
+        [Tooltip("再生する VideoClip（VideoClip を使う場合）")]
+        public VideoClip videoClip;
+        [Tooltip("VideoPlayer を割り当ててください（未設定時は自動で探しません）")]
+        public VideoPlayer videoPlayer;
+        [Tooltip("ビデオ出力先の RawImage（UI に表示するため）")]
+        public RawImage videoRawImage;
+        [Tooltip("ループ再生するかどうか（任意）")]
+        public bool loopVideo = false;
+
         public event Action OnOpened;
         public event Action OnClosed;
 
@@ -91,6 +104,50 @@ namespace YubiSoccer.UI
                 canvasGroup.interactable = false;
                 canvasGroup.blocksRaycasts = false;
             }
+
+            // Initialize video UI if assigned
+            if (videoRawImage != null)
+            {
+                try { videoRawImage.gameObject.SetActive(false); } catch { }
+            }
+            if (videoPlayer != null)
+            {
+                videoPlayer.playOnAwake = false;
+                videoPlayer.isLooping = loopVideo;
+                // On mobile / WebGL, browsers or OS may block autoplay with audio.
+                // Mute audio output so autoplay is allowed.
+                if (Application.isMobilePlatform || Application.platform == RuntimePlatform.WebGLPlayer)
+                {
+                    try
+                    {
+                        videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+                    }
+                    catch { }
+                }
+                // Register prepare-completed to ensure playback starts after preparation
+                try { videoPlayer.prepareCompleted += OnVideoPrepared; } catch { }
+                // If targetTexture not set but RawImage is provided, create a RenderTexture
+                if (videoPlayer.targetTexture == null && videoRawImage != null)
+                {
+                    int w = 1280, h = 720;
+                    if (videoClip != null)
+                    {
+                        int clipW = (int)videoClip.width;
+                        int clipH = (int)videoClip.height;
+                        if (clipW > 0) w = clipW;
+                        if (clipH > 0) h = clipH;
+                    }
+                    var rt = new RenderTexture(w, h, 0);
+                    videoPlayer.targetTexture = rt;
+                    videoRawImage.texture = rt;
+                }
+            }
+        }
+
+        private void OnVideoPrepared(VideoPlayer vp)
+        {
+            try { vp.Play(); }
+            catch { }
         }
 
         private void Start()
@@ -116,6 +173,10 @@ namespace YubiSoccer.UI
             if (prevButton != null) prevButton.onClick.RemoveListener(Prev);
             if (closeButton != null) closeButton.onClick.RemoveListener(Close);
             if (missionReadAgainButton != null && missionOpenAction != null) missionReadAgainButton.onClick.RemoveListener(missionOpenAction);
+            if (videoPlayer != null)
+            {
+                try { videoPlayer.prepareCompleted -= OnVideoPrepared; } catch { }
+            }
         }
 
         private void Update()
@@ -178,6 +239,8 @@ namespace YubiSoccer.UI
             }
             else
             {
+                // Ensure any playing video is stopped when closing
+                StopVideo();
                 for (int i = 0; i < pages.Count; i++)
                 {
                     if (pages[i] != null) pages[i].SetActive(false);
@@ -237,6 +300,8 @@ namespace YubiSoccer.UI
         {
             yield return StartCoroutine(CoFade(cg, from, to, duration));
             // deactivate pages
+            // Ensure any playing video is stopped when closing
+            StopVideo();
             for (int i = 0; i < pages.Count; i++)
             {
                 if (pages[i] != null) pages[i].SetActive(false);
@@ -301,6 +366,43 @@ namespace YubiSoccer.UI
             // update button states if bound
             if (prevButton != null) prevButton.interactable = (currentIndex > 0);
             if (nextButton != null) nextButton.interactable = (currentIndex < pages.Count - 1);
+            // Handle page-specific video playback
+            if (videoPageIndex >= 0 && videoPlayer != null && videoRawImage != null)
+            {
+                if (currentIndex == videoPageIndex)
+                {
+                    PlayVideo();
+                }
+                else
+                {
+                    StopVideo();
+                }
+            }
+        }
+
+        private void PlayVideo()
+        {
+            try
+            {
+                if (videoRawImage != null) videoRawImage.gameObject.SetActive(true);
+                if (videoPlayer == null) return;
+                if (videoClip != null) videoPlayer.clip = videoClip;
+                // If clip is set use it; otherwise leave URL as-is
+                videoPlayer.isLooping = loopVideo;
+                // Prepare and let OnVideoPrepared callback call Play() to improve compatibility with mobile/WebGL autoplay policies
+                videoPlayer.Prepare();
+            }
+            catch { }
+        }
+
+        private void StopVideo()
+        {
+            try
+            {
+                if (videoPlayer != null && videoPlayer.isPlaying) videoPlayer.Stop();
+                if (videoRawImage != null) videoRawImage.gameObject.SetActive(false);
+            }
+            catch { }
         }
     }
 }

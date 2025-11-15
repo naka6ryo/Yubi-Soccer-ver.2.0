@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.Events;
 
 namespace YubiSoccer.UI
 {
@@ -52,6 +53,15 @@ namespace YubiSoccer.UI
 
         private Coroutine playingAnnouncement;
         private bool isCompleted = false;
+        /// <summary>
+        /// Announcement 完了時に呼び出される UnityEvent（Inspector で他コンポーネントを割り当て可能）
+        /// </summary>
+        public UnityEvent onAnnouncementFinished;
+
+        /// <summary>
+        /// Announcement 完了時にコードから購読できる Action イベント
+        /// </summary>
+        public event System.Action OnAnnouncementFinished;
 
         private void Start()
         {
@@ -98,6 +108,12 @@ namespace YubiSoccer.UI
                     }
                 }
                 catch { }
+                // If there's no announcementRect (no visual announcement), fire finished immediately
+                if (announcementRect == null)
+                {
+                    try { onAnnouncementFinished?.Invoke(); } catch { }
+                    try { OnAnnouncementFinished?.Invoke(); } catch { }
+                }
             }
         }
 
@@ -207,6 +223,9 @@ namespace YubiSoccer.UI
 
             announcementRect.gameObject.SetActive(false);
             playingAnnouncement = null;
+            // イベント発火: Announcement の表示が完了した
+            try { onAnnouncementFinished?.Invoke(); } catch { }
+            try { OnAnnouncementFinished?.Invoke(); } catch { }
         }
 
         public void ResetCompleted()

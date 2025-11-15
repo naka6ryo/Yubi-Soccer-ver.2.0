@@ -34,6 +34,12 @@ namespace YubiSoccer.Game
 
         public event Action OnCompleted;
 
+        [Header("Startup")]
+        [Tooltip("シーン起動直後に判定を無効化する待ち時間（秒）。短時間の初期配置で誤検出するのを防ぐために使用します。")]
+        public float detectionDelay = 0.5f;
+
+        private float timeSinceStart = 0f;
+
         private void Start()
         {
             // ボール Transform を自動検索（タグ -> 名前に 'ball' を含むオブジェクト -> Rigidbody を持つ最初の ball 名称）
@@ -80,6 +86,9 @@ namespace YubiSoccer.Game
 
         private void Update()
         {
+            // Update elapsed time and defer detection for a short startup period
+            timeSinceStart += Time.deltaTime;
+            if (timeSinceStart < detectionDelay) return;
             if (completed) return;
             if (ballTransform == null) return;
 
