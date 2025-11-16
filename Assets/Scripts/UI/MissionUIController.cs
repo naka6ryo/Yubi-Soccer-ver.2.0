@@ -116,6 +116,16 @@ namespace YubiSoccer.UI
         public void SetCompleted(bool completed)
         {
             if (isCompleted == completed) return;
+            // Diagnostic logging: when something sets a mission completed, log stack trace to help identify caller
+            if (completed)
+            {
+                try
+                {
+                    var trace = System.Environment.StackTrace;
+                    Debug.Log($"MissionUIController: SetCompleted(true) called on '{gameObject.name}'. Stack:\n{trace}");
+                }
+                catch { }
+            }
             isCompleted = completed;
             ApplyState(isCompleted);
             if (isCompleted)

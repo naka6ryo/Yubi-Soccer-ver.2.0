@@ -18,7 +18,8 @@ public static class Mission2ActivationTracer
 
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // 少し遅らせて探す（他の Awake/Start が先に実行される）
+        // Create a runner that will attach ActivationWatcher as early as possible and
+        // continue monitoring for several seconds to catch late activations/instantiations.
         var runner = new GameObject("_Mission2ActivationTracerRunner");
         runner.hideFlags = HideFlags.HideAndDontSave;
         UnityEngine.Object.DontDestroyOnLoad(runner);
@@ -30,13 +31,11 @@ public static class Mission2ActivationTracer
     {
         public IEnumerator FindAndAttach(string sceneName)
         {
-            // Wait a few frames to catch activations happening during Start
-            for (int i = 0; i < 4; i++) yield return null;
-
+            // First: immediate attach pass (no wait) to existing objects in scene.
+            int totalAttached = 0;
             try
             {
                 var roots = SceneManager.GetActiveScene().GetRootGameObjects();
-                int attached = 0;
                 foreach (var root in roots)
                 {
                     var transforms = root.GetComponentsInChildren<Transform>(true);
@@ -50,20 +49,55 @@ public static class Mission2ActivationTracer
                             if (go.GetComponent<ActivationWatcher>() == null)
                             {
                                 go.AddComponent<ActivationWatcher>();
-                                attached++;
+                                totalAttached++;
                             }
                         }
                     }
                 }
-                Debug.Log($"Mission2ActivationTracer: Attached ActivationWatcher to {attached} GameObjects in scene '{sceneName}'.");
+                Debug.Log($"Mission2ActivationTracer: Immediately attached ActivationWatcher to {totalAttached} GameObjects in scene '{sceneName}'.");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"Mission2ActivationTracer: Exception while attaching: {ex}");
+                Debug.LogWarning($"Mission2ActivationTracer: Exception while doing immediate attach: {ex}");
             }
 
-            // keep runner around for a short while to catch late creations
-            yield return new WaitForSecondsRealtime(5f);
+            // Then keep monitoring for a short period: do repeated attach passes and wait a few frames
+            float watchSeconds = 5f;
+            float elapsed = 0f;
+            while (elapsed < watchSeconds)
+            {
+                try
+                {
+                    var roots2 = SceneManager.GetActiveScene().GetRootGameObjects();
+                    foreach (var root in roots2)
+                    {
+                        var transforms = root.GetComponentsInChildren<Transform>(true);
+                        foreach (var t in transforms)
+                        {
+                            if (t == null) continue;
+                            var go = t.gameObject;
+                            if (go == null) continue;
+                            if (IsTargetName(go.name))
+                            {
+                                if (go.GetComponent<ActivationWatcher>() == null)
+                                {
+                                    go.AddComponent<ActivationWatcher>();
+                                    totalAttached++;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"Mission2ActivationTracer: Exception while attaching in watch loop: {ex}");
+                }
+                // wait a short time before next pass
+                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+            }
+
+            Debug.Log($"Mission2ActivationTracer: Finished watch; total ActivationWatcher attached={totalAttached} in scene '{sceneName}'.");
             Destroy(gameObject);
         }
 
@@ -82,7 +116,7 @@ public static class Mission2ActivationTracer
             try
             {
                 var trace = Environment.StackTrace;
-                Debug.Log($"Mission2ActivationTracer: GameObject '{gameObject.name}' OnEnable detected. Stack:\n{trace}");
+                Debug.Log($"Mission2ActivationTracer: GameObject '{GetFullPath(gameObject)}' OnEnable detected. activeSelf={gameObject.activeSelf}. Stack:\n{trace}");
             }
             catch (Exception ex)
             {
@@ -90,6 +124,19 @@ public static class Mission2ActivationTracer
             }
             // NOTE: previously we proactively disabled the GameObject here to avoid flicker during startup,
             // but that interferes with legitimate activations (e.g. when tutorials close). Do not auto-disable.
+        }
+
+        private string GetFullPath(GameObject go)
+        {
+            if (go == null) return "<null>";
+            var path = go.name;
+            var t = go.transform.parent;
+            while (t != null)
+            {
+                path = t.name + "/" + path;
+                t = t.parent;
+            }
+            return path;
         }
     }
 }

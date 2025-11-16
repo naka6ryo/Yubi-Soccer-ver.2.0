@@ -52,6 +52,11 @@ namespace YubiSoccer.UI
         private List<GameObject> disabledCanvases = new List<GameObject>();
 
         private MissionUIController missionUIController;
+        // subscribe to goal events to show final UI only on real goals
+        private void OnGoalScored(YubiSoccer.Game.Team team)
+        {
+            try { StartCoroutine(ShowFinalUICoroutine()); } catch { ShowFinalUI(); }
+        }
 
         private bool isShowing = false;
 
@@ -59,10 +64,14 @@ namespace YubiSoccer.UI
         {
             // find mission controller if not assigned via inspector
             try { missionUIController = FindObjectOfType<MissionUIController>(); } catch { }
-            if (missionUIController != null)
+
+            // Subscribe to actual goal events so final UI shows only on real goals.
+            try
             {
-                missionUIController.OnAnnouncementFinished += OnMissionAnnouncementFinished;
+                YubiSoccer.Field.GoalTrigger.OnGoalScored -= OnGoalScored; // ensure no duplicate
+                YubiSoccer.Field.GoalTrigger.OnGoalScored += OnGoalScored;
             }
+            catch { }
 
             if (closeButton != null)
             {
@@ -124,8 +133,9 @@ namespace YubiSoccer.UI
         {
             if (missionUIController != null)
             {
-                missionUIController.OnAnnouncementFinished -= OnMissionAnnouncementFinished;
+                try { missionUIController.OnAnnouncementFinished -= OnMissionAnnouncementFinished; } catch { }
             }
+            try { YubiSoccer.Field.GoalTrigger.OnGoalScored -= OnGoalScored; } catch { }
             if (closeButton != null) closeButton.onClick.RemoveListener(OnCloseClicked);
             if (homeButton != null) homeButton.onClick.RemoveListener(OnHomeClicked);
             if (readAgainButton != null) readAgainButton.onClick.RemoveListener(OnReadAgainClicked);
@@ -133,6 +143,17 @@ namespace YubiSoccer.UI
 
         private void OnMissionAnnouncementFinished()
         {
+            // Guard: do not show final UI in Tutorial scene even if mission announcement fires
+            try
+            {
+                var sceneName = SceneManager.GetActiveScene().name;
+                if (string.Equals(sceneName, "Tutorial", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    Debug.Log("FinalGoalUIController: OnMissionAnnouncementFinished fired in Tutorial scene; ignoring.");
+                    return;
+                }
+            }
+            catch { }
             try { StartCoroutine(ShowFinalUICoroutine()); } catch { ShowFinalUI(); }
         }
 
