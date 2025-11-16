@@ -279,6 +279,14 @@ namespace YubiSoccer.UI
             if (openButton != null) openButton.gameObject.SetActive(true);
             if (closeButton != null) closeButton.gameObject.SetActive(false);
             if (photoImage != null) photoImage.gameObject.SetActive(false);
+
+            // Ensure any video RawImages/players are cleaned up even in non-paging fallback
+            try { if (page3VideoTarget != null) { page3VideoTarget.texture = null; page3VideoTarget.gameObject.SetActive(false); } } catch { }
+            try { if (page4VideoTarget != null) { page4VideoTarget.texture = null; page4VideoTarget.gameObject.SetActive(false); } } catch { }
+            try { if (sharedVideoRawImage != null) { sharedVideoRawImage.texture = null; sharedVideoRawImage.gameObject.SetActive(false); } } catch { }
+            try { if (page3VideoPlayer != null) { if (page3VideoPlayer.isPlaying) page3VideoPlayer.Stop(); page3VideoPlayer.enabled = false; } } catch { }
+            try { if (page4VideoPlayer != null) { if (page4VideoPlayer.isPlaying) page4VideoPlayer.Stop(); page4VideoPlayer.enabled = false; } } catch { }
+            try { if (sharedVideoPlayer != null) { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); sharedVideoPlayer.enabled = false; } } catch { }
         }
 
         // Close everything (used by closeAll)
@@ -288,33 +296,14 @@ namespace YubiSoccer.UI
             {
                 for (int i = 0; i < pages.Length; i++) if (pages[i] != null) pages[i].SetActive(false);
                 StopAllPageVideos();
-                // clear dedicated page targets
-                if (page3VideoTarget != null)
-                {
-                    try { page3VideoTarget.texture = null; } catch { }
-                }
-                if (page4VideoTarget != null)
-                {
-                    try { page4VideoTarget.texture = null; } catch { }
-                }
-                // stop dedicated page players
-                if (page3VideoPlayer != null)
-                {
-                    try { if (page3VideoPlayer.isPlaying) page3VideoPlayer.Stop(); } catch { }
-                }
-                if (page4VideoPlayer != null)
-                {
-                    try { if (page4VideoPlayer.isPlaying) page4VideoPlayer.Stop(); } catch { }
-                }
+                // clear dedicated page targets and fully disable players/targets
+                try { if (page3VideoTarget != null) { page3VideoTarget.texture = null; page3VideoTarget.gameObject.SetActive(false); } } catch { }
+                try { if (page4VideoTarget != null) { page4VideoTarget.texture = null; page4VideoTarget.gameObject.SetActive(false); } } catch { }
+                try { if (page3VideoPlayer != null) { if (page3VideoPlayer.isPlaying) page3VideoPlayer.Stop(); page3VideoPlayer.enabled = false; } } catch { }
+                try { if (page4VideoPlayer != null) { if (page4VideoPlayer.isPlaying) page4VideoPlayer.Stop(); page4VideoPlayer.enabled = false; } } catch { }
                 // stop shared video and hide its RawImage
-                if (sharedVideoPlayer != null)
-                {
-                    try { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); } catch { }
-                }
-                if (sharedVideoRawImage != null)
-                {
-                    try { sharedVideoRawImage.texture = null; sharedVideoRawImage.gameObject.SetActive(false); } catch { }
-                }
+                try { if (sharedVideoPlayer != null) { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); sharedVideoPlayer.enabled = false; } } catch { }
+                try { if (sharedVideoRawImage != null) { sharedVideoRawImage.texture = null; sharedVideoRawImage.gameObject.SetActive(false); } } catch { }
             }
             if (photoImage != null) photoImage.gameObject.SetActive(false);
             if (openButton != null) openButton.gameObject.SetActive(true);
@@ -328,25 +317,25 @@ namespace YubiSoccer.UI
             // stop corresponding video
             if (index == 2 && page3VideoPlayer != null)
             {
-                try { page3VideoPlayer.Stop(); } catch { }
+                try { if (page3VideoPlayer.isPlaying) page3VideoPlayer.Stop(); page3VideoPlayer.enabled = false; } catch { }
             }
             if (index == 3 && page4VideoPlayer != null)
             {
-                try { page4VideoPlayer.Stop(); } catch { }
+                try { if (page4VideoPlayer.isPlaying) page4VideoPlayer.Stop(); page4VideoPlayer.enabled = false; } catch { }
             }
             // stop shared video if it was used for this page
             if (sharedVideoPlayer != null)
             {
-                try { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); } catch { }
+                try { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); sharedVideoPlayer.enabled = false; } catch { }
             }
             // clear corresponding RawImage texture so video won't be visible when page inactive
             if (index == 2 && page3VideoTarget != null)
             {
-                try { page3VideoTarget.texture = null; } catch { }
+                try { page3VideoTarget.texture = null; page3VideoTarget.gameObject.SetActive(false); } catch { }
             }
             if (index == 3 && page4VideoTarget != null)
             {
-                try { page4VideoTarget.texture = null; } catch { }
+                try { page4VideoTarget.texture = null; page4VideoTarget.gameObject.SetActive(false); } catch { }
             }
             if (sharedVideoRawImage != null)
             {
