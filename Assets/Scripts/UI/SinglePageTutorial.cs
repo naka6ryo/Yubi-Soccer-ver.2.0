@@ -34,6 +34,16 @@ namespace YubiSoccer.UI
         [Tooltip("チュートリアル表示中にゲームを一時停止するか（Time.timeScale = 0）")]
         public bool pauseGameWhileOpen = true;
 
+        [Header("Show / Fade")]
+        [Tooltip("表示前の遅延(秒)")]
+        public float showDelay = 0f;
+        [Tooltip("フェードを使用するか（CanvasGroup が必要）")]
+        public bool useFade = true;
+        [Tooltip("フェード時間（秒）")]
+        public float fadeDuration = 0.25f;
+        [Tooltip("フェード用の CanvasGroup を割り当てます。未設定時は root に追加します。")]
+        public CanvasGroup canvasGroup;
+
         private float previousTimeScale = 1f;
 
         private void Awake()
@@ -67,6 +77,29 @@ namespace YubiSoccer.UI
                     videoRawImage.texture = rt;
                 }
             }
+
+            // Ensure CanvasGroup exists if fade is enabled
+            if (useFade)
+            {
+                try
+                {
+                    if (canvasGroup == null && root != null)
+                    {
+                        canvasGroup = root.GetComponent<CanvasGroup>();
+                        if (canvasGroup == null)
+                        {
+                            canvasGroup = root.AddComponent<CanvasGroup>();
+                        }
+                    }
+                    if (canvasGroup != null)
+                    {
+                        canvasGroup.alpha = 0f;
+                        canvasGroup.interactable = false;
+                        canvasGroup.blocksRaycasts = false;
+                    }
+                }
+                catch { }
+            }
         }
 
         private void OnDestroy()
@@ -81,6 +114,14 @@ namespace YubiSoccer.UI
 
         public void Show()
         {
+            // Start coroutine to handle optional delay and fade
+            try { StartCoroutine(ShowCoroutine()); } catch { }
+        }
+
+        private System.Collections.IEnumerator ShowCoroutine()
+        {
+            if (showDelay > 0f) yield return new WaitForSecondsRealtime(showDelay);
+
             try { if (root != null) root.SetActive(true); } catch { }
             PlayVideo();
             // Pause game if configured
@@ -94,10 +135,57 @@ namespace YubiSoccer.UI
                 }
             }
             catch { }
+
+            // Handle fade-in
+            if (useFade && canvasGroup != null)
+            {
+                bool doFade = false;
+                try
+                {
+                    canvasGroup.alpha = 0f;
+                    canvasGroup.interactable = true;
+                    canvasGroup.blocksRaycasts = true;
+                    doFade = true;
+                }
+                catch { }
+                if (doFade)
+                {
+                    yield return StartCoroutine(CoFade(canvasGroup, 0f, 1f, fadeDuration));
+                }
+            }
         }
 
         public void Close()
         {
+            // If fade-out is enabled and canvasGroup is available, perform fade then close
+            try
+            {
+                if (useFade && canvasGroup != null && root != null && root.activeSelf)
+                {
+                    StartCoroutine(CloseWithFadeCoroutine());
+                    return;
+                }
+            }
+            catch { }
+
+            // Immediate close fallback
+            DoCloseImmediate();
+        }
+
+        private System.Collections.IEnumerator CloseWithFadeCoroutine()
+        {
+            Debug.Log("SinglePageTutorial: Close() called (with fade)");
+            // fade out
+            if (canvasGroup != null)
+            {
+                yield return StartCoroutine(CoFade(canvasGroup, canvasGroup.alpha, 0f, fadeDuration));
+            }
+            DoCloseImmediate();
+        }
+
+        private void DoCloseImmediate()
+        {
+            Debug.Log("SinglePageTutorial: Close() called");
             StopVideo();
             try { if (root != null) root.SetActive(false); } catch { }
             // Restore timeScale: always resume gameplay when this tutorial is closed
@@ -110,12 +198,38 @@ namespace YubiSoccer.UI
                 }
             }
             catch { }
+
+            // notify close listeners first so subscribers can react before mission UI is shown
+            try
+            {
+                Debug.Log("SinglePageTutorial: Invoking OnClosed listeners...");
+                OnClosed?.Invoke();
+                Debug.Log("SinglePageTutorial: OnClosed listeners invoked.");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("SinglePageTutorial: Exception while invoking OnClosed: " + ex);
+            }
+
+            // Show assigned mission UI after notifying listeners
             if (onClosedShowMission != null)
             {
-                try { onClosedShowMission.SetActive(true); } catch { }
+                try { onClosedShowMission.SetActive(true); Debug.Log("SinglePageTutorial: onClosedShowMission activated."); } catch (System.Exception ex) { Debug.LogWarning("SinglePageTutorial: Failed to activate onClosedShowMission: " + ex); }
             }
-            // notify close listeners
-            try { OnClosed?.Invoke(); } catch { }
+        }
+
+        private System.Collections.IEnumerator CoFade(CanvasGroup cg, float from, float to, float duration)
+        {
+            if (cg == null) yield break;
+            float t = 0f;
+            cg.alpha = from;
+            while (t < duration)
+            {
+                t += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(from, to, Mathf.Clamp01(t / duration));
+                yield return null;
+            }
+            cg.alpha = to;
         }
 
         /// <summary>

@@ -45,6 +45,12 @@ namespace YubiSoccer.UI
         [Tooltip("位置イージング（スライド時に使用）")]
         public AnimationCurve ease = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
+        [Header("State Hide (optional)")]
+        [Tooltip("達成時に一時的に非表示にする STATE UI の CanvasGroup（任意）")]
+        [SerializeField] private CanvasGroup stateCanvasGroup;
+        [Tooltip("達成時に一時的に非表示にする STATE UI のルート GameObject（任意）")]
+        [SerializeField] private GameObject stateRootGameObject;
+
         [Header("Sound (play once, no SoundManager)")]
         [Tooltip("任意の AudioSource を割り当てるとそのソースで再生します。未設定ならこの GameObject に追加されます。")]
         public AudioSource seSource;
@@ -133,6 +139,8 @@ namespace YubiSoccer.UI
             {
                 yield break;
             }
+            // Hide STATE while announcement is playing
+            SetStateVisible(false);
 
             announcementRect.gameObject.SetActive(true);
             var cg = announcementRect.GetComponent<CanvasGroup>();
@@ -223,6 +231,9 @@ namespace YubiSoccer.UI
 
             announcementRect.gameObject.SetActive(false);
             playingAnnouncement = null;
+            // Restore STATE visibility
+            SetStateVisible(true);
+
             // イベント発火: Announcement の表示が完了した
             try { onAnnouncementFinished?.Invoke(); } catch { }
             try { OnAnnouncementFinished?.Invoke(); } catch { }
@@ -239,6 +250,22 @@ namespace YubiSoccer.UI
                 var cg = announcementRect.GetComponent<CanvasGroup>();
                 if (cg != null) cg.alpha = 0f;
                 announcementRect.gameObject.SetActive(false);
+            }
+            // Ensure STATE is visible again when resetting
+            SetStateVisible(true);
+        }
+
+        private void SetStateVisible(bool visible)
+        {
+            if (stateCanvasGroup != null)
+            {
+                stateCanvasGroup.alpha = visible ? 1f : 0f;
+                stateCanvasGroup.interactable = visible;
+                stateCanvasGroup.blocksRaycasts = visible;
+            }
+            if (stateRootGameObject != null)
+            {
+                try { stateRootGameObject.SetActive(visible); } catch { }
             }
         }
     }

@@ -88,8 +88,8 @@ public static class Mission2ActivationTracer
             {
                 Debug.LogWarning($"Mission2ActivationTracer: Exception in OnEnable: {ex}");
             }
-            // Also try to proactively disable to avoid visible flicker
-            try { if (gameObject.activeSelf) gameObject.SetActive(false); } catch { }
+            // NOTE: previously we proactively disabled the GameObject here to avoid flicker during startup,
+            // but that interferes with legitimate activations (e.g. when tutorials close). Do not auto-disable.
         }
     }
 }
