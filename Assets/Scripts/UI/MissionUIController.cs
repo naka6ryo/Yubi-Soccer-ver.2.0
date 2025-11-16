@@ -71,8 +71,27 @@ namespace YubiSoccer.UI
 
         private void Start()
         {
-            // 初期表示を設定
-            ApplyState(isCompleted);
+            // If a reload requested missions to be hidden on next load, respect it immediately
+            try
+            {
+                if (YubiSoccer.UI.FinalGoalUIController.hideMissionsOnNextLoad)
+                {
+                    isCompleted = false;
+                    ApplyState(false);
+                    // clear the global request so it only applies once
+                    YubiSoccer.UI.FinalGoalUIController.hideMissionsOnNextLoad = false;
+                }
+                else
+                {
+                    // 初期表示を設定
+                    ApplyState(isCompleted);
+                }
+            }
+            catch
+            {
+                // fallback to normal behavior
+                ApplyState(isCompleted);
+            }
 
             // announcement 初期化
             if (announcementRect != null)

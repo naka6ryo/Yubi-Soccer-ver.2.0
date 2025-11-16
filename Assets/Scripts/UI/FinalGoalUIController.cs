@@ -15,6 +15,8 @@ namespace YubiSoccer.UI
     /// </summary>
     public class FinalGoalUIController : MonoBehaviour
     {
+        // If true, when the scene is next loaded we will hide mission UI initial states.
+        public static bool hideMissionsOnNextLoad = false;
         [Tooltip("表示する最終 UI のルート GameObject（Canvas 等）")]
         public GameObject finalRoot;
 
@@ -23,6 +25,11 @@ namespace YubiSoccer.UI
 
         [Tooltip("ホームへ戻るボタン（finalRoot 内の Home）")]
         public Button homeButton;
+
+        [Tooltip("もう一度読むボタン（finalRoot 内の ReadAgain） - シーンを再読み込みします")]
+        public Button readAgainButton;
+        [Tooltip("Close を押したときに ReadAgain ボタンを無効化せず残すか（Inspector で制御、デフォルト false）")]
+        public bool keepReadAgainAfterClose = false;
 
         [Tooltip("ホームへ戻る際にロードするシーン名（未設定ならログ出力のみ）")]
         public string homeSceneName = "";
@@ -77,6 +84,16 @@ namespace YubiSoccer.UI
                 }
                 catch { }
             }
+            if (readAgainButton != null)
+            {
+                readAgainButton.onClick.AddListener(OnReadAgainClicked);
+                try
+                {
+                    readAgainButton.interactable = false;
+                    if (readAgainButton.gameObject != null) readAgainButton.gameObject.SetActive(false);
+                }
+                catch { }
+            }
 
             if (finalRoot != null) finalRoot.SetActive(false);
             // Ensure CanvasGroup exists if fade is enabled
@@ -111,6 +128,7 @@ namespace YubiSoccer.UI
             }
             if (closeButton != null) closeButton.onClick.RemoveListener(OnCloseClicked);
             if (homeButton != null) homeButton.onClick.RemoveListener(OnHomeClicked);
+            if (readAgainButton != null) readAgainButton.onClick.RemoveListener(OnReadAgainClicked);
         }
 
         private void OnMissionAnnouncementFinished()
@@ -182,6 +200,15 @@ namespace YubiSoccer.UI
                 }
                 catch { }
             }
+            if (readAgainButton != null)
+            {
+                try
+                {
+                    if (readAgainButton.gameObject != null) readAgainButton.gameObject.SetActive(true);
+                    readAgainButton.interactable = true;
+                }
+                catch { }
+            }
             isShowing = true;
             Debug.Log($"FinalGoalUIController: Shown final UI. Disabled {disabledCanvases.Count} assigned UI roots.");
         }
@@ -202,6 +229,11 @@ namespace YubiSoccer.UI
             {
                 try { closeButton.interactable = false; if (closeButton.gameObject != null) closeButton.gameObject.SetActive(false); } catch { }
             }
+            // Also disable ReadAgain so it starts disabled next time (unless configured to keep it)
+            if (readAgainButton != null && !keepReadAgainAfterClose)
+            {
+                try { readAgainButton.interactable = false; if (readAgainButton.gameObject != null) readAgainButton.gameObject.SetActive(false); } catch { }
+            }
             // Do NOT disable Home button on Close; leave it enabled per request.
             isShowing = false;
             Debug.Log("FinalGoalUIController: Close clicked - final UI hidden. Previously disabled UI remain disabled.");
@@ -219,6 +251,10 @@ namespace YubiSoccer.UI
             if (closeButton != null)
             {
                 try { closeButton.interactable = false; if (closeButton.gameObject != null) closeButton.gameObject.SetActive(false); } catch { }
+            }
+            if (readAgainButton != null && !keepReadAgainAfterClose)
+            {
+                try { readAgainButton.interactable = false; if (readAgainButton.gameObject != null) readAgainButton.gameObject.SetActive(false); } catch { }
             }
             // leave homeButton enabled
             isShowing = false;
@@ -248,6 +284,22 @@ namespace YubiSoccer.UI
             else
             {
                 Debug.Log("FinalGoalUIController: homeSceneName is empty; no scene loaded.");
+            }
+        }
+
+        private void OnReadAgainClicked()
+        {
+            Debug.Log("FinalGoalUIController: ReadAgain clicked - reloading current scene.");
+            try
+            {
+                // Request that missions be hidden on the next scene load (so initial UI won't flash visible)
+                hideMissionsOnNextLoad = true;
+                var scene = SceneManager.GetActiveScene();
+                SceneManager.LoadScene(scene.name);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("FinalGoalUIController: Failed to reload scene: " + ex);
             }
         }
 
