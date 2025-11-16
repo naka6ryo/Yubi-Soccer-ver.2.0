@@ -2813,6 +2813,11 @@ MonoBehaviour:
   canvasGroup: {fileID: 1736578917}
   videoPageIndex: 2
   videoClip: {fileID: 32900000, guid: 8e60e18544ad0ae4385f0385fc02b8f3, type: 3}
+  pageVideoUrls: []
+  pageVideoFileNames:
+  - 
+  - 
+  - Run.webm
   videoPlayer: {fileID: 1514457564}
   videoRawImage: {fileID: 2032471188}
   loopVideo: 1
@@ -3674,6 +3679,8 @@ MonoBehaviour:
   videoPlayer: {fileID: 2127700573}
   videoRawImage: {fileID: 1813374978}
   videoClip: {fileID: 32900000, guid: 529c1833cee505d46aadd1884e5e2c86, type: 3}
+  videoUrl: 
+  videoFileName: Kick.webm
   loopVideo: 1
   onClosedShowMission: {fileID: 1459877949}
   pauseGameWhileOpen: 1

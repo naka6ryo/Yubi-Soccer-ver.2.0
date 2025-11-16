@@ -58,6 +58,10 @@ namespace YubiSoccer.UI
         public int videoPageIndex = -1;
         [Tooltip("再生する VideoClip（VideoClip を使う場合）")]
         public VideoClip videoClip;
+        [Tooltip("(WebGL/mobile) Per-page video URL. If set, this URL will be used instead of VideoClip when running in WebGL or on mobile browser builds.")]
+        public string[] pageVideoUrls;
+        [Tooltip("(StreamingAssets) Per-page file name to be appended to Application.streamingAssetsPath (eg. \"videos/tutorial3.webm\"). Used when pageVideoUrls entry is empty.")]
+        public string[] pageVideoFileNames;
         [Tooltip("VideoPlayer を割り当ててください（未設定時は自動で探しません）")]
         public VideoPlayer videoPlayer;
         [Tooltip("ビデオ出力先の RawImage（UI に表示するため）")]
@@ -148,6 +152,23 @@ namespace YubiSoccer.UI
         {
             try { vp.Play(); }
             catch { }
+        }
+
+        private string GetVideoUrlForIndex(int index)
+        {
+            try
+            {
+                if (pageVideoUrls != null && index >= 0 && index < pageVideoUrls.Length)
+                {
+                    var s = pageVideoUrls[index]; if (!string.IsNullOrWhiteSpace(s)) return s;
+                }
+                if (pageVideoFileNames != null && index >= 0 && index < pageVideoFileNames.Length)
+                {
+                    var fn = pageVideoFileNames[index]; if (!string.IsNullOrWhiteSpace(fn)) return Application.streamingAssetsPath.TrimEnd('/') + "/" + fn.TrimStart('/');
+                }
+            }
+            catch { }
+            return null;
         }
 
         private void Start()
@@ -272,6 +293,7 @@ namespace YubiSoccer.UI
                         mpCanvas.overrideSorting = true;
                         mpCanvas.sortingOrder = 1000;
 
+                        Debug.Log($"TutorialSequence: Attempting to activate missionPanel='{GetGameObjectPath(missionPanel)}' (activeInHierarchy={missionPanel.activeInHierarchy})");
                         missionPanel.SetActive(true);
                     }
                     catch { missionPanel.SetActive(true); }
@@ -329,6 +351,7 @@ namespace YubiSoccer.UI
                     if (mpCanvas == null) mpCanvas = missionPanel.AddComponent<Canvas>();
                     mpCanvas.overrideSorting = true;
                     mpCanvas.sortingOrder = 1000;
+                    Debug.Log($"TutorialSequence: Attempting to activate missionPanel='{GetGameObjectPath(missionPanel)}' (activeInHierarchy={missionPanel.activeInHierarchy})");
                     missionPanel.SetActive(true);
                 }
                 catch { missionPanel.SetActive(true); }
@@ -386,10 +409,28 @@ namespace YubiSoccer.UI
             {
                 if (videoRawImage != null) videoRawImage.gameObject.SetActive(true);
                 if (videoPlayer == null) return;
-                if (videoClip != null) videoPlayer.clip = videoClip;
-                // If clip is set use it; otherwise leave URL as-is
+                // Prefer per-page URL (or StreamingAssets file) when available for current page index
+                try
+                {
+                    string urlToUse = null;
+                    if (videoPageIndex >= 0)
+                    {
+                        urlToUse = GetVideoUrlForIndex(videoPageIndex);
+                    }
+                    if (!string.IsNullOrWhiteSpace(urlToUse))
+                    {
+                        try { videoPlayer.source = VideoSource.Url; videoPlayer.url = urlToUse; } catch { }
+                    }
+                    else if (videoClip != null)
+                    {
+                        try { videoPlayer.source = VideoSource.VideoClip; videoPlayer.clip = videoClip; } catch { }
+                    }
+                }
+                catch { if (videoClip != null) try { videoPlayer.clip = videoClip; } catch { } }
+
                 videoPlayer.isLooping = loopVideo;
-                // Prepare and let OnVideoPrepared callback call Play() to improve compatibility with mobile/WebGL autoplay policies
+                try { videoPlayer.enabled = true; } catch { }
+                // Prepare and let OnVideoPrepared callback call Play()
                 videoPlayer.Prepare();
             }
             catch { }
@@ -403,6 +444,23 @@ namespace YubiSoccer.UI
                 if (videoRawImage != null) videoRawImage.gameObject.SetActive(false);
             }
             catch { }
+        }
+
+        private string GetGameObjectPath(GameObject go)
+        {
+            if (go == null) return "(null)";
+            try
+            {
+                string path = go.name;
+                var t = go.transform.parent;
+                while (t != null)
+                {
+                    path = t.name + "/" + path;
+                    t = t.parent;
+                }
+                return path;
+            }
+            catch { return go.name; }
         }
     }
 }

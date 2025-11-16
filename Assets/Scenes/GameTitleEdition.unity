@@ -17622,6 +17622,12 @@ MonoBehaviour:
   sharedVideoPlayer: {fileID: 0}
   sharedVideoRawImage: {fileID: 0}
   pageVideoClips: []
+  pageVideoUrls: []
+  pageVideoFileNames:
+  - 
+  - 
+  - Run.webm
+  - Kick.webm
   sharedLoopVideo: 1
 --- !u!114 &819615521
 MonoBehaviour:

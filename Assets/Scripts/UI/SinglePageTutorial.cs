@@ -24,11 +24,17 @@ namespace YubiSoccer.UI
         public VideoPlayer videoPlayer;
         public RawImage videoRawImage;
         public VideoClip videoClip;
+        [Tooltip("(WebGL/mobile) 動画の直接 URL を指定します（優先）。")]
+        public string videoUrl;
+        [Tooltip("(StreamingAssets) 動画ファイル名（例: videos/tutorial.webm）。URL 未指定時は Application.streamingAssetsPath + \"/\" + fileName を使います。")]
+        public string videoFileName;
         public bool loopVideo = false;
 
         [Header("After Close")]
         [Tooltip("閉じたときに表示する別のミッション用パネル（任意）")]
         public GameObject onClosedShowMission;
+        [Tooltip("閉じたときに onClosedShowMission を自動で有効化するか（デフォルト true）")]
+        public bool activateOnClosedShowMission = true;
 
         [Header("Behavior")]
         [Tooltip("チュートリアル表示中にゲームを一時停止するか（Time.timeScale = 0）")]
@@ -110,6 +116,20 @@ namespace YubiSoccer.UI
             {
                 try { videoPlayer.prepareCompleted -= OnVideoPrepared; } catch { }
             }
+        }
+
+        private string GetVideoUrl()
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(videoUrl)) return videoUrl;
+                if (!string.IsNullOrWhiteSpace(videoFileName))
+                {
+                    return Application.streamingAssetsPath.TrimEnd('/') + "/" + videoFileName.TrimStart('/');
+                }
+            }
+            catch { }
+            return null;
         }
 
         public void Show()
@@ -214,8 +234,38 @@ namespace YubiSoccer.UI
             // Show assigned mission UI after notifying listeners
             if (onClosedShowMission != null)
             {
-                try { onClosedShowMission.SetActive(true); Debug.Log("SinglePageTutorial: onClosedShowMission activated."); } catch (System.Exception ex) { Debug.LogWarning("SinglePageTutorial: Failed to activate onClosedShowMission: " + ex); }
+                try
+                {
+                    Debug.Log($"SinglePageTutorial: Attempting to activate onClosedShowMission='{GetGameObjectPath(onClosedShowMission)}' (activeInHierarchy={onClosedShowMission.activeInHierarchy})");
+                    if (activateOnClosedShowMission)
+                    {
+                        onClosedShowMission.SetActive(true);
+                        Debug.Log("SinglePageTutorial: onClosedShowMission activated.");
+                    }
+                    else
+                    {
+                        Debug.Log("SinglePageTutorial: activateOnClosedShowMission is false; skipping activation.");
+                    }
+                }
+                catch (System.Exception ex) { Debug.LogWarning("SinglePageTutorial: Failed to activate onClosedShowMission: " + ex); }
             }
+        }
+
+        private string GetGameObjectPath(GameObject go)
+        {
+            if (go == null) return "(null)";
+            try
+            {
+                string path = go.name;
+                var t = go.transform.parent;
+                while (t != null)
+                {
+                    path = t.name + "/" + path;
+                    t = t.parent;
+                }
+                return path;
+            }
+            catch { return go.name; }
         }
 
         private System.Collections.IEnumerator CoFade(CanvasGroup cg, float from, float to, float duration)
@@ -243,13 +293,28 @@ namespace YubiSoccer.UI
             {
                 if (videoRawImage != null) videoRawImage.gameObject.SetActive(true);
                 if (videoPlayer == null) return;
-                if (videoClip != null) videoPlayer.clip = videoClip;
+                // Prefer URL (explicit or StreamingAssets filename) first, otherwise use VideoClip
+                try
+                {
+                    var url = GetVideoUrl();
+                    if (!string.IsNullOrWhiteSpace(url))
+                    {
+                        try { videoPlayer.source = VideoSource.Url; videoPlayer.url = url; } catch { }
+                    }
+                    else if (videoClip != null)
+                    {
+                        videoPlayer.source = VideoSource.VideoClip;
+                        videoPlayer.clip = videoClip;
+                    }
+                }
+                catch { if (videoClip != null) { videoPlayer.clip = videoClip; } }
                 videoPlayer.isLooping = loopVideo;
                 // mute for autoplay compatibility on some platforms
                 if (Application.isMobilePlatform || Application.platform == RuntimePlatform.WebGLPlayer)
                 {
                     try { videoPlayer.audioOutputMode = VideoAudioOutputMode.None; } catch { }
                 }
+                try { videoPlayer.enabled = true; } catch { }
                 videoPlayer.Prepare();
             }
             catch { }

@@ -42,6 +42,10 @@ namespace YubiSoccer.UI
         [SerializeField] private UnityEngine.UI.RawImage sharedVideoRawImage;
         [Tooltip("Per-page VideoClips used with the shared VideoPlayer. Index corresponds to pages[].")]
         [SerializeField] private VideoClip[] pageVideoClips;
+        [Tooltip("(WebGL/mobile) Per-page video URL. If set, this URL will be used instead of VideoClip when running in WebGL or on mobile browser builds. Use absolute or StreamingAssets relative URLs (eg. Application.streamingAssetsPath + \"/videos/foo.webm\").")]
+        [SerializeField] private string[] pageVideoUrls;
+        [Tooltip("(StreamingAssets) ページごとのファイル名。例: \"videos/tutorial3.webm\"。InspectorでURLが空のとき、StreamingAssets から自動的に組み立てます。")]
+        [SerializeField] private string[] pageVideoFileNames;
         [Tooltip("If true, shared video will loop when played")]
         [SerializeField] private bool sharedLoopVideo = false;
 
@@ -383,6 +387,23 @@ namespace YubiSoccer.UI
                     try { vp.enabled = true; } catch { }
                     if (target != null) try { target.gameObject.SetActive(true); } catch { }
                     try { if (vp.isPlaying) vp.Stop(); } catch { }
+
+                    // try to use URL (explicit or StreamingAssets) on WebGL/mobile; on other platforms prefer explicit URL
+                    try
+                    {
+                        string url = null;
+                        if (Application.platform == RuntimePlatform.WebGLPlayer || Application.isMobilePlatform)
+                        {
+                            url = GetVideoUrlForIndex(2);
+                        }
+                        else
+                        {
+                            if (pageVideoUrls != null && pageVideoUrls.Length > 2) { var s2 = pageVideoUrls[2]; if (!string.IsNullOrWhiteSpace(s2)) url = s2; }
+                        }
+                        if (!string.IsNullOrWhiteSpace(url)) { try { vp.source = VideoSource.Url; vp.url = url; } catch { } }
+                    }
+                    catch { }
+
                     try { vp.Prepare(); } catch { }
                 }
                 catch { }
@@ -402,25 +423,79 @@ namespace YubiSoccer.UI
                     try { vp.enabled = true; } catch { }
                     if (target != null) try { target.gameObject.SetActive(true); } catch { }
                     try { if (vp.isPlaying) vp.Stop(); } catch { }
+
+                    // try to use URL (explicit or StreamingAssets) on WebGL/mobile; on other platforms prefer explicit URL
+                    try
+                    {
+                        string url = null;
+                        if (Application.platform == RuntimePlatform.WebGLPlayer || Application.isMobilePlatform)
+                        {
+                            url = GetVideoUrlForIndex(3);
+                        }
+                        else
+                        {
+                            if (pageVideoUrls != null && pageVideoUrls.Length > 3) { var s2 = pageVideoUrls[3]; if (!string.IsNullOrWhiteSpace(s2)) url = s2; }
+                        }
+                        if (!string.IsNullOrWhiteSpace(url)) { try { vp.source = VideoSource.Url; vp.url = url; } catch { } }
+                    }
+                    catch { }
+
                     try { vp.Prepare(); } catch { }
                 }
                 catch { }
             }
-            // If no dedicated page player handled this page, try shared VideoPlayer + per-page clip
-            if (sharedVideoPlayer != null && pageVideoClips != null && currentIndex >= 0 && currentIndex < pageVideoClips.Length)
+
+            // Shared video player fallback: prefer URL (explicit or StreamingAssets) on WebGL/mobile
+            if (sharedVideoPlayer != null)
             {
-                var clip = pageVideoClips[currentIndex];
-                if (clip != null)
+                string urlToUse = null;
+                try
+                {
+                    if (Application.platform == RuntimePlatform.WebGLPlayer || Application.isMobilePlatform)
+                    {
+                        urlToUse = GetVideoUrlForIndex(currentIndex);
+                    }
+                    else
+                    {
+                        if (pageVideoUrls != null && currentIndex >= 0 && currentIndex < pageVideoUrls.Length)
+                        {
+                            var s = pageVideoUrls[currentIndex]; if (!string.IsNullOrWhiteSpace(s)) urlToUse = s;
+                        }
+                    }
+                }
+                catch { }
+
+                if (!string.IsNullOrWhiteSpace(urlToUse))
                 {
                     try
                     {
                         if (sharedVideoRawImage != null) try { sharedVideoRawImage.gameObject.SetActive(true); } catch { }
                         try { sharedVideoPlayer.enabled = true; } catch { }
-                        sharedVideoPlayer.clip = clip;
+                        try { sharedVideoPlayer.source = VideoSource.Url; sharedVideoPlayer.url = urlToUse; } catch { }
                         sharedVideoPlayer.isLooping = sharedLoopVideo;
                         try { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); } catch { }
-                        // Prepare; OnSharedVideoPrepared will Play()
                         try { sharedVideoPlayer.Prepare(); } catch { }
+                    }
+                    catch { }
+                }
+                else
+                {
+                    // fallback to VideoClip if available
+                    try
+                    {
+                        if (pageVideoClips != null && currentIndex >= 0 && currentIndex < pageVideoClips.Length)
+                        {
+                            var clip = pageVideoClips[currentIndex];
+                            if (clip != null)
+                            {
+                                if (sharedVideoRawImage != null) try { sharedVideoRawImage.gameObject.SetActive(true); } catch { }
+                                try { sharedVideoPlayer.enabled = true; } catch { }
+                                try { sharedVideoPlayer.source = VideoSource.VideoClip; sharedVideoPlayer.clip = clip; } catch { }
+                                sharedVideoPlayer.isLooping = sharedLoopVideo;
+                                try { if (sharedVideoPlayer.isPlaying) sharedVideoPlayer.Stop(); } catch { }
+                                try { sharedVideoPlayer.Prepare(); } catch { }
+                            }
+                        }
                     }
                     catch { }
                 }
@@ -528,6 +603,33 @@ namespace YubiSoccer.UI
         private void OnSharedVideoPrepared(VideoPlayer vp)
         {
             try { vp.Play(); } catch { }
+        }
+
+        // Build a usable URL for a page index. Preference order:
+        // 1) explicit pageVideoUrls[index]
+        // 2) pageVideoFileNames[index] -> Application.streamingAssetsPath + "/" + filename
+        // Returns null when none available.
+        private string GetVideoUrlForIndex(int index)
+        {
+            try
+            {
+                if (pageVideoUrls != null && index >= 0 && index < pageVideoUrls.Length)
+                {
+                    var s = pageVideoUrls[index];
+                    if (!string.IsNullOrWhiteSpace(s)) return s;
+                }
+                if (pageVideoFileNames != null && index >= 0 && index < pageVideoFileNames.Length)
+                {
+                    var fn = pageVideoFileNames[index];
+                    if (!string.IsNullOrWhiteSpace(fn))
+                    {
+                        // Application.streamingAssetsPath is already a URL on many platforms
+                        return Application.streamingAssetsPath.TrimEnd('/') + "/" + fn.TrimStart('/');
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
     }
 }

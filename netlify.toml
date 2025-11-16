@@ -61,3 +61,41 @@ for = "/Build/*.wasm"
   [headers.values]
   Content-Type = "application/wasm"
 
+
+## If you publish pre-compressed gzip variants (Unity Gzip Compression),
+## ensure the server serves them with Content-Encoding: gzip as well.
+[[headers]]
+for = "/Build/*.js.gz"
+  [headers.values]
+  Content-Type = "application/javascript"
+  Content-Encoding = "gzip"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.framework.js.gz"
+  [headers.values]
+  Content-Type = "application/javascript"
+  Content-Encoding = "gzip"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.data.gz"
+  [headers.values]
+  Content-Type = "application/octet-stream"
+  Content-Encoding = "gzip"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.wasm.gz"
+  [headers.values]
+  Content-Type = "application/wasm"
+  Content-Encoding = "gzip"
+  Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/Build/*.mem.gz"
+  [headers.values]
+  Content-Type = "application/octet-stream"
+  Content-Encoding = "gzip"
+  Cache-Control = "public, max-age=31536000, immutable"
+
