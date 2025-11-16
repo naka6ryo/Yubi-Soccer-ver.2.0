@@ -100,13 +100,13 @@ namespace YubiSoccer.UI
         {
             StopVideo();
             try { if (root != null) root.SetActive(false); } catch { }
-            // Restore timeScale
+            // Restore timeScale: always resume gameplay when this tutorial is closed
             try
             {
                 if (pauseGameWhileOpen)
                 {
-                    Time.timeScale = previousTimeScale;
-                    Debug.Log($"SinglePageTutorial: Restored timeScale={previousTimeScale} on Close().");
+                    Time.timeScale = 1f;
+                    Debug.Log("SinglePageTutorial: Restored timeScale=1 on Close().");
                 }
             }
             catch { }
