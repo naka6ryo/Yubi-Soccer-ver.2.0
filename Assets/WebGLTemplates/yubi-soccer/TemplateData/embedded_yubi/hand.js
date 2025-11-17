@@ -12,13 +12,12 @@ const CFG = {
   hysteresis: { on: 0.65, off: 0.45 },
   run: {
     minAbsCorr: 0.5,
-    minSpeedAmp: 80, // px/s 相当（指振りの速度閾値）
+    minSpeedAmp: 50, // px/s 相当（指振りの速度閾値）
     // 代替: 手首の上下速度のゼロ交差から走動作（周期運動）を検出
-    freqBandHz: [1.6, 4.0], // 許容する歩幅/走行の周波数帯（1/s）
-    zeroXMinAmp: 80,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
-    minTipSpeedPxPerSec: 80, // 甲から離れた領域での指先速度の下限（RUN 用）
+    zeroXMinAmp: 50,       // px/s ゼロ交差判定に用いる最小速度（ノイズ抑制）
+    minTipSpeedPxPerSec: 50, // 甲から離れた領域での指先速度の下限（RUN 用）
     // RUN を即座に終了させるための低い閾値（通常の off より低く設定）
-    immediateOffThreshold: 80, // px/s これ以下になったら即座に NONE へ
+    immediateOffThreshold: 50, // px/s これ以下になったら即座に NONE へ
   },
   kick: {
     minAngVel: 10.0, // rad/s
@@ -31,18 +30,17 @@ const CFG = {
     minTipForwardZ: 0.5,
   },
   charge: {
-    // 厳しめの判定に変更: より大きく曲げないと CHARGE とならないようにする
+    // 判定を少し厳しめに: 閾値を下げて、より深く曲げないと CHARGE と判定しないようにする
     // PIP 関節の角度しきい値 (rad)。angleAt(...) < angleThresholdRad -> 曲がっていると判定
-    // 小さな曲がりを誤検出しないよう、PI(≈3.1416) から少し離れた値に設定する
-  // しきい値を少し緩めて、軽い曲げでも検出しやすくする
-  angleThresholdRad: 2.85,
+    // 値を小さくするほど「深く曲げる」必要があり、誤検出が減る。
+    angleThresholdRad: 2.75,
     // CHARGE を開始するまでのホールド時間（秒）
     holdSec: 0.06,
-    // MCP（第1関節）の角度もしきい値として考慮する
-    mcpAngleThresholdRad: 2.85,
-    // anyBend は KICK 抑止に使う閾値。主閾値に近づけて若干緩くする
-    anyBendAngleRad: 2.70,
-    anyBendMcpAngleRad: 2.70,
+    // MCP（第1関節）の角度もしきい値として考慮する（同程度に厳しく）
+    mcpAngleThresholdRad: 2.75,
+    // anyBend は KICK 抑止に使う閾値。主閾値より若干緩めだが、こちらも少し厳しめに下げる
+    anyBendAngleRad: 2.65,
+    anyBendMcpAngleRad: 2.65,
   },
 };
 
@@ -114,6 +112,67 @@ export class HandTracker {
   this.lastTriggerTime = 0;
   this.lastSeenTime = 0; // 最後に手を検出した時刻（sec）
   this.noHandCount = 0;  // 連続で検出できなかったフレーム数
+
+    // postMessage ガード/デバウンス用の状態
+    // key -> last sent timestamp (ms)
+    this._lastPosted = {};
+    // post rate limiting state
+    this._postWindowStart = 0;
+    this._postCount = 0;
+    this._postCooldownUntil = 0;
+
+    // detect mobile user agent for conservative defaults
+    this._isMobile = (typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+    // post to parent with simple guards to avoid echo loops
+    this.postParent = (msg, minIntervalMs) => {
+      try {
+        // test/dev global: if true, completely suppress any outgoing postMessage from the iframe
+        if (window.__BLOCK_EMBEDDED_SENDING) {
+          if (typeof console !== 'undefined' && console.warn) console.warn('[HandTracker] postParent blocked by __BLOCK_EMBEDDED_SENDING flag');
+          return;
+        }
+      } catch (e) { /* ignore */ }
+      try {
+        if (!window.parent || window.parent === window) return; // same-window guard
+        const now = (performance && performance.now) ? performance.now() : Date.now();
+        // global cooldown: if too many posts in short time, enter cooldown to avoid recursion
+        if (this._postCooldownUntil && now < this._postCooldownUntil) {
+          if (typeof console !== 'undefined' && console.warn) console.warn('[HandTracker] postParent suppressed due to cooldown');
+          return;
+        }
+        const key = (msg && msg.type) ? msg.type : JSON.stringify(msg || {});
+        // choose conservative default on mobile if minIntervalMs not provided
+        const defaultMin = this._isMobile ? 500 : 100;
+        const minMs = (typeof minIntervalMs === 'number') ? minIntervalMs : defaultMin;
+        const last = this._lastPosted[key] || 0;
+        if ((now - last) < minMs) {
+          // debounced
+          return;
+        }
+
+        // rate counting per-second window
+        if (!this._postWindowStart || (now - this._postWindowStart) > 1000) {
+          this._postWindowStart = now;
+          this._postCount = 0;
+        }
+        this._postCount++;
+        // if too many posts in 1s, enter cooldown to avoid runaway loops (mobile can amplify)
+        if (this._postCount > (this._isMobile ? 12 : 40)) {
+          this._postCooldownUntil = now + (this._isMobile ? 3000 : 1000);
+          if (typeof console !== 'undefined' && console.warn) console.warn('[HandTracker] entering post cooldown due to high send rate');
+          return;
+        }
+
+        this._lastPosted[key] = now;
+        // attach embed token if available to help host validate origin and prevent echo loops
+        try { if (msg && typeof msg === 'object' && typeof window.__EMBED_TOKEN === 'string') msg.__embedToken = window.__EMBED_TOKEN; } catch (e) {}
+        // debug log to help detect loops
+        if (typeof console !== 'undefined' && console.debug) console.debug('[HandTracker] postParent', key, msg);
+        window.parent.postMessage(msg, '*');
+      } catch (e) {
+        // swallow errors to avoid crashing detection loop
+      }
+    };
 
     // 推論入力用のオフスクリーン Canvas
     this.procCanvas = document.createElement('canvas');
@@ -359,8 +418,8 @@ export class HandTracker {
       this.kickHoldUntil = nowSecFloat + 1.0;
       // KICK 遷移時は即座に送信
       if (this.prevState !== 'KICK') {
-        window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
-      }
+          this.postParent({ type: 'kick', confidence: this.stateConf });
+        }
     } else {
       this.state = desiredState;
       this.stateConf = desiredConf;
@@ -368,13 +427,13 @@ export class HandTracker {
       // 状態が変化したときのみメッセージ送信（重複送信を回避）
       if (this.prevState !== this.state) {
         if (this.state === 'KICK') {
-          window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+            this.postParent({ type: 'kick', confidence: this.stateConf });
         } else if (this.state === 'RUN') {
-          window.parent.postMessage({ type: 'run', confidence: this.stateConf }, '*');
+            this.postParent({ type: 'run', confidence: this.stateConf });
         } else if (this.state === 'CHARGE') {
-          window.parent.postMessage({ type: 'charge', confidence: this.stateConf }, '*');
+            this.postParent({ type: 'charge', confidence: this.stateConf });
         } else if (this.state === 'IDLE' || this.state === 'NONE') {
-          window.parent.postMessage({ type: 'idle', confidence: this.stateConf }, '*');
+            this.postParent({ type: 'idle', confidence: this.stateConf });
         }
       }
       this.prevState = this.state;
@@ -396,7 +455,7 @@ export class HandTracker {
         this.chargePendingUntil = 0;
         // 新規KICK遷移時のみメッセージ送信
         if (!wasKick) {
-          window.parent.postMessage({ type: 'kick', confidence: this.stateConf }, '*');
+            this.postParent({ type: 'kick', confidence: this.stateConf });
         }
       }
     }
@@ -633,16 +692,11 @@ export class HandTracker {
     const tipSpeedPeak = Math.max(...tipIndexSpeed, ...tipMidSpeed);
     const tipForwardMin = Math.min(...tipIndexVz, ...tipMidVz);
 
-  // KICK（簡素化）: 指先の速度ピークのみで判定
-  // tipSpeedPeak と tipForwardMin は index/middle 両方のピーク/最小値を既に計算済み
+  // KICK 判定（速度による自動遷移）を無効化。
+  // 仕様変更: KICK へ遷移するのは CHARGE が終了したときのみとするため、
+  // ここでの tipSpeed による自動 KICK 判定は行わない。
+  // tipSpeedPeak と tipForwardMin は保持しておくが、自動判定は無効。
     let kickScore = 0;
-    // suppressKick が指定されている場合は KICK 判定を抑止する
-    if (!suppressKick) {
-      // 2D の速度ピークが閾値を超え、かつ前方への z 速度が閾値以上であることを要求する
-      if (tipSpeedPeak > CFG.kick.minTipSpeedPxPerSec && tipForwardMin <= -CFG.kick.minTipForwardZ) {
-        kickScore = clamp((tipSpeedPeak - CFG.kick.minTipSpeedPxPerSec) / CFG.kick.minTipSpeedPxPerSec, 0, 1);
-      }
-    }
 
     // RUN（簡素化）: KICK でない限りすべて RUN。加速用の confidence は指先速度RMSから算出。
     const tipAmp = rms(tipSpeed);

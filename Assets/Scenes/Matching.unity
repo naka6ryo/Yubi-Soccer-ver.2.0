@@ -299,8 +299,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: State
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: a55c4edaeac3c1846b692e8ac2c2666b, type: 2}
+  m_sharedMaterial: {fileID: 6024109715677104685, guid: a55c4edaeac3c1846b692e8ac2c2666b, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -324,7 +324,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28.1
+  m_fontSize: 33.9
   m_fontSizeBase: 70
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -1704,7 +1704,7 @@ MonoBehaviour:
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
   m_ReferenceResolution: {x: 875, y: 376}
-  m_ScreenMatchMode: 0
+  m_ScreenMatchMode: 1
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
@@ -2811,6 +2811,7 @@ MonoBehaviour:
   reloadScene: 0
   delaySeconds: 3
   ballRigidbody: {fileID: 3595070269344119584, guid: 9d27f30a014fce143bb37b8af7497613, type: 3}
+  explicitInitialTransform: {fileID: 0}
   onlyMasterClientResets: 1
   enableBallReset: 1
   autoFindSpawners: 0
@@ -3007,7 +3008,7 @@ MonoBehaviour:
   arrowIndicator: {fileID: 639957804}
   canvas: {fileID: 1013196551}
   referenceCamera: {fileID: 1411125666}
-  edgePadding: {x: 170, y: 80}
+  edgePadding: {x: 400, y: 200}
   viewportMargin: 0.02
   player: {fileID: 0}
   showIfFartherThan: 15
