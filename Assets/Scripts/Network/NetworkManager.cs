@@ -42,7 +42,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     [Header("TitleScene")]
     [Tooltip("タイトル（ホーム）シーン名")]
-    public string titleSceneName = "GameTitle";
+    public string titleSceneName = "GameTitleEdition";
 
     bool joinAfterConnect = false;
     string pendingRoomName = null; // オリジナルルーム作成/参加用のルーム名を保持
@@ -52,6 +52,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     void Awake()
     {
         PhotonNetwork.AutomaticallySyncScene = true;
+        // タイトルシーンが Build Settings に登録されているか事前検証（再発防止）
+        if (!Application.CanStreamedLevelBeLoaded(titleSceneName))
+        {
+            Debug.LogWarning($"[NetworkManager] タイトルシーン '{titleSceneName}' が Build Settings に存在しません。File -> Build Settings で追加してください。");
+        }
+        else
+        {
+            Debug.Log($"[NetworkManager] Title scene configured: '{titleSceneName}'");
+        }
     }
 
     void Start()

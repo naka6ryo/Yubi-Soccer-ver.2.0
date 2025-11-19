@@ -17,7 +17,7 @@ public class BackToTitleButton : MonoBehaviour
     }
 
     void OnClicked()
-    {　
+    {
         var nm = FindObjectOfType<NetworkManager>();
         if (nm != null)
         {

@@ -170,7 +170,7 @@ namespace YubiSoccer.UI
         /// </summary>
         public void OnBackToTitleButtonClicked()
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("GameTitle");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("GameTitleEdition");
         }
     }
 }

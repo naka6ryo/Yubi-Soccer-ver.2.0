@@ -2038,6 +2038,7 @@ MonoBehaviour:
   drawMessage: DRAW!
   redTeamColor: {r: 1, g: 0.2, b: 0.2, a: 1}
   blueTeamColor: {r: 0.2, g: 0.5, b: 1, a: 1}
+  backToTitleButton: {fileID: 0}
 --- !u!1001 &551702087
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5715,7 +5716,7 @@ MonoBehaviour:
   statusDisplay: {fileID: 0}
   gameSceneName: Multi Player
   matchingSceneName: Matching
-  titleSceneName: GameTitle
+  titleSceneName: GameTitleEdition
 --- !u!4 &1714396237
 Transform:
   m_ObjectHideFlags: 0
