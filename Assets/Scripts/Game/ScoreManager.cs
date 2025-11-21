@@ -63,7 +63,12 @@ namespace YubiSoccer.Game
         public void AddScore(Team team, int delta = 1)
         {
             delta = Mathf.Max(0, delta);
-            soundManager.PlaySE("スコア増加");
+            // SoundManager may not be initialized in some scenes (null), guard against NRE
+            if (soundManager == null) soundManager = SoundManager.Instance;
+            if (soundManager != null)
+            {
+                try { soundManager.PlaySE("スコア増加"); } catch { }
+            }
             switch (team)
             {
                 case Team.TeamA:

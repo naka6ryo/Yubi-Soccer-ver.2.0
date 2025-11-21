@@ -14,7 +14,6 @@ public class CustomRoomUI : MonoBehaviour
 
     public NetworkManager networkManager;
     public ChangePictureController changePictureController;
-    public ChangePictureController backPictureController;
     private byte maxPlayers = 0;
 
     void Start()
@@ -66,6 +65,6 @@ public class CustomRoomUI : MonoBehaviour
 
     void OnBackButtonClick()
     {
-        if (backPictureController != null) backPictureController.OnClicked();
+        if (changePictureController != null) changePictureController.OnClickedReverse();
     }
 }

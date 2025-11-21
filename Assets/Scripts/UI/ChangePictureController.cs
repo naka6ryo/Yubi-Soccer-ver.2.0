@@ -60,5 +60,20 @@ namespace YubiSoccer.UI
             if (addObject != null) addObject.gameObject.SetActive(true);
             if (addObject2 != null) addObject2.gameObject.SetActive(true);
         }
+
+        public void OnClickedReverse()
+        {
+            if (hiddenObject != null) hiddenObject.SetActive(true);
+            if (hiddenObject2 != null) hiddenObject2.SetActive(true);
+            if (hiddenButton != null) hiddenButton.gameObject.SetActive(true);
+            if (hiddenButton2 != null) hiddenButton2.gameObject.SetActive(true);
+            if (hiddenButton3 != null) hiddenButton3.gameObject.SetActive(true);
+            if (addedImage != null) addedImage.gameObject.SetActive(false);
+            if (addedButton != null) addedButton.gameObject.SetActive(false);
+            if (addedButton2 != null) addedButton2.gameObject.SetActive(false);
+            if (addedButton3 != null) addedButton3.gameObject.SetActive(false);
+            if (addObject != null) addObject.gameObject.SetActive(false);
+            if (addObject2 != null) addObject2.gameObject.SetActive(false);
+        }
     }
 }
