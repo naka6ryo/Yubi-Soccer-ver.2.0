@@ -318,30 +318,28 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // タイトルへ戻る公開API（ボタンから呼ぶ）
     public void ReturnToTitleAndDisconnect()
     {
-        StartCoroutine(CoReturnToTitle());
-    }
-
-    // MOD: 切断＋シーン戻りコルーチン
-    private IEnumerator CoReturnToTitle()
-    {
         // 以後自動再接続を防ぐ
         joinAfterConnect = false;
 
-        // ルーム離脱
+        // ルームにいるなら、まずは退出処理だけを行う
         if (PhotonNetwork.InRoom)
         {
-            Log("Leaving room...");
+            Log("Leaving room... Waiting for OnLeftRoom callback.");
             PhotonNetwork.LeaveRoom();
-            float t = 0f;
-            while (PhotonNetwork.InRoom && t < 5f)
-            {
-                t += Time.deltaTime;
-                yield return null;
-            }
+            // ※ここではまだシーン遷移しません。「退出完了」の合図を待ちます。
         }
+        else
+        {
+            // 既に部屋にいない（または未接続）なら、即座にタイトルへ
+            Log("Not in room. Loading title scene: " + titleSceneName);
+            SceneManager.LoadScene(titleSceneName);
+        }
+    }
 
-        // タイトルへ遷移
-        Log("Loading title scene: " + titleSceneName);
+    // Photonが「退出完了した」タイミングで自動的に呼ばれる
+    public override void OnLeftRoom()
+    {
+        Log("OnLeftRoom callback received. Loading title scene: " + titleSceneName);
         SceneManager.LoadScene(titleSceneName);
     }
 
