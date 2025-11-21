@@ -1,31 +1,52 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using YubiSoccer.UI;
 
 public class CustomRoomUI : MonoBehaviour
 {
-    [Header("Create Room UI")]
-    public TMP_InputField createRoomNameInput;
-    public TMP_Dropdown maxPlayersDropdown;
+    public Button oneOnOneButton;
+    public Button twoOnTwoButton;
+    public Button threeOnThreeButton;
     public Button createRoomButton;
+    public Button backButton;
+    public TMP_InputField roomNameInput;
 
-    [Header("Join Room UI")]
-    public TMP_InputField joinRoomNameInput;
-    public Button joinRoomButton;
-
-    [Header("NetworkManager")]
     public NetworkManager networkManager;
+    public ChangePictureController changePictureController;
+    public ChangePictureController backPictureController;
+    private byte maxPlayers = 0;
 
     void Start()
     {
-        // ボタンのクリックイベントを設定
-        createRoomButton.onClick.AddListener(OnCreateRoomButtonClick);
-        joinRoomButton.onClick.AddListener(OnJoinRoomButtonClick);
+        if (oneOnOneButton != null) oneOnOneButton.onClick.AddListener(OnOneOnOneButtonClick);
+        if (twoOnTwoButton != null) twoOnTwoButton.onClick.AddListener(OnTwoOnTwoButtonClick);
+        if (threeOnThreeButton != null) threeOnThreeButton.onClick.AddListener(OnThreeOnThreeButtonClick);
+        if (createRoomButton != null) createRoomButton.onClick.AddListener(OnCreateRoomButtonClick);
+        if (backButton != null) backButton.onClick.AddListener(OnBackButtonClick);
+    }
+
+    void OnOneOnOneButtonClick()
+    {
+        maxPlayers = 2;
+        if (changePictureController != null) changePictureController.OnClicked();
+    }
+
+    void OnTwoOnTwoButtonClick()
+    {
+        maxPlayers = 4;
+        if (changePictureController != null) changePictureController.OnClicked();
+    }
+
+    void OnThreeOnThreeButtonClick()
+    {
+        maxPlayers = 6;
+        if (changePictureController != null) changePictureController.OnClicked();
     }
 
     void OnCreateRoomButtonClick()
     {
-        string roomName = createRoomNameInput.text.Trim();
+        string roomName = roomNameInput.text.Trim();
         
         if (string.IsNullOrEmpty(roomName))
         {
@@ -33,22 +54,18 @@ public class CustomRoomUI : MonoBehaviour
             return;
         }
 
-        // Dropdown の値を MaxPlayers に変換（0=2人, 1=4人, 2=6人）
-        byte maxPlayers = (byte)(2 + maxPlayersDropdown.value * 2);
-
-        networkManager.CreateCustomRoom(roomName, maxPlayers);
+        if (maxPlayers != 0)
+        {
+            networkManager.CreateCustomRoom(roomName, maxPlayers);
+        }
+        else
+        {
+            networkManager.JoinCustomRoom(roomName);
+        }  
     }
 
-    void OnJoinRoomButtonClick()
+    void OnBackButtonClick()
     {
-        string roomName = joinRoomNameInput.text.Trim();
-
-        if (string.IsNullOrEmpty(roomName))
-        {
-            Debug.LogError("ルーム名を入力してください");
-            return;
-        }
-
-        networkManager.JoinCustomRoom(roomName);
+        if (backPictureController != null) backPictureController.OnClicked();
     }
 }

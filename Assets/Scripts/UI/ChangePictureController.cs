@@ -6,13 +6,16 @@ namespace YubiSoccer.UI
     public class ChangePictureController : MonoBehaviour
     {
         [Header("References")]
-        [Tooltip("押されたら処理される Button (OriginalBattleButton)")]
-        [SerializeField] private Button originalBattleButton;
+        [Tooltip("押されたら処理される Button")]
+        [SerializeField] private Button onClickButton;
 
         [Tooltip("隠す対象の BattleMode GameObject (パネル等)")]
         [SerializeField] private GameObject hiddenObject;
+        [SerializeField] private GameObject hiddenObject2;
         [SerializeField] private Button hiddenButton;
         [SerializeField] private Button hiddenButton2;
+        [SerializeField] private Button hiddenButton3;
+        
 
         [Tooltip("表示する Image (Inspectorで GameObject を割当て)")]
         [SerializeField] private Image addedImage;
@@ -37,17 +40,19 @@ namespace YubiSoccer.UI
 
         private void Start()
         {
-            if (originalBattleButton != null)
+            if (onClickButton != null)
             {
-                originalBattleButton.onClick.AddListener(OnClicked);
+                onClickButton.onClick.AddListener(OnClicked);
             }
         }
 
         public void OnClicked()
         {
             if (hiddenObject != null) hiddenObject.SetActive(false);
+            if (hiddenObject2 != null) hiddenObject2.SetActive(false);
             if (hiddenButton != null) hiddenButton.gameObject.SetActive(false);
             if (hiddenButton2 != null) hiddenButton2.gameObject.SetActive(false);
+            if (hiddenButton3 != null) hiddenButton3.gameObject.SetActive(false);
             if (addedImage != null) addedImage.gameObject.SetActive(true);
             if (addedButton != null) addedButton.gameObject.SetActive(true);
             if (addedButton2 != null) addedButton2.gameObject.SetActive(true);
