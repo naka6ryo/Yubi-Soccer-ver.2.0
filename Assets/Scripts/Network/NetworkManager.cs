@@ -40,6 +40,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [Tooltip("マッチングシーンの名前")]
     public string matchingSceneName = "Matching";
 
+    [Header("TitleScene")]
+    [Tooltip("タイトル（ホーム）シーン名")]
+    public string titleSceneName = "GameTitleEdition";
+
     bool joinAfterConnect = false;
     string pendingRoomName = null; // オリジナルルーム作成/参加用のルーム名を保持
     byte pendingRoomMaxPlayers = 0; // オリジナルルーム作成時の最大人数を保持
@@ -48,6 +52,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     void Awake()
     {
         PhotonNetwork.AutomaticallySyncScene = true;
+        // タイトルシーンが Build Settings に登録されているか事前検証（再発防止）
+        if (!Application.CanStreamedLevelBeLoaded(titleSceneName))
+        {
+            Debug.LogWarning($"[NetworkManager] タイトルシーン '{titleSceneName}' が Build Settings に存在しません。File -> Build Settings で追加してください。");
+        }
+        else
+        {
+            Debug.Log($"[NetworkManager] Title scene configured: '{titleSceneName}'");
+        }
     }
 
     void Start()
@@ -300,6 +313,34 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
         }
+    }
+
+    // タイトルへ戻る公開API（ボタンから呼ぶ）
+    public void ReturnToTitleAndDisconnect()
+    {
+        // 以後自動再接続を防ぐ
+        joinAfterConnect = false;
+
+        // ルームにいるなら、まずは退出処理だけを行う
+        if (PhotonNetwork.InRoom)
+        {
+            Log("Leaving room... Waiting for OnLeftRoom callback.");
+            PhotonNetwork.LeaveRoom();
+            // ※ここではまだシーン遷移しません。「退出完了」の合図を待ちます。
+        }
+        else
+        {
+            // 既に部屋にいない（または未接続）なら、即座にタイトルへ
+            Log("Not in room. Loading title scene: " + titleSceneName);
+            SceneManager.LoadScene(titleSceneName);
+        }
+    }
+
+    // Photonが「退出完了した」タイミングで自動的に呼ばれる
+    public override void OnLeftRoom()
+    {
+        Log("OnLeftRoom callback received. Loading title scene: " + titleSceneName);
+        SceneManager.LoadScene(titleSceneName);
     }
 
     void Log(string text)

@@ -13,7 +13,7 @@ namespace YubiSoccer.UI
     public class NetworkSceneTransition : MonoBehaviourPunCallbacks
     {
         [Header("Scene Settings")]
-        [SerializeField] private string targetSceneName = "GameTitle";
+        [SerializeField] private string targetSceneName = "GameTitleEdition";
         [SerializeField] private bool transitionOnConnected = true;
 
         [Header("Fade Settings")]

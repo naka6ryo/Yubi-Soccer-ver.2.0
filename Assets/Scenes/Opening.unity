@@ -794,6 +794,7 @@ MonoBehaviour:
   statusDisplay: {fileID: 0}
   gameSceneName: Multi Player Stadium
   matchingSceneName: Matching
+  titleSceneName: GameTitleEdition
 --- !u!4 &1310750165
 Transform:
   m_ObjectHideFlags: 0

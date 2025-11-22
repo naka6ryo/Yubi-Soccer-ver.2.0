@@ -26,6 +26,10 @@ namespace YubiSoccer.UI
         [SerializeField] private Color redTeamColor = new Color(1f, 0.2f, 0.2f); // 赤
         [SerializeField] private Color blueTeamColor = new Color(0.2f, 0.5f, 1f); // 青
 
+        [Header("Back To Title Button")]
+        [Tooltip("リザルト表示時にだけ表示したい戻るボタンの GameObject")]
+        [SerializeField] private GameObject backToTitleButton;
+
         private void OnEnable()
         {
             // MatchTimer の試合終了イベントを購読
@@ -58,6 +62,11 @@ namespace YubiSoccer.UI
             if (blueScoreText != null)
             {
                 blueScoreText.text = "";
+            }
+
+            if (backToTitleButton != null)
+            {
+                backToTitleButton.SetActive(false);
             }
         }
 
@@ -121,6 +130,12 @@ namespace YubiSoccer.UI
 
             // パネルを表示
             resultPanel.SetActive(true);
+
+            // リザルトUIと同じタイミングでボタン表示
+            if (backToTitleButton != null)
+            {
+                backToTitleButton.SetActive(true);
+            }
         }
 
         /// <summary>
@@ -155,7 +170,7 @@ namespace YubiSoccer.UI
         /// </summary>
         public void OnBackToTitleButtonClicked()
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("GameTitle");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("GameTitleEdition");
         }
     }
 }

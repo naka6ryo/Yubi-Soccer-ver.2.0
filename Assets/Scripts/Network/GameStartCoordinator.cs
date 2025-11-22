@@ -23,21 +23,31 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        // 自分の読み込み完了をルームのプレイヤープロパティに設定
-        var props = new ExitGames.Client.Photon.Hashtable { { PROP_PLAYER_LOADED, true } };
-        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
-        Debug.Log("[GameStartCoordinator] Set playerLoaded=true");
         soundManager = SoundManager.Instance;
 
-        // マスターは即チェック（既に全員揃っている可能性がある）
-        if (PhotonNetwork.IsMasterClient)
+        // 【修正箇所】
+        // 切断処理中(Leaving)や未接続の場合は、プロパティ設定を行わないようにガードする
+        if (PhotonNetwork.IsConnectedAndReady && PhotonNetwork.InRoom)
         {
-            CheckAllPlayersLoadedAndStart();
+            // 自分の読み込み完了をルームのプレイヤープロパティに設定
+            var props = new ExitGames.Client.Photon.Hashtable { { PROP_PLAYER_LOADED, true } };
+            PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+            Debug.Log("[GameStartCoordinator] Set playerLoaded=true");
+
+            // マスターは即チェック（既に全員揃っている可能性がある）
+            if (PhotonNetwork.IsMasterClient)
+            {
+                CheckAllPlayersLoadedAndStart();
+            }
+            else
+            {
+                // 非マスターは既にカウントダウンが始まっているかチェック
+                CheckCountdownStart();
+            }
         }
         else
         {
-            // 非マスターは既にカウントダウンが始まっているかチェック
-            CheckCountdownStart();
+            Debug.LogWarning("[GameStartCoordinator] Start called but client is not connected or leaving. Skipping initialization.");
         }
     }
 
@@ -63,6 +73,9 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
     void CheckAllPlayersLoadedAndStart()
     {
+        // 念のためルーム情報のチェック
+        if (PhotonNetwork.CurrentRoom == null) return;
+
         // 既にカウントダウン開始済みならスキップ（二重実行防止）
         if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(PROP_COUNTDOWN_START))
         {
@@ -97,6 +110,9 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
     /// </summary>
     void CheckCountdownStart()
     {
+        // 念のためルーム情報のチェック
+        if (PhotonNetwork.CurrentRoom == null) return;
+
         object val;
         if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(PROP_COUNTDOWN_START, out val))
         {
@@ -108,7 +124,12 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
             if (remainMs <= 0)
             {
-                soundManager.PlayBGM("試合中");
+                // SoundManagerがnullでないか確認
+                if (soundManager != null)
+                {
+                    soundManager.PlayBGM("試合中");
+                }
+                
                 // 既に開始時刻を過ぎている → 即座に開始
                 Debug.Log("[GameStartCoordinator] Start time already passed - starting immediately");
                 if (countDown != null) countDown.Play();
@@ -126,6 +147,10 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[GameStartCoordinator] Waiting {waitSeconds:F2}s before starting countdown UI");
         yield return new WaitForSecondsRealtime(waitSeconds);
+        
+        // 待機中に切断された場合のガード
+        if (this == null) yield break;
+
         Debug.Log("[GameStartCoordinator] Starting countdown UI now (synchronized)");
         if (countDown != null)
         {
@@ -139,12 +164,15 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
     void OnDestroy()
     {
-        // オプション: シーン離脱時にフラグをクリアする場合
-        try
+        // ネットワークが生きていて、操作可能な状態かチェックする
+        if (PhotonNetwork.IsConnectedAndReady && PhotonNetwork.InRoom)
         {
-            var props = new ExitGames.Client.Photon.Hashtable { { PROP_PLAYER_LOADED, false } };
-            PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+            try
+            {
+                var props = new ExitGames.Client.Photon.Hashtable { { PROP_PLAYER_LOADED, false } };
+                PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+            }
+            catch { }
         }
-        catch { }
     }
 }
