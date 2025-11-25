@@ -46,5 +46,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   seName: "\u6C7A\u5B9A"
   rescanInterval: 0
-  includeInactive: 0
+  includeInactive: 1
   makeSingleton: 1

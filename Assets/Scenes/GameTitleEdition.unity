@@ -28832,8 +28832,8 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 841717048}
   - {fileID: 819615517}
+  - {fileID: 841717048}
   - {fileID: 1383333775}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -45535,6 +45535,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 7899939916500255878, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: includeInactive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8527320087609972618, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
       propertyPath: m_Name
       value: AnyButtonSEPlayer
