@@ -92,8 +92,9 @@
         // Insert modal HTML into the page
         var modal = document.createElement('div');
         modal.id = 'cameraModal';
-        modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:9999;';
-        modal.innerHTML = '\n          <div id="cameraModalPanel" style="background:#111;color:#fff;padding:20px;border-radius:10px;min-width:320px;max-width:90vw;text-align:left">\n            <h3 style="margin:0 0 10px">カメラを選択して開始</h3>\n            <div style="margin-bottom:12px">\n              <select id="cameraSelectMain" style="width:100%;padding:8px;border-radius:6px;background:#000;color:#fff;border:1px solid rgba(255,255,255,0.08)"></select>\n            </div>\n            <div style="display:flex;gap:8px;justify-content:flex-end">\n              <button id="cameraStartMain" style="padding:8px 12px;border-radius:6px;background:#36c;border:none;color:#fff;font-weight:700">開始</button>\n            </div>\n          </div>\n        ';
+        modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.92);z-index:9999;';
+        modal.className = 'camera-modal';
+        modal.innerHTML = '\n          <div id="cameraModalPanel">\n            <h3>内カメラを選択</h3>\n            <div style="margin-bottom:8px">\n              <select id="cameraSelectMain"></select>\n            </div>\n            <div class="camera-controls">\n              <button id="cameraStartMain"><span>プレイ</span></button>\n            </div>\n          </div>\n        ';
         document.body.appendChild(modal);
 
         var cameraSelectMain = document.getElementById('cameraSelectMain');
