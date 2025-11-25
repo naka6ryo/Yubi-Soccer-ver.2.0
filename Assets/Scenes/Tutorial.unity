@@ -3683,6 +3683,7 @@ MonoBehaviour:
   videoFileName: Kick.webm
   loopVideo: 1
   onClosedShowMission: {fileID: 1459877949}
+  activateOnClosedShowMission: 1
   pauseGameWhileOpen: 1
   showDelay: 0
   useFade: 1
@@ -4188,6 +4189,7 @@ MonoBehaviour:
   statusDisplay: {fileID: 1013196548}
   gameSceneName: Multi Player Stadium
   matchingSceneName: Matching
+  titleSceneName: GameTitleEdition
 --- !u!4 &1381035367
 Transform:
   m_ObjectHideFlags: 0
@@ -5485,6 +5487,63 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8321280428039233278, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
   m_PrefabInstance: {fileID: 1695707146}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &1720588546
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 8527320087609972618, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_Name
+      value: AnyButtonSEPlayer
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 2124.263
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -560.4676
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 2248.354
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8528052776796277240, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: bea7cd211c139b3478bf1fa7d78e5c00, type: 3}
 --- !u!1 &1722420623
 GameObject:
   m_ObjectHideFlags: 0
@@ -6736,3 +6795,4 @@ SceneRoots:
   - {fileID: 1192141241}
   - {fileID: 1565375424}
   - {fileID: 381705432}
+  - {fileID: 1720588546}
