@@ -313,9 +313,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                         {
                             sw.PlayWithCallback(() =>
                             {
-                                try { Debug.Log("[NetworkManager] Wipe complete - invoking PhotonNetwork.LoadLevel(" + matchingSceneName + ")"); } catch { }
-                                try { PhotonNetwork.LoadLevel(matchingSceneName); }
-                                catch (Exception e) { Debug.LogError($"Failed to LoadLevel('{matchingSceneName}') in onComplete: {e}"); }
+                                try { Debug.Log("[NetworkManager] Wipe complete - scheduling PhotonNetwork.LoadLevel(" + matchingSceneName + ")"); } catch { }
+                                try { StartCoroutine(DelayedPhotonLoad(matchingSceneName)); } catch (Exception e) { Debug.LogError($"Failed to start delayed load coroutine: {e}"); }
                             });
                         }
                         catch
@@ -337,6 +336,37 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             {
                 Debug.LogError($"Failed to LoadLevel('{matchingSceneName}'): {ex}");
             }
+        }
+
+    }
+
+    private System.Collections.IEnumerator DelayedPhotonLoad(string sceneName)
+    {
+        float wait = 0.5f;
+        try
+        {
+            var sw = ScreenCircleWipe.Instance;
+            if (sw != null)
+            {
+                wait = Mathf.Max(0f, sw.minLoadDelay);
+            }
+        }
+        catch { }
+
+        float elapsed = 0f;
+        while (elapsed < wait)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        try
+        {
+            PhotonNetwork.LoadLevel(sceneName);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"DelayedPhotonLoad: Failed to LoadLevel('{sceneName}'): {e}");
         }
     }
 
@@ -390,9 +420,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                     {
                         sw.PlayWithCallback(() =>
                         {
-                            try { Debug.Log("[NetworkManager] Wipe complete - invoking PhotonNetwork.LoadLevel(" + gameSceneName + ")"); } catch { }
-                            try { PhotonNetwork.LoadLevel(gameSceneName); }
-                            catch (Exception e) { Debug.LogError($"Failed to LoadLevel('{gameSceneName}') in onComplete: {e}"); }
+                            try { Debug.Log("[NetworkManager] Wipe complete - scheduling PhotonNetwork.LoadLevel(" + gameSceneName + ")"); } catch { }
+                            try { StartCoroutine(DelayedPhotonLoad(gameSceneName)); } catch (Exception e) { Debug.LogError($"Failed to start delayed load coroutine: {e}"); }
                         });
                     }
                     catch

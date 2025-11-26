@@ -28,6 +28,8 @@ namespace YubiSoccer.UI
         public Material overrideMaterial;
         [Tooltip("ワイプ完了時のイベント")]
         public UnityEvent onComplete;
+        [Tooltip("シーン読み込みが完了してから場面を表示するまでに最低限待つ秒数（モバイルの遅延対策用）")]
+        public float minLoadDelay = 0.6f;
 
         // internal
         private Material _matInstance;
@@ -300,7 +302,37 @@ namespace YubiSoccer.UI
             var op = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName, mode);
             if (op != null)
             {
-                // do not allow activation until load complete - but allow immediate activation
+                // Ensure scene activation is delayed until we're ready. This helps mobile platforms
+                // which may be sensitive to immediate activation and cause reloads. We'll wait until
+                // progress reaches 0.9 (load finished) then wait an extra `minLoadDelay` seconds before allowing activation.
+                try
+                {
+                    op.allowSceneActivation = false;
+                }
+                catch { }
+
+                // wait until load reaches ready state
+                while (op.progress < 0.9f)
+                {
+                    yield return null;
+                }
+
+                // wait an extra little bit (unscaled) to avoid race conditions on mobile
+                float extraWait = Mathf.Max(0f, minLoadDelay);
+                float extraElapsed = 0f;
+                while (extraElapsed < extraWait)
+                {
+                    extraElapsed += Time.unscaledDeltaTime;
+                    yield return null;
+                }
+
+                // allow activation and wait for completion
+                try
+                {
+                    op.allowSceneActivation = true;
+                }
+                catch { }
+
                 while (!op.isDone)
                     yield return null;
             }

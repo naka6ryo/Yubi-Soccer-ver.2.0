@@ -2179,6 +2179,7 @@ MonoBehaviour:
   onComplete:
     m_PersistentCalls:
       m_Calls: []
+  startDelay: 0.15
 --- !u!4 &584355141
 Transform:
   m_ObjectHideFlags: 0
@@ -3462,7 +3463,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 1:00
+  m_text: 02:00
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: a55c4edaeac3c1846b692e8ac2c2666b, type: 2}
   m_sharedMaterial: {fileID: 6024109715677104685, guid: a55c4edaeac3c1846b692e8ac2c2666b, type: 2}
