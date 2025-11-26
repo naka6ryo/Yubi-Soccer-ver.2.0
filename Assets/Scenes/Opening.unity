@@ -824,8 +824,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetSceneName: GameTitleEdition
   transitionOnConnected: 1
-  fadeImage: {fileID: 975113985}
-  fadeColor: {r: 1, g: 1, b: 1, a: 1}
+  fadeImage: {fileID: 0}
+  fadeColor: {r: 1, g: 1, b: 1, a: 0}
   fadeOutDuration: 1
   fadeInDuration: 1
   delayBeforeTransition: 0.5
