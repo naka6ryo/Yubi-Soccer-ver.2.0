@@ -15,7 +15,7 @@ namespace YubiSoccer.UI
         [SerializeField] private Button hiddenButton;
         [SerializeField] private Button hiddenButton2;
         [SerializeField] private Button hiddenButton3;
-        
+
 
         [Tooltip("表示する Image (Inspectorで GameObject を割当て)")]
         [SerializeField] private Image addedImage;
@@ -25,6 +25,10 @@ namespace YubiSoccer.UI
         [SerializeField] private Button addedButton3;
         [SerializeField] private GameObject addObject;
         [SerializeField] private GameObject addObject2;
+
+        [Header("Back Button (Inspector)")]
+        [Tooltip("戻る動作をするボタン（Inspector で割り当ててください）。押されると OnClickedReverse が呼ばれます。")]
+        [SerializeField] private Button backButton;
 
 
         private void Awake()
@@ -38,11 +42,27 @@ namespace YubiSoccer.UI
             if (addObject2 != null) addObject2.gameObject.SetActive(false);
         }
 
-        private void Start()
+        private void OnEnable()
         {
             if (onClickButton != null)
             {
                 onClickButton.onClick.AddListener(OnClicked);
+            }
+            if (backButton != null)
+            {
+                backButton.onClick.AddListener(OnClickedReverse);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (onClickButton != null)
+            {
+                onClickButton.onClick.RemoveListener(OnClicked);
+            }
+            if (backButton != null)
+            {
+                backButton.onClick.RemoveListener(OnClickedReverse);
             }
         }
 
