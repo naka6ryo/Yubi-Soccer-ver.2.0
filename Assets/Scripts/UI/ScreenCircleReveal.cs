@@ -27,9 +27,16 @@ namespace YubiSoccer.UI
         public Material overrideMaterial;
         [Tooltip("ワイプ完了時のイベント（穴が最大になった時）")]
         public UnityEvent onComplete;
+        [Tooltip("シーン遷移後に Reveal を開始する前に待つ余裕時間（秒）。モバイルで描画が間に合わない場合に増やすと良いです。")]
+        public float startDelay = 0.15f;
 
         private Material _matInstance;
         private Image _image;
+        // CPU fallback for platforms without shader support
+        private Sprite _circleSprite;
+        private bool _useSpriteFallback = false;
+        private float _spriteMaxScale = 1f;
+        private int _circleTextureSize = 512;
         private float _maxRadius = 1.0f;
 
         void Awake()
@@ -82,14 +89,30 @@ namespace YubiSoccer.UI
 
             if (mat == null)
             {
-                // fallback: plain white image. We'll animate alpha as a degrade-friendly fallback
-                _image.color = color;
-                RectTransform rtfb = _image.rectTransform;
-                rtfb.anchorMin = Vector2.zero;
-                rtfb.anchorMax = Vector2.one;
-                rtfb.sizeDelta = Vector2.zero;
                 _matInstance = null;
-                Debug.LogWarning("[ScreenCircleReveal] Material creation failed - using alpha-fade fallback.");
+                _useSpriteFallback = true;
+
+                // create inverted circle sprite if not exists
+                if (_circleSprite == null)
+                {
+                    _circleSprite = CreateInvertedCircleSprite(_circleTextureSize, feather);
+                }
+
+                _image.sprite = _circleSprite;
+                _image.type = Image.Type.Simple;
+                _image.preserveAspect = true;
+                _image.color = color;
+
+                RectTransform rtf = _image.rectTransform;
+                rtf.anchorMin = new Vector2(0.5f, 0.5f);
+                rtf.anchorMax = new Vector2(0.5f, 0.5f);
+                rtf.sizeDelta = new Vector2(_circleTextureSize, _circleTextureSize);
+                rtf.localScale = Vector3.zero;
+
+                float diag = Mathf.Sqrt(Screen.width * (float)Screen.width + Screen.height * (float)Screen.height);
+                _spriteMaxScale = (diag / (float)_circleTextureSize) * 1.2f;
+
+                Debug.Log("[ScreenCircleReveal] Using sprite fallback for reveal. Max scale=" + _spriteMaxScale);
                 return;
             }
 
@@ -126,23 +149,54 @@ namespace YubiSoccer.UI
         private IEnumerator CoPlay()
         {
             float elapsed = 0f;
+            // ensure mask/setup is present
+            SetupMask();
+            // wait one frame and optional startDelay to let scene finish first-frame UI setup (mobile safety)
+            yield return null;
+            float sd = Mathf.Max(0f, startDelay);
+            float se = 0f;
+            while (se < sd)
+            {
+                se += Time.unscaledDeltaTime;
+                yield return null;
+            }
             // If shader/material is missing, fallback to animating image alpha (1 -> 0)
             if (_matInstance == null && _image != null)
             {
-                Color startCol = _image.color;
-                startCol.a = 1f;
-                Color endCol = startCol; endCol.a = 0f;
-                while (elapsed < duration)
+                if (_useSpriteFallback)
                 {
-                    elapsed += Time.unscaledDeltaTime;
-                    float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
-                    float v = curve.Evaluate(t);
-                    if (_image != null) _image.color = Color.Lerp(startCol, endCol, v);
-                    yield return null;
+                    // animate sprite scale from 0 -> max
+                    _image.rectTransform.localScale = Vector3.zero;
+                    while (elapsed < duration)
+                    {
+                        elapsed += Time.unscaledDeltaTime;
+                        float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
+                        float v = curve.Evaluate(t);
+                        float scale = Mathf.Lerp(0f, _spriteMaxScale, v);
+                        if (_image != null) _image.rectTransform.localScale = Vector3.one * scale;
+                        yield return null;
+                    }
+                    if (_image != null) _image.rectTransform.localScale = Vector3.one * _spriteMaxScale;
+                    onComplete?.Invoke();
+                    yield break;
                 }
-                if (_image != null) _image.color = endCol;
-                onComplete?.Invoke();
-                yield break;
+                else
+                {
+                    Color startCol = _image.color;
+                    startCol.a = 1f;
+                    Color endCol = startCol; endCol.a = 0f;
+                    while (elapsed < duration)
+                    {
+                        elapsed += Time.unscaledDeltaTime;
+                        float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
+                        float v = curve.Evaluate(t);
+                        if (_image != null) _image.color = Color.Lerp(startCol, endCol, v);
+                        yield return null;
+                    }
+                    if (_image != null) _image.color = endCol;
+                    onComplete?.Invoke();
+                    yield break;
+                }
             }
 
             while (elapsed < duration)
@@ -166,26 +220,77 @@ namespace YubiSoccer.UI
             onComplete?.Invoke();
         }
 
+        /// <summary>
+        /// Generate an inverted circular sprite: transparent inside, opaque outside.
+        /// Used as a shader-free fallback for reveal (hole) effect on platforms where shaders may be stripped.
+        /// </summary>
+        private Sprite CreateInvertedCircleSprite(int size, float feather)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            Color[] cols = new Color[size * size];
+            float half = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (x + 0.5f - half) / half; // -1..1
+                    float ny = (y + 0.5f - half) / half; // -1..1
+                    float dist = Mathf.Sqrt(nx * nx + ny * ny);
+                    float norm = dist;
+                    // inverted: alpha 0 inside, 1 outside, with soft feather
+                    float a = Mathf.SmoothStep(1f - feather, 1f + feather, norm);
+                    cols[y * size + x] = new Color(1f, 1f, 1f, a);
+                }
+            }
+            tex.SetPixels(cols);
+            tex.Apply(false, false);
+            var spr = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+            spr.name = "_RuntimeInvertedCircleSprite";
+            return spr;
+        }
+
         private IEnumerator CoReverse()
         {
             float elapsed = 0f;
             // Fallback reverse: animate alpha 0 -> 1 if no material
             if (_matInstance == null && _image != null)
             {
-                Color startCol = _image.color;
-                startCol.a = 0f;
-                Color endCol = startCol; endCol.a = 1f;
-                while (elapsed < duration)
+                if (_useSpriteFallback)
                 {
-                    elapsed += Time.unscaledDeltaTime;
-                    float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
-                    float v = curve.Evaluate(t);
-                    if (_image != null) _image.color = Color.Lerp(startCol, endCol, v);
-                    yield return null;
+                    // animate sprite scale 0 -> max for reverse? For reverse (closing), we want to scale from 0 to max?
+                    // Actually ReversePlay here should close hole (transparent->opaque), so scale from 0 -> max then hide.
+                    _image.rectTransform.localScale = Vector3.zero;
+                    while (elapsed < duration)
+                    {
+                        elapsed += Time.unscaledDeltaTime;
+                        float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
+                        float v = curve.Evaluate(t);
+                        float scale = Mathf.Lerp(0f, _spriteMaxScale, v);
+                        if (_image != null) _image.rectTransform.localScale = Vector3.one * scale;
+                        yield return null;
+                    }
+                    if (_image != null) _image.rectTransform.localScale = Vector3.one * _spriteMaxScale;
+                    onComplete?.Invoke();
+                    yield break;
                 }
-                if (_image != null) _image.color = endCol;
-                onComplete?.Invoke();
-                yield break;
+                else
+                {
+                    Color startCol = _image.color;
+                    startCol.a = 0f;
+                    Color endCol = startCol; endCol.a = 1f;
+                    while (elapsed < duration)
+                    {
+                        elapsed += Time.unscaledDeltaTime;
+                        float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
+                        float v = curve.Evaluate(t);
+                        if (_image != null) _image.color = Color.Lerp(startCol, endCol, v);
+                        yield return null;
+                    }
+                    if (_image != null) _image.color = endCol;
+                    onComplete?.Invoke();
+                    yield break;
+                }
             }
 
             while (elapsed < duration)

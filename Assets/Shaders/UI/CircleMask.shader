@@ -3,7 +3,8 @@ Shader "UI/CircleMask" {
         _Color ("Color", Color) = (1,1,1,1)
         _MainTex ("Texture", 2D) = "white" {}
         _Radius ("Radius", Range(0,2)) = 0
-        _Feather ("Feather", Range(0,0.5)) = 0.02
+        _Feather ("Feather", Range(0,0.5)) = 0.005
+        _Hardness ("Hardness", Range(0.1,20)) = 12
     }
     SubShader {
         Tags { "Queue" = "Transparent" "IgnoreProjector" = "True" "RenderType" = "Transparent" }
@@ -26,6 +27,7 @@ Shader "UI/CircleMask" {
             float4 _MainTex_ST;
             float _Radius;
             float _Feather;
+            float _Hardness;
 
             v2f vert(appdata_t v)
             {
@@ -48,6 +50,8 @@ Shader "UI/CircleMask" {
 
                 // radius is interpreted in normalized units (0..1) where 1 reaches corners
                 float alphaMask = 1.0 - smoothstep(_Radius - _Feather, _Radius + _Feather, normDist);
+                // sharpen the edge by applying a hardness exponent (>1 sharpens)
+                alphaMask = pow(max(clamp(alphaMask, 0.0, 1.0), 0.0001), _Hardness);
 
                 fixed4 tex = tex2D(_MainTex, i.uv);
                 fixed4 baseCol = tex * _Color;
