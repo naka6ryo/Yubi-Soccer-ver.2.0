@@ -1793,6 +1793,82 @@ Transform:
   - {fileID: 1888675675}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 7.015, z: 0}
+--- !u!1 &1117544906
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1117544908}
+  - component: {fileID: 1117544907}
+  m_Layer: 0
+  m_Name: ComeCircleTransition
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1117544907
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1117544906}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c15ab3a1683c9664ebd45512bb4d8829, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  duration: 0.7
+  curve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  color: {r: 1, g: 1, b: 1, a: 1}
+  feather: 0
+  playOnStart: 1
+  overrideMaterial: {fileID: 0}
+  onComplete:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!4 &1117544908
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1117544906}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 439.49673, y: 102.01905, z: -18.663027}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1149907676
 GameObject:
   m_ObjectHideFlags: 0
@@ -2103,6 +2179,7 @@ MonoBehaviour:
   statusDisplay: {fileID: 1013196548}
   gameSceneName: Multi Player Stadium
   matchingSceneName: Matching
+  titleSceneName: GameTitleEdition
 --- !u!4 &1381035367
 Transform:
   m_ObjectHideFlags: 0
@@ -3380,3 +3457,4 @@ SceneRoots:
   - {fileID: 1339136414}
   - {fileID: 628907931}
   - {fileID: 1722420628}
+  - {fileID: 1117544908}

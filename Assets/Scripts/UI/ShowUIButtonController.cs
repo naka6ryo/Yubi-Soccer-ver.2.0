@@ -77,7 +77,7 @@ namespace YubiSoccer.UI
             HideUI();
             if (!string.IsNullOrEmpty(sceneToLoadOnOptionA))
             {
-                try { SceneManager.LoadScene(sceneToLoadOnOptionA); } catch { }
+                try { ScreenCircleWipe.LoadSceneWithWipe(sceneToLoadOnOptionA); } catch { }
             }
         }
 
@@ -86,7 +86,7 @@ namespace YubiSoccer.UI
             HideUI();
             if (!string.IsNullOrEmpty(sceneToLoadOnOptionB))
             {
-                try { SceneManager.LoadScene(sceneToLoadOnOptionB); } catch { }
+                try { ScreenCircleWipe.LoadSceneWithWipe(sceneToLoadOnOptionB); } catch { }
             }
         }
 

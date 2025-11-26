@@ -99,26 +99,52 @@ namespace YubiSoccer.UI
             }
 
             // フェードアウト（暗転）
-            yield return StartCoroutine(FadeOut());
-
-            // シーン遷移
-            Debug.Log($"[NetworkSceneTransition] Loading scene: {targetSceneName}");
-            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(targetSceneName);
-
-            // シーンロード完了まで待機
-            while (!asyncLoad.isDone)
+            // Use ScreenCircleWipe for transition if available
+            bool usedWipe = false;
+            try
             {
-                yield return null;
+                Debug.Log($"[NetworkSceneTransition] Using ScreenCircleWipe for scene: {targetSceneName}");
+                // disable legacy fade image to avoid overlapping overlays
+                if (fadeImage != null) fadeImage.gameObject.SetActive(false);
+                ScreenCircleWipe.LoadSceneWithWipe(targetSceneName);
+                usedWipe = true;
+            }
+            catch
+            {
+                usedWipe = false;
             }
 
-            // フェードイン（明転）は次のシーンで行うか、ここで行うか選択可能
-            // ここではフェードインまで行う
-            yield return StartCoroutine(FadeIn());
-
-            // フェードImageを非表示
-            if (fadeImage != null)
+            // If wipe was started, wait for it outside the try/catch (cannot yield inside try/catch)
+            if (usedWipe)
             {
-                fadeImage.gameObject.SetActive(false);
+                var sw = ScreenCircleWipe.Instance;
+                if (sw != null)
+                {
+                    while (sw.IsPlaying)
+                    {
+                        yield return null;
+                    }
+                }
+            }
+
+            if (!usedWipe)
+            {
+                // fallback to original fade + load
+                yield return StartCoroutine(FadeOut());
+
+                Debug.Log($"[NetworkSceneTransition] Loading scene: {targetSceneName}");
+                AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(targetSceneName);
+                while (!asyncLoad.isDone)
+                {
+                    yield return null;
+                }
+
+                yield return StartCoroutine(FadeIn());
+
+                if (fadeImage != null)
+                {
+                    fadeImage.gameObject.SetActive(false);
+                }
             }
         }
 

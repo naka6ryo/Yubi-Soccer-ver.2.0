@@ -300,7 +300,7 @@ namespace YubiSoccer.UI
             Debug.Log("FinalGoalUIController: Home clicked.");
             if (!string.IsNullOrEmpty(homeSceneName))
             {
-                try { SceneManager.LoadScene(homeSceneName); } catch (System.Exception ex) { Debug.LogWarning("FinalGoalUIController: Failed to load home scene: " + ex); }
+                try { ScreenCircleWipe.LoadSceneWithWipe(homeSceneName); } catch (System.Exception ex) { Debug.LogWarning("FinalGoalUIController: Failed to load home scene: " + ex); }
             }
             else
             {
@@ -316,7 +316,7 @@ namespace YubiSoccer.UI
                 // Request that missions be hidden on the next scene load (so initial UI won't flash visible)
                 hideMissionsOnNextLoad = true;
                 var scene = SceneManager.GetActiveScene();
-                SceneManager.LoadScene(scene.name);
+                try { ScreenCircleWipe.LoadSceneWithWipe(scene.name); } catch (System.Exception ex) { Debug.LogWarning("FinalGoalUIController: Failed to reload scene: " + ex); }
             }
             catch (System.Exception ex)
             {

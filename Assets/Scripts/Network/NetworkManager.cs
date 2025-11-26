@@ -8,6 +8,8 @@ using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine.SceneManagement;
+using UnityEngine.Events;
+using YubiSoccer.UI;
 
 // Simple NetworkManager using Photon PUN 2.
 // - QuickMatch(): join random room (MaxPlayers=2) or create one if none available.
@@ -26,7 +28,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool autoConnectOnStart = true;
 
     [Header("UI (optional)")]
-    
+
     [Tooltip("ゲーム開始ボタン（マッチングシーンに配置）")]
     public StartGameButton startGameButton;
     [Tooltip("ステータス表示クラス（オプション）")]
@@ -65,7 +67,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        PhotonNetwork.GameVersion = "1"; 
+        PhotonNetwork.GameVersion = "1";
         if (PhotonNetwork.InRoom)
         {
             Log($"Already in room: {PhotonNetwork.CurrentRoom.Name}");
@@ -91,6 +93,40 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Log("Connecting to Photon...");
             PhotonNetwork.ConnectUsingSettings();
         }
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded_Wipe;
+        try
+        {
+            PhotonNetwork.AddCallbackTarget(this);
+        }
+        catch { }
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded_Wipe;
+        try
+        {
+            PhotonNetwork.RemoveCallbackTarget(this);
+        }
+        catch { }
+    }
+
+    private void OnSceneLoaded_Wipe(Scene scene, LoadSceneMode mode)
+    {
+        // When a scene finishes loading, if we have a global ScreenCircleWipe manager, reverse the wipe
+        try
+        {
+            var sw = ScreenCircleWipe.Instance;
+            if (sw != null)
+            {
+                sw.ReversePlay();
+            }
+        }
+        catch { }
     }
 
     public void QuickMatch2Players()
@@ -125,7 +161,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        Log("Joining random room...");
+        // extra diagnostic logs
+        try
+        {
+            Log($"Joining random room... Photon.IsConnected={PhotonNetwork.IsConnected}, IsConnectedAndReady={PhotonNetwork.IsConnectedAndReady}");
+            // NetworkClientState property may not exist in older PUN versions, guard it
+            try { Log($"Photon NetworkClientState: {PhotonNetwork.NetworkClientState}"); } catch { }
+        }
+        catch { }
+
         PhotonNetwork.JoinRandomRoom(null, maxPlayers);
     }
 
@@ -165,7 +209,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         };
         PhotonNetwork.CreateRoom(roomName, roomOptions);
     }
-    
+
     /// <summary>
     /// オリジナルルームに参加
     /// </summary>
@@ -258,7 +302,36 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Log($"MasterClient loading scene '{matchingSceneName}' (current: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
             try
             {
-                PhotonNetwork.LoadLevel(matchingSceneName);
+                // Play wipe locally before invoking Photon network load so clients see a fill animation
+                try
+                {
+                    var sw = ScreenCircleWipe.Instance;
+                    if (sw != null)
+                    {
+                        // Use PlayWithCallback to ensure callback registration and clearer behavior
+                        try
+                        {
+                            sw.PlayWithCallback(() =>
+                            {
+                                try { Debug.Log("[NetworkManager] Wipe complete - invoking PhotonNetwork.LoadLevel(" + matchingSceneName + ")"); } catch { }
+                                try { PhotonNetwork.LoadLevel(matchingSceneName); }
+                                catch (Exception e) { Debug.LogError($"Failed to LoadLevel('{matchingSceneName}') in onComplete: {e}"); }
+                            });
+                        }
+                        catch
+                        {
+                            PhotonNetwork.LoadLevel(matchingSceneName);
+                        }
+                    }
+                    else
+                    {
+                        PhotonNetwork.LoadLevel(matchingSceneName);
+                    }
+                }
+                catch
+                {
+                    PhotonNetwork.LoadLevel(matchingSceneName);
+                }
             }
             catch (Exception ex)
             {
@@ -307,7 +380,35 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Log($"Master starting game... Loading '{gameSceneName}'");
             var props = new ExitGames.Client.Photon.Hashtable { { "gameStarted", true } };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props);
-            PhotonNetwork.LoadLevel(gameSceneName);
+            // Play wipe locally before invoking Photon network load — wait for completion
+            try
+            {
+                var sw = ScreenCircleWipe.Instance;
+                if (sw != null)
+                {
+                    try
+                    {
+                        sw.PlayWithCallback(() =>
+                        {
+                            try { Debug.Log("[NetworkManager] Wipe complete - invoking PhotonNetwork.LoadLevel(" + gameSceneName + ")"); } catch { }
+                            try { PhotonNetwork.LoadLevel(gameSceneName); }
+                            catch (Exception e) { Debug.LogError($"Failed to LoadLevel('{gameSceneName}') in onComplete: {e}"); }
+                        });
+                    }
+                    catch
+                    {
+                        PhotonNetwork.LoadLevel(gameSceneName);
+                    }
+                }
+                else
+                {
+                    PhotonNetwork.LoadLevel(gameSceneName);
+                }
+            }
+            catch
+            {
+                PhotonNetwork.LoadLevel(gameSceneName);
+            }
         }
         catch (Exception ex)
         {
@@ -331,16 +432,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         else
         {
             // 既に部屋にいない（または未接続）なら、即座にタイトルへ
-            Log("Not in room. Loading title scene: " + titleSceneName);
-            SceneManager.LoadScene(titleSceneName);
+            Log("Not in room. Wipe->Loading title scene: " + titleSceneName);
+            try { ScreenCircleWipe.LoadSceneWithWipe(titleSceneName); } catch { }
         }
     }
 
     // Photonが「退出完了した」タイミングで自動的に呼ばれる
     public override void OnLeftRoom()
     {
-        Log("OnLeftRoom callback received. Loading title scene: " + titleSceneName);
-        SceneManager.LoadScene(titleSceneName);
+        Log("OnLeftRoom callback received. Wipe->Loading title scene: " + titleSceneName);
+        try { ScreenCircleWipe.LoadSceneWithWipe(titleSceneName); } catch { }
     }
 
     void Log(string text)
