@@ -15,6 +15,25 @@ namespace YubiSoccer.UI
     /// </summary>
     public class FinalGoalUIController : MonoBehaviour
     {
+        // Keep track of scenes where the final UI was closed by the user.
+        // The entry is removed when the scene is (re)loaded so the UI may show again after a reload.
+        private static System.Collections.Generic.HashSet<string> s_closedScenes = new System.Collections.Generic.HashSet<string>();
+
+        // Static ctor: register for sceneLoaded to clear entries on reload.
+        static FinalGoalUIController()
+        {
+            try { SceneManager.sceneLoaded += OnSceneLoadedStatic; } catch { }
+        }
+
+        private static void OnSceneLoadedStatic(Scene scene, LoadSceneMode mode)
+        {
+            try
+            {
+                // When the scene is loaded/reloaded, allow showing final UI again by removing the flag.
+                if (s_closedScenes.Contains(scene.name)) s_closedScenes.Remove(scene.name);
+            }
+            catch { }
+        }
         // If true, when the scene is next loaded we will hide mission UI initial states.
         public static bool hideMissionsOnNextLoad = false;
         [Tooltip("表示する最終 UI のルート GameObject（Canvas 等）")]
@@ -165,6 +184,18 @@ namespace YubiSoccer.UI
 
         private void ShowFinalUI()
         {
+            // If the user already closed the final UI in this scene, do not show again
+            try
+            {
+                var scn = SceneManager.GetActiveScene().name;
+                if (!string.IsNullOrEmpty(scn) && s_closedScenes.Contains(scn))
+                {
+                    Debug.Log("FinalGoalUIController: Final UI suppressed because user closed it earlier in this scene.");
+                    return;
+                }
+            }
+            catch { }
+
             // Disable only Inspector-assigned targets
             disabledCanvases.Clear();
             if (targetsToDisable != null)
@@ -236,6 +267,14 @@ namespace YubiSoccer.UI
 
         private void OnCloseClicked()
         {
+            // Mark this scene as closed so the final UI won't reappear until the scene is reloaded
+            try
+            {
+                var scn = SceneManager.GetActiveScene().name;
+                if (!string.IsNullOrEmpty(scn)) s_closedScenes.Add(scn);
+            }
+            catch { }
+
             // If fade-out configured, perform fade then close
             if (useFade && canvasGroup != null && isShowing)
             {
