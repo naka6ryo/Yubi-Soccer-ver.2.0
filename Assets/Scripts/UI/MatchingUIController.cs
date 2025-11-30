@@ -1,5 +1,6 @@
 using System.Collections;
 using TMPro;
+using Photon.Pun;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -53,9 +54,16 @@ namespace YubiSoccer.UI
         [Tooltip("シーン開始時に表示を開始するまでの待機時間（秒）")]
         [SerializeField] private float startDelay = 0.2f;
 
+        [Header("Players Display")]
+        [Tooltip("マッチング中に表示する人数テキスト (フォーマット: 残り人数/ルーム最大人数) ")]
+        [SerializeField] private TMP_Text playersText;
+        [Tooltip("プレイヤー表示の更新間隔（秒）")]
+        [SerializeField] private float playersUpdateInterval = 0.5f;
+
         private Vector2 centerAnchoredPos = Vector2.zero;
         private Canvas parentCanvas;
         private CanvasGroup matchingCg;
+        private Coroutine playersUpdateCoroutine;
 
         private void Awake()
         {
@@ -136,6 +144,13 @@ namespace YubiSoccer.UI
                 matchingText.color = matchingColor;
             }
 
+            // Start updating players display while matching UI is visible
+            if (playersText != null)
+            {
+                UpdatePlayersDisplay();
+                if (playersUpdateCoroutine == null) playersUpdateCoroutine = StartCoroutine(CoUpdatePlayersLoop());
+            }
+
             if (autoToggleActive) matchingRect.gameObject.SetActive(true);
 
             if (useFadeInsteadOfSlide)
@@ -160,8 +175,47 @@ namespace YubiSoccer.UI
 
             matchingCg.alpha = 0f;
             if (autoToggleActive) matchingRect.gameObject.SetActive(false);
+            // stop updating players display
+            if (playersUpdateCoroutine != null)
+            {
+                try { StopCoroutine(playersUpdateCoroutine); } catch { }
+                playersUpdateCoroutine = null;
+            }
 
             SetStateVisible(true);
+        }
+
+        private System.Collections.IEnumerator CoUpdatePlayersLoop()
+        {
+            while (true)
+            {
+                UpdatePlayersDisplay();
+                yield return new WaitForSecondsRealtime(Mathf.Max(0.05f, playersUpdateInterval));
+            }
+        }
+
+        private void UpdatePlayersDisplay()
+        {
+            if (playersText == null) return;
+            try
+            {
+                if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null)
+                {
+                    int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
+                    int maxPlayers = PhotonNetwork.CurrentRoom.MaxPlayers;
+                    int remaining = Mathf.Max(0, maxPlayers - playerCount);
+                    playersText.text = $"{remaining}/{maxPlayers}";
+                }
+                else
+                {
+                    // Not in room: show placeholder
+                    playersText.text = $"-/-";
+                }
+            }
+            catch
+            {
+                playersText.text = "-/-";
+            }
         }
 
         private IEnumerator Slide(RectTransform rt, Vector2 from, Vector2 to, float dur)
