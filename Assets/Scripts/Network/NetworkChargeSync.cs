@@ -16,11 +16,13 @@ namespace YubiSoccer.Network
 
         private PlayerKickController kickController;
         private KickRadiusIndicator radiusIndicator;
+        private YubiSoccer.Player.PlayerAudioController playerAudio;
 
         // received remote state
         private float remoteCharge = 0f;
         private float displayedCharge = 0f;
         private bool remoteIsCharging = false;
+        private float prevDisplayedCharge = 0f;
 
         void Awake()
         {
@@ -29,6 +31,7 @@ namespace YubiSoccer.Network
             // if not found on parent, try children
             if (radiusIndicator == null)
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
+            playerAudio = GetComponentInParent<YubiSoccer.Player.PlayerAudioController>();
         }
 
         void Update()
@@ -41,6 +44,22 @@ namespace YubiSoccer.Network
 
             // Remote: smooth toward remoteCharge
             displayedCharge = Mathf.Lerp(displayedCharge, remoteCharge, Mathf.Clamp01(1f - smoothing));
+
+            // Audio: notify PlayerAudioController about remote charge state
+            if (playerAudio != null)
+            {
+                // if charge dropped from >eps to ~0 -> treat as kick event
+                if (prevDisplayedCharge > 0.01f && displayedCharge <= 0.01f)
+                {
+                    // Charge fell to zero -> treat as kick end. Do NOT play remote kick sound; only stop the remote charge loop.
+                    playerAudio.StopRemoteCharge();
+                }
+                else
+                {
+                    playerAudio.SetRemoteCharge(displayedCharge);
+                }
+                prevDisplayedCharge = displayedCharge;
+            }
 
             // Update remote visuals: pulse effect on indicator if available
             if (radiusIndicator != null && kickController != null)

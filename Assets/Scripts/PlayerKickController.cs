@@ -213,6 +213,7 @@ namespace YubiSoccer.Player
 
         // サウンド用変数
         private SoundManager soundManager;
+        private PlayerAudioController playerAudio;
         [SerializeField] private float strongKickWall = 0.7f; // 強いキックの閾値
 
         // --- 所有者ガード用 ---
@@ -242,6 +243,7 @@ namespace YubiSoccer.Player
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
             if (radiusIndicator != null)
                 radiusIndicator.SetCenter(transform);
+            playerAudio = GetComponentInChildren<PlayerAudioController>(true);
         }
 
         void Start()
@@ -327,7 +329,7 @@ namespace YubiSoccer.Player
                         if (Input.GetKeyDown(kickKey))
                         {
                             state = KickState.Charging;
-                            soundManager?.PlaySE("チャージ");
+                            if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
                             chargeTime = 0f;
                             UpdateChargingVisuals(0f, 0f);
                         }
@@ -345,7 +347,7 @@ namespace YubiSoccer.Player
                             float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                             lastCharge01 = charge01;
                             lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-                            soundManager?.StopSE();
+                            if (playerAudio != null) playerAudio.StopChargingLocal(); else soundManager?.StopSE();
                             BeginKick();
                         }
                         break;
@@ -389,8 +391,14 @@ namespace YubiSoccer.Player
                 }
 
                 // キックの強さで音を切り替えて再生
-                if (lastCharge01 >= strongKickWall) soundManager?.PlaySE("強いキック");
-                else soundManager?.PlaySE("普通のキック");
+                if (lastCharge01 >= strongKickWall)
+                {
+                    if (playerAudio != null) playerAudio.PlayKickLocal(true); else soundManager?.PlaySE("強いキック");
+                }
+                else
+                {
+                    if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
+                }
 
                 // 視覚的反動を開始（1回のみ）
                 StartRecoil();
@@ -506,7 +514,7 @@ namespace YubiSoccer.Player
                 }
                 lastKickPowerMultiplier = 1f;
                 lastCharge01 = 0f;
-                soundManager?.PlaySE("普通のキック");
+                if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
                 BeginKick();
             }
             catch (System.Exception ex)
@@ -522,7 +530,7 @@ namespace YubiSoccer.Player
             if (state != KickState.Idle) return;
             state = KickState.Charging;
             chargeTime = 0f;
-            soundManager?.PlaySE("チャージ");
+            if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
             Debug.Log($"[PlayerKickController] Playing SE: チャージ (ownerViewID={OwnerViewID})");
             UpdateChargingVisuals(0f, 0f);
         }
@@ -552,7 +560,7 @@ namespace YubiSoccer.Player
                 float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                 lastCharge01 = charge01;
                 lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-                soundManager?.StopSE();
+                if (playerAudio != null) playerAudio.StopChargingLocal(); else soundManager?.StopSE();
                 BeginKick();
             }
             catch (System.Exception ex)
