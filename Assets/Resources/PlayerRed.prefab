@@ -123,6 +123,7 @@ GameObject:
   - component: {fileID: 1182831760752411901}
   - component: {fileID: -1593564267464305539}
   - component: {fileID: 1743997682763509098}
+  - component: {fileID: 5260834160630389694}
   m_Layer: 0
   m_Name: PlayerRed
   m_TagString: Untagged
@@ -191,6 +192,7 @@ MonoBehaviour:
   observableSearch: 2
   ObservedComponents:
   - {fileID: 8582209902803411777}
+  - {fileID: 5260834160630389694}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
@@ -511,6 +513,19 @@ MonoBehaviour:
   impactRippleLineWidth: 0.035
   strongKickWall: 0.7
   allowExternalControl: 1
+--- !u!114 &5260834160630389694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555769449232906187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2e680459be319d4a99a3e1e89beba3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  smoothing: 0.2
 --- !u!1 &6754117769112644705
 GameObject:
   m_ObjectHideFlags: 0

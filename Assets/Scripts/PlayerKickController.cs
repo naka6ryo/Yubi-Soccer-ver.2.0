@@ -158,6 +158,51 @@ namespace YubiSoccer.Player
         private float chargeTime;
         private float lastKickPowerMultiplier = 1f;
         private float lastCharge01 = 0f;
+        // Public network-exposed charge value (read-only for external callers)
+        // NOTE: For network visuals we send 0 once a kick has started (state != Charging)
+        public float NetworkCharge01 => (enableCharge && state == KickState.Charging) ? Mathf.Clamp01(chargeTime / maxChargeTime) : 0f;
+
+        /// <summary>
+        /// Compute the indicator color for a given charge value (0..1) mirroring local visual logic.
+        /// </summary>
+        public Color ComputeIndicatorColor(float charge01)
+        {
+            float t = Mathf.Clamp01(charge01);
+            float eval = 0f;
+            try { eval = Mathf.Clamp01(chargeToIndicatorColor != null ? chargeToIndicatorColor.Evaluate(t) : t); } catch { eval = t; }
+            if (colorIndicatorWithCharge)
+            {
+                if (useIndicatorGradient && indicatorColorGradient != null)
+                {
+                    return indicatorColorGradient.Evaluate(eval);
+                }
+                else
+                {
+                    return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, eval);
+                }
+            }
+            return indicatorColorAtZeroCharge;
+        }
+
+        /// <summary>
+        /// Compute the indicator radius corresponding to a given charge (0..1).
+        /// Mirrors the logic used when scaling hitbox with charge.
+        /// </summary>
+        /// <param name="charge01"></param>
+        /// <returns></returns>
+        public float ComputeRadiusForCharge(float charge01)
+        {
+            float t = Mathf.Clamp01(charge01);
+            if (scaleHitboxWithCharge)
+            {
+                float eval = 0f;
+                try { eval = Mathf.Clamp01(chargeToRadius != null ? chargeToRadius.Evaluate(t) : t); } catch { eval = t; }
+                float r = Mathf.Lerp(zeroChargeMaxRadius, maxRadius, eval);
+                return Mathf.Clamp(r, baseRadius, maxRadius);
+            }
+            return maxRadius;
+        }
+
         private float activeMaxRadius; // 今回キック時に到達する半径
         private float activeExpandSpeed; // 今回キックの拡大速度
         private float activeShrinkSpeed; // 今回キックの縮小速度
