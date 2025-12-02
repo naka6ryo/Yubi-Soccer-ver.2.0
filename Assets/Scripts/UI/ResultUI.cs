@@ -149,6 +149,19 @@ namespace YubiSoccer.UI
             if (winnerText != null)
             {
                 winnerText.text = winner;
+                // 色を勝者に合わせて変更（赤勝ち=>赤、青勝ち=>青、引き分け=>白）
+                if (redScore > blueScore)
+                {
+                    winnerText.color = redTeamColor;
+                }
+                else if (blueScore > redScore)
+                {
+                    winnerText.color = blueTeamColor;
+                }
+                else
+                {
+                    winnerText.color = Color.white;
+                }
             }
 
             if (redScoreText != null)
