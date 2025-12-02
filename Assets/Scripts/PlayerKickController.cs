@@ -400,6 +400,20 @@ namespace YubiSoccer.Player
                     if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
                 }
 
+                // 所有者は自身のキックを他クライアントにも通知して、他クライアントで位置付きに鳴らす
+                try
+                {
+                    if (ownerView != null && ownerView.IsMine)
+                    {
+                        Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+                        ownerView.RPC("RPC_OtherPlayerKick", Photon.Pun.RpcTarget.Others, kickWorldCenter, lastCharge01 >= strongKickWall, lastCharge01);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[PlayerKickController] RPC_OtherPlayerKick send failed: {ex.Message}");
+                }
+
                 // 視覚的反動を開始（1回のみ）
                 StartRecoil();
 
@@ -765,6 +779,30 @@ namespace YubiSoccer.Player
             if (useIndicatorGradient && indicatorColorGradient != null)
                 return indicatorColorGradient.Evaluate(ct);
             return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
+        }
+
+        // RPC: 他クライアントのキックを受け取って、そのクライアント上で位置付きに再生する
+        [Photon.Pun.PunRPC]
+        private void RPC_OtherPlayerKick(Vector3 worldPos, bool strong, float charge01)
+        {
+            // このメソッドは "RpcTarget.Others" に送信されるため、受信側では ownerState が NotMine のはず
+            try
+            {
+                if (playerAudio != null)
+                {
+                    // チャージループを明示的に停止してから、ローカルの挙動と同様に PlayOneShot で鳴らす
+                    playerAudio.StopRemoteCharge();
+                    playerAudio.PlayKickRemote(strong);
+                }
+                else
+                {
+                    // フォールバック: SoundManager に位置付き再生機能がない場合は無視
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[PlayerKickController] RPC_OtherPlayerKick failed to play audio: {ex.Message}");
+            }
         }
 
         private void OnDrawGizmosSelected()

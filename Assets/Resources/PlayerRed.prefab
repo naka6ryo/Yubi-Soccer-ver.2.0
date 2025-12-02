@@ -548,6 +548,9 @@ MonoBehaviour:
   rolloff: 0
   minPitch: 0.95
   maxPitch: 1.25
+  runClip: {fileID: 8300000, guid: bba8f6c351ba3b747ad1c75de6a68ece, type: 3}
+  runVolume: 1
+  remoteRunScale: 0.123
 --- !u!1 &6754117769112644705
 GameObject:
   m_ObjectHideFlags: 0
