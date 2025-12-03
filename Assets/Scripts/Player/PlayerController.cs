@@ -52,9 +52,14 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     private string currentHandState = "NONE";
     private SoundManager soundManager;
 
+    // プレイヤー固有の AudioController (存在すれば利用して空間再生を行う)
+    private YubiSoccer.Player.PlayerAudioController playerAudio;
+
     // 移動検出とSE制御
     private bool isMoving = false;
     private float runSETimer = 0f;
+    // リモート側の走行フラグ（OnPhotonSerializeView から受信する）
+    private bool remoteIsMoving = false;
 
     void Start()
     {
@@ -138,6 +143,9 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         networkRotation = transform.rotation;
 
         soundManager = SoundManager.Instance;
+
+        // PlayerAudioController があれば取得（プレハブにアタッチされている想定）
+        playerAudio = myRoot.GetComponentInChildren<YubiSoccer.Player.PlayerAudioController>(true);
 
         // AudioListener の設定（非所有インスタンスでは無効化）
         ConfigureAudioListenerForOwnership();
@@ -284,8 +292,15 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
                 runSETimer -= Time.deltaTime;
                 if (runSETimer <= 0f)
                 {
-                    // サウンドマネージャがあれば再生（null 安全）
-                    soundManager?.PlaySE("走る");
+                    // PlayerAudioController があればローカル非空間再生、無ければ従来の SoundManager を使用
+                    if (playerAudio != null)
+                    {
+                        playerAudio.PlayRunLocalOneShot();
+                    }
+                    else
+                    {
+                        soundManager?.PlaySE("走る");
+                    }
                     runSETimer = Mathf.Max(0.001f, runSEInterval);
                 }
             }
@@ -300,6 +315,29 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             // smooth remote transforms
             transform.position = Vector3.Lerp(transform.position, networkPosition, Time.deltaTime * lerpRate);
             transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, Time.deltaTime * lerpRate);
+
+            // リモートの走行SE を空間再生する (PlayerAudioController があればそちらを利用)
+            if (remoteIsMoving)
+            {
+                runSETimer -= Time.deltaTime;
+                if (runSETimer <= 0f)
+                {
+                    if (playerAudio != null)
+                    {
+                        playerAudio.PlayRunRemoteOneShot();
+                    }
+                    else
+                    {
+                        // フォールバック: グローバル再生 (2D)
+                        soundManager?.PlaySE("走る");
+                    }
+                    runSETimer = Mathf.Max(0.001f, runSEInterval);
+                }
+            }
+            else
+            {
+                runSETimer = 0f;
+            }
         }
     }
 
@@ -368,11 +406,21 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         {
             stream.SendNext(transform.position);
             stream.SendNext(transform.rotation);
+            // 所有者は走行フラグを送る
+            stream.SendNext(isMoving);
         }
         else
         {
             networkPosition = (Vector3)stream.ReceiveNext();
             networkRotation = (Quaternion)stream.ReceiveNext();
+            try
+            {
+                remoteIsMoving = (bool)stream.ReceiveNext();
+            }
+            catch
+            {
+                remoteIsMoving = false;
+            }
         }
     }
 
