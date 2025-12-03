@@ -1415,7 +1415,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 356939891}
   m_CullTransparentMesh: 1
-<<<<<<< HEAD
 --- !u!224 &355710925
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1493,8 +1492,7 @@ MonoBehaviour:
   useFade: 0
   fadeDuration: 0.75
   controlButton: {fileID: 1536132045}
-=======
->>>>>>> 0a383c1af1de268c7736c6951209235b34a584f5
+ 
 --- !u!1 &394986597
 GameObject:
   m_ObjectHideFlags: 0
