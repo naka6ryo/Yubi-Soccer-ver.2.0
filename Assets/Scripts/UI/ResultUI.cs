@@ -142,6 +142,8 @@ namespace YubiSoccer.UI
             HideObjects();
 
             // パネルを表示
+            // 同時にシャッター演出を有効化して、シーン遷移まで破片を保持する
+            YubiSoccer.Environment.BreakableProximityGlass.StartShutterForAll();
             resultPanel.SetActive(true);
 
             // リザルトUIと同じタイミングでボタン表示

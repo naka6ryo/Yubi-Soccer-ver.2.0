@@ -84,6 +84,9 @@ namespace YubiSoccer.Environment
         private float _nextFindTime = 0f;
 
         private static readonly HashSet<BreakableProximityGlass> s_instances = new HashSet<BreakableProximityGlass>();
+        // シャッター用モード: true の間は破片を自動破棄しない（シーン遷移まで保持する用途）
+        private static bool s_keepShardsUntilSceneChange = false;
+        private static bool s_sceneChangeHandlerRegistered = false;
 
         private void Awake()
         {
@@ -307,7 +310,8 @@ namespace YubiSoccer.Environment
             {
                 shards = Instantiate(shatteredPrefab, transform.position, transform.rotation);
                 // 以前は破片に AddExplosionForce を与えていたが、現在は不要なため処理を行わない
-                if (autoDestroyShardsAfter > 0f)
+                // 通常は autoDestroyShardsAfter に従うが、シャッターモード中はシーン遷移まで保持する
+                if (!s_keepShardsUntilSceneChange && autoDestroyShardsAfter > 0f)
                 {
                     Destroy(shards, autoDestroyShardsAfter);
                 }
@@ -318,6 +322,50 @@ namespace YubiSoccer.Environment
             {
                 if (destroyOriginalDelay <= 0f) Destroy(gameObject);
                 else Destroy(gameObject, destroyOriginalDelay);
+            }
+        }
+
+        /// <summary>
+        /// シーン遷移までシャッター（破片）を保持するモードを有効にして、全インスタンスを即座に割る。
+        /// Result 表示などで呼ぶ想定。
+        /// </summary>
+        public static void StartShutterForAll()
+        {
+            if (s_keepShardsUntilSceneChange) return;
+            s_keepShardsUntilSceneChange = true;
+            // シーン切替時にモードを解除して破片を片付けるハンドラを登録
+            if (!s_sceneChangeHandlerRegistered)
+            {
+                UnityEngine.SceneManagement.SceneManager.activeSceneChanged += OnActiveSceneChanged;
+                s_sceneChangeHandlerRegistered = true;
+            }
+            foreach (var inst in s_instances)
+            {
+                if (inst == null) continue;
+                // 即時で割る（位置は各インスタンスの中心）
+                inst.Shatter(inst.transform.position);
+            }
+        }
+
+        private static void OnActiveSceneChanged(UnityEngine.SceneManagement.Scene oldScene, UnityEngine.SceneManagement.Scene newScene)
+        {
+            // シーンが変わったら保持モードを解除し、残された破片を片付ける
+            s_keepShardsUntilSceneChange = false;
+            UnityEngine.SceneManagement.SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+            s_sceneChangeHandlerRegistered = false;
+            foreach (var inst in s_instances)
+            {
+                if (inst == null) continue;
+                inst.CleanupShardsAfterSceneChange();
+            }
+        }
+
+        private void CleanupShardsAfterSceneChange()
+        {
+            if (lastShards != null)
+            {
+                Destroy(lastShards);
+                lastShards = null;
             }
         }
 
