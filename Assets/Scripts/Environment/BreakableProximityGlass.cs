@@ -17,6 +17,7 @@ namespace YubiSoccer.Environment
         // 距離アンカー指定
         private enum DistanceAnchorMode { TransformPosition, RenderersBoundsCenter, ColliderClosestPoint }
         private enum BallAnchorMode { TransformPosition, RigidbodyPosition, ColliderClosestPoint }
+        private enum MidlineAxis { LocalX, LocalY, LocalZ }
 
         [Header("Target (Ball)")]
         [SerializeField] private string ballTag = "Ball";
@@ -40,6 +41,12 @@ namespace YubiSoccer.Environment
         [Tooltip("距離→透明度の応答。未設定なら線形")]
         [SerializeField] private AnimationCurve fadeCurve = null; // 0..1
 
+        [Header("Distance Mode")]
+        [Tooltip("オブジェクトの横方向中線に対する距離を使うか（true の場合は中心/コライダー距離ではなく中線からの横方向距離を使用）")]
+        [SerializeField] private bool useMidlineDistance = true;
+        [Tooltip("中線として扱うローカル軸。通常は横方向（LocalX）を選択してください。")]
+        [SerializeField] private MidlineAxis midlineAxis = MidlineAxis.LocalX;
+
         [Header("Renderers")]
         [Tooltip("アルファを操作する対象Renderer。未指定時は自身と子から自動収集")]
         [SerializeField] private Renderer[] renderers;
@@ -55,8 +62,8 @@ namespace YubiSoccer.Environment
         [SerializeField] private bool usePropertyBlock = true;
 
         [Header("Distance Anchor Options")]
-        [Tooltip("ガラス側の距離アンカーの取り方。既定はTransformの位置")]
-        [SerializeField] private DistanceAnchorMode glassAnchorMode = DistanceAnchorMode.TransformPosition;
+        [Tooltip("ガラス側の距離アンカーの取り方。既定はオブジェクトの端に近づいた際にも反応するコライダー最短点（ColliderClosestPoint）")]
+        [SerializeField] private DistanceAnchorMode glassAnchorMode = DistanceAnchorMode.ColliderClosestPoint;
         [Tooltip("ガラス側のアンカーを明示したい場合に指定（優先）")]
         [SerializeField] private Transform glassAnchorOverride;
         [Tooltip("ボール側の距離アンカーの取り方。既定はTransformの位置")]
@@ -144,20 +151,57 @@ namespace YubiSoccer.Environment
             // 距離アンカーを計算
             Vector3 glassPos = GetGlassAnchorWorld();
             Vector3 ballPos = GetBallAnchorWorld(glassPos);
-            float d = Vector3.Distance(glassPos, ballPos);
-            float t = 0f;
+
+            float d;
+            if (useMidlineDistance && ball != null)
+            {
+                // 指定オブジェクトの ZY 平面（local x = 0）に平行な直方体面への最短距離を計算する
+                // 具体的には、ローカル座標系で球の位置を求め、y/z を直方体の範囲にクランプした点を
+                // 面上の最近接点とみなし、その点との距離を d とする。
+                Vector3 localBall = transform.InverseTransformPoint(ballPos);
+                Vector3 halfExtents = GetLocalBoundsHalfExtents(); // ローカルでの半長さ (x,y,z)
+
+                // 直方体面は local x = 0 にあり、y/z が [-halfExtents.y, halfExtents.y], [-halfExtents.z, halfExtents.z]
+                float cy = Mathf.Clamp(localBall.y, -halfExtents.y, halfExtents.y);
+                float cz = Mathf.Clamp(localBall.z, -halfExtents.z, halfExtents.z);
+                Vector3 nearest = new Vector3(0f, cy, cz);
+                d = (localBall - nearest).magnitude;
+            }
+            else
+            {
+                // 既存の挙動: 可能ならコライダー表面間距離、なければ中心間距離
+                if (glassAnchorMode == DistanceAnchorMode.ColliderClosestPoint && col != null && ball != null)
+                {
+                    if (TryGetPrimaryCollider(ball, out var ballCol) && ballCol != null)
+                    {
+                        Vector3 glassClosest = col.ClosestPoint(ball.position);
+                        Vector3 ballClosest = ballCol.ClosestPoint(glassClosest);
+                        d = Vector3.Distance(glassClosest, ballClosest);
+                    }
+                    else
+                    {
+                        Vector3 glassClosest = col.ClosestPoint(ballPos);
+                        d = Vector3.Distance(glassClosest, ballPos);
+                    }
+                }
+                else
+                {
+                    d = Vector3.Distance(glassPos, ballPos);
+                }
+            }
+            float interp = 0f;
             if (Mathf.Approximately(maxDistance, minDistance))
             {
-                t = d <= minDistance ? 1f : 0f;
+                interp = d <= minDistance ? 1f : 0f;
             }
             else
             {
                 // d>=max→0, d<=min→1 となる 0..1 値
-                t = Mathf.InverseLerp(maxDistance, minDistance, d);
+                interp = Mathf.InverseLerp(maxDistance, minDistance, d);
             }
             if (fadeCurve != null)
-                t = Mathf.Clamp01(fadeCurve.Evaluate(Mathf.Clamp01(t)));
-            float a = Mathf.Lerp(farAlpha, nearAlpha, t);
+                interp = Mathf.Clamp01(fadeCurve.Evaluate(Mathf.Clamp01(interp)));
+            float a = Mathf.Lerp(farAlpha, nearAlpha, interp);
 
             SetAlpha(a);
         }
@@ -262,19 +306,45 @@ namespace YubiSoccer.Environment
         {
             outCol = null;
             if (root == null) return false;
-            // 非Trigger優先で探す
-            var cols = root.GetComponentsInChildren<Collider>(true);
+
+            // 1) 自身の Collider を優先
+            var self = root.GetComponent<Collider>();
             Collider fallback = null;
-            for (int i = 0; i < cols.Length; i++)
+            if (self != null)
             {
-                var c = cols[i];
-                if (c == null) continue;
+                if (!self.isTrigger)
+                {
+                    outCol = self; return true;
+                }
+                fallback = self;
+            }
+
+            // 2) 子供を検索（自身は除外）
+            var childCols = root.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < childCols.Length; i++)
+            {
+                var c = childCols[i];
+                if (c == null || c == self) continue;
                 if (!c.isTrigger)
                 {
                     outCol = c; return true;
                 }
                 if (fallback == null) fallback = c;
             }
+
+            // 3) 親方向も検索（自身/子で見つからない場合）
+            var parentCols = root.GetComponentsInParent<Collider>(true);
+            for (int i = 0; i < parentCols.Length; i++)
+            {
+                var c = parentCols[i];
+                if (c == null || c == self) continue;
+                if (!c.isTrigger)
+                {
+                    outCol = c; return true;
+                }
+                if (fallback == null) fallback = c;
+            }
+
             if (fallback != null)
             {
                 outCol = fallback; return true;
@@ -610,6 +680,101 @@ namespace YubiSoccer.Environment
                     colorPropId = Shader.PropertyToID("_Color");
                 }
             }
+        }
+
+        // 指定のローカル軸に沿った中線の半長さ（ローカル座標系）を返す。
+        // まず Renderer のバウンディングボックスを優先し、なければ Collider.bounds を利用する。
+        private float GetMidlineHalfLength(Vector3 localAxis)
+        {
+            // world-space bounds を取得
+            Bounds b;
+            bool haveBounds = TryGetRenderersBounds(out b);
+            if (!haveBounds && col != null)
+            {
+                b = col.bounds;
+                haveBounds = true;
+            }
+            if (!haveBounds)
+            {
+                // フォールバック: 小さめの値
+                return 0.5f;
+            }
+
+            // bounds の 8 コーナーをローカル空間に変換して、指定軸に沿った min/max を求める
+            Vector3[] corners = new Vector3[8];
+            Vector3 ext = b.extents;
+            Vector3 c = b.center;
+            int idx = 0;
+            for (int xi = -1; xi <= 1; xi += 2)
+            {
+                for (int yi = -1; yi <= 1; yi += 2)
+                {
+                    for (int zi = -1; zi <= 1; zi += 2)
+                    {
+                        Vector3 worldCorner = c + Vector3.Scale(ext, new Vector3(xi, yi, zi));
+                        corners[idx++] = transform.InverseTransformPoint(worldCorner);
+                    }
+                }
+            }
+
+            // localAxis はローカル単位ベクトル（x/y/z）で渡される想定
+            // axisValue = dot(corner, localAxis)
+            float minv = float.PositiveInfinity;
+            float maxv = float.NegativeInfinity;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                float v = Vector3.Dot(corners[i], localAxis);
+                if (v < minv) minv = v;
+                if (v > maxv) maxv = v;
+            }
+            float halfLength = (maxv - minv) * 0.5f;
+            // 安全側の最低値
+            if (halfLength <= 0f) halfLength = 0.5f;
+            return halfLength;
+        }
+
+        // ローカル座標系での bounds の半長さを (x,y,z) で返す。Renderer bounds を優先し、なければ Collider.bounds を使用。
+        private Vector3 GetLocalBoundsHalfExtents()
+        {
+            Bounds b;
+            bool haveBounds = TryGetRenderersBounds(out b);
+            if (!haveBounds && col != null)
+            {
+                b = col.bounds;
+                haveBounds = true;
+            }
+            if (!haveBounds)
+            {
+                return new Vector3(0.5f, 0.5f, 0.5f);
+            }
+
+            // ワールド空間の bounds のコーナーをローカルに変換して min/max を求める
+            Vector3 ext = b.extents;
+            Vector3 c = b.center;
+            float minx = float.PositiveInfinity, miny = float.PositiveInfinity, minz = float.PositiveInfinity;
+            float maxx = float.NegativeInfinity, maxy = float.NegativeInfinity, maxz = float.NegativeInfinity;
+            for (int xi = -1; xi <= 1; xi += 2)
+            {
+                for (int yi = -1; yi <= 1; yi += 2)
+                {
+                    for (int zi = -1; zi <= 1; zi += 2)
+                    {
+                        Vector3 worldCorner = c + Vector3.Scale(ext, new Vector3(xi, yi, zi));
+                        Vector3 local = transform.InverseTransformPoint(worldCorner);
+                        if (local.x < minx) minx = local.x;
+                        if (local.x > maxx) maxx = local.x;
+                        if (local.y < miny) miny = local.y;
+                        if (local.y > maxy) maxy = local.y;
+                        if (local.z < minz) minz = local.z;
+                        if (local.z > maxz) maxz = local.z;
+                    }
+                }
+            }
+            Vector3 half = new Vector3((maxx - minx) * 0.5f, (maxy - miny) * 0.5f, (maxz - minz) * 0.5f);
+            if (half.x <= 0f) half.x = 0.5f;
+            if (half.y <= 0f) half.y = 0.5f;
+            if (half.z <= 0f) half.z = 0.5f;
+            return half;
         }
 
         private void SetAlpha(float a)

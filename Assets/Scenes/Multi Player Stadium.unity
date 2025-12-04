@@ -2047,6 +2047,14 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2311640576533437947, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
     - target: {fileID: 2330167771701634547, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
+      propertyPath: usePlaneDistance
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2330167771701634547, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
+      propertyPath: useMidlineDistance
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2330167771701634547, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
       propertyPath: renderers.Array.size
       value: 1
       objectReference: {fileID: 0}
@@ -6903,6 +6911,14 @@ PrefabInstance:
       propertyPath: shatteredPrefab
       value: 
       objectReference: {fileID: 2311640576533437947, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+    - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+      propertyPath: usePlaneDistance
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+      propertyPath: useMidlineDistance
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
       propertyPath: glassAnchorOverride
       value: 
