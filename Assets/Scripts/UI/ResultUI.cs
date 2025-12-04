@@ -30,6 +30,12 @@ namespace YubiSoccer.UI
         [Tooltip("リザルト表示時にだけ表示したい戻るボタンの GameObject")]
         [SerializeField] private GameObject backToTitleButton;
 
+        [Header("Sound Effects")]
+        [Tooltip("リザルト表示時に順番に再生する SE (3つ)。隙間なく連続再生されます。")]
+        [SerializeField] private AudioClip[] resultSoundEffects = new AudioClip[3];
+
+        private AudioSource audioSource;
+
         private void OnEnable()
         {
             // MatchTimer の試合終了イベントを購読
@@ -44,6 +50,15 @@ namespace YubiSoccer.UI
 
         private void Awake()
         {
+            // AudioSource を取得または追加
+            audioSource = GetComponent<AudioSource>();
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+            }
+            audioSource.playOnAwake = false;
+            audioSource.loop = false;
+
             // 初期状態では非表示
             if (resultPanel != null)
             {
@@ -150,6 +165,37 @@ namespace YubiSoccer.UI
             if (backToTitleButton != null)
             {
                 backToTitleButton.SetActive(true);
+            }
+
+            // SE を順次再生
+            PlayResultSoundEffects();
+        }
+
+        /// <summary>
+        /// リザルト SE を順番に隙間なく再生する
+        /// </summary>
+        private void PlayResultSoundEffects()
+        {
+            if (resultSoundEffects == null || resultSoundEffects.Length == 0)
+            {
+                return;
+            }
+            StartCoroutine(PlaySoundEffectsSequentially());
+        }
+
+        private System.Collections.IEnumerator PlaySoundEffectsSequentially()
+        {
+            for (int i = 0; i < resultSoundEffects.Length; i++)
+            {
+                AudioClip clip = resultSoundEffects[i];
+                if (clip == null)
+                {
+                    continue;
+                }
+                audioSource.clip = clip;
+                audioSource.Play();
+                // クリップの長さだけ待機（隙間なく次へ）
+                yield return new WaitForSeconds(clip.length);
             }
         }
 
