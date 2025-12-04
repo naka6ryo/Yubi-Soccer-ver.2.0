@@ -310,8 +310,6 @@ export class HandTracker {
 
   let normalizedLandmarks = null;
   let isCharge = false;
-  // isAnyBend: CHARGE より緩い閾値でわずかな曲がりを検出し、KICK を抑止するために使う
-  let isAnyBend = false;
   if (lmResult && lmResult.landmarks && lmResult.landmarks[0]) {
       // 0..1 正規化座標（鏡反転のみ適用、ピクセル変換は描画・分類時に行う）
       const hands = lmResult.landmarks.map(lm => this.normalizeLandmarks01(lm, this.mirror));
@@ -349,21 +347,19 @@ export class HandTracker {
           midMCP: 9, midPIP: 10, midDIP: 11, midTIP: 12
         };
 
+  // PIP (第2関節) と DIP (第3関節) の角度を測定
   const indexPipAng = angleAt(idx.idxMCP, idx.idxPIP, idx.idxDIP);
-  const indexMcpAng = angleAt(idx.wrist, idx.idxMCP, idx.idxPIP);
+  const indexDipAng = angleAt(idx.idxPIP, idx.idxDIP, idx.idxTIP);
   const midPipAng = angleAt(idx.midMCP, idx.midPIP, idx.midDIP);
-  const midMcpAng = angleAt(idx.wrist, idx.midMCP, idx.midPIP);
+  const midDipAng = angleAt(idx.midPIP, idx.midDIP, idx.midTIP);
 
-  // Finger-level bend: use PIP (第2関節) のみで判定する（ユーザ指定）
-  const indexBent = (indexPipAng < CFG.charge.angleThresholdRad);
-  const midBent = (midPipAng < CFG.charge.angleThresholdRad);
-  // CHARGE if either index or middle finger PIP is bent
+  // 第2関節と第3関節の角度の合計が290度以下の時をCHARGEと認定
+  const indexTotalDeg = (indexPipAng + indexDipAng) * (180 / Math.PI);
+  const midTotalDeg = (midPipAng + midDipAng) * (180 / Math.PI);
+  const indexBent = (indexTotalDeg <= 290);
+  const midBent = (midTotalDeg <= 290);
+  // CHARGE if either index or middle finger meets the criteria
   isCharge = indexBent || midBent;
-
-  // anyBend: use PIP only for suppressing KICK
-  const anyBendIndex = (indexPipAng < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad));
-  const anyBendMid = (midPipAng < (CFG.charge.anyBendAngleRad || CFG.charge.angleThresholdRad));
-  isAnyBend = anyBendIndex || anyBendMid;
 
         // Debugging: removed embedded overlay per user request (HUD removed).
       } catch (e) {
@@ -378,13 +374,11 @@ export class HandTracker {
     }
 
   // ジェスチャ分類（最新のバッファから） -- classify はメトリクスも返す
-  // 引数 suppressKick を通じて、指が曲がっている場合は KICK 判定を抑止する
-  // suppressKick フラグには、CHARGE の閾値はそのままに「わずかな曲がり」を示す isAnyBend を渡す
-  const { state, confidence, tipSpeedPeak, tipForwardMin, runConf, palmSize } = this.classify(now / 1000, isAnyBend);
+  const { state, confidence, tipSpeedPeak, tipForwardMin, runConf, palmSize } = this.classify(now / 1000);
     // CHARGE 表示フラグ (isCharge) は HUD/actionState 用であり，
-    // 直接 this.state を書き換えない（RUN/NONE/KICK の判定に影響を与えない）
-    // ただし，CHARGE が所定時間保持された（chargeHeld）あとに解除されたら
-    // 次の非 NONE を KICK に変換する既存の挙動は維持する。
+    // 直接 this.state を書き換えない（RUN/NONE の判定に影響を与えない）
+    // CHARGE が所定時間保持された（chargeHeld）あとに解除されたら
+    // 次のフレームで強制的に KICK に遷移する。
     const nowSecFloat = now / 1000;
     if (isCharge) {
       if (this.chargeStartTime === null) this.chargeStartTime = nowSecFloat;
@@ -637,7 +631,7 @@ export class HandTracker {
     ctx.restore();
   }
 
-  classify(nowSec, suppressKick = false) {
+  classify(nowSec) {
     const windowLen = CFG.windowSec;
     const arr = this.landmarksBuf.toArray().filter((e) => nowSec - e.t <= windowLen);
     if (arr.length < 4) return { state: 'NONE', confidence: 0 };
@@ -697,42 +691,20 @@ export class HandTracker {
     const tipSpeedPeak = Math.max(...tipIndexSpeed, ...tipMidSpeed);
     const tipForwardMin = Math.min(...tipIndexVz, ...tipMidVz);
 
-  // KICK 判定（速度による自動遷移）を無効化。
-  // 仕様変更: KICK へ遷移するのは CHARGE が終了したときのみとするため、
-  // ここでの tipSpeed による自動 KICK 判定は行わない。
-  // tipSpeedPeak と tipForwardMin は保持しておくが、自動判定は無効。
-    let kickScore = 0;
-
-    // RUN（簡素化）: KICK でない限りすべて RUN。加速用の confidence は指先速度RMSから算出。
+    // RUN（簡素化）: 指先速度RMSから算出
     const tipAmp = rms(tipSpeed);
     const runConf = clamp((tipAmp - CFG.run.minTipSpeedPxPerSec) / CFG.run.minTipSpeedPxPerSec, 0, 1);
 
     // ヒステリシス + デバウンス
     const now = nowSec;
-    const since = now - this.lastTriggerTime;
     let nextState = this.state;
     let conf = 0;
 
-    const kickOn = kickScore >= CFG.hysteresis.on;
-    const kickOff = kickScore <= CFG.hysteresis.off;
     const runOn = runConf >= CFG.hysteresis.on;
     const runOff = runConf <= CFG.hysteresis.off;
 
-    if (this.state === 'KICK') {
-      if (kickOff) {
-        // KICK を抜けたら、走りが十分であれば RUN、そうでなければ NONE
-        if (runOn) { nextState = 'RUN'; conf = runConf; }
-        else { nextState = 'NONE'; conf = 0; }
-      } else {
-        nextState = 'KICK';
-        conf = kickScore;
-      }
-    } else if (this.state === 'RUN') {
-      if (kickOn && since > CFG.debounceSec) {
-        nextState = 'KICK';
-        conf = kickScore;
-        this.lastTriggerTime = now;
-      } else if (tipAmp < CFG.run.immediateOffThreshold) {
+    if (this.state === 'RUN') {
+      if (tipAmp < CFG.run.immediateOffThreshold) {
         // 走るのをやめたら即座に NONE へ（指先速度が閾値以下）
         nextState = 'NONE';
         conf = 0;
@@ -745,11 +717,7 @@ export class HandTracker {
         conf = runConf;
       }
     } else { // NONE
-      if (kickOn && since > CFG.debounceSec) {
-        nextState = 'KICK';
-        conf = kickScore;
-        this.lastTriggerTime = now;
-      } else if (runOn) {
+      if (runOn) {
         nextState = 'RUN';
         conf = runConf;
       } else {
