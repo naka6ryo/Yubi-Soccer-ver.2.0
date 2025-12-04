@@ -140,7 +140,9 @@ public class HandStateReceiver : MonoBehaviour
         currentConfidence = payload.confidence;
 
         // 状態が変化した場合、イベントを発火
-        if (previousState != currentState)
+        // NOTE: CHARGE は重要なトリガーなので、同一状態の連続受信でも必ずイベントを投げる。
+        // これにより、表示と実際のゲームロジックが不一致になるケースを防止する。
+        if (previousState != currentState || (currentState != null && currentState.ToUpperInvariant() == "CHARGE"))
         {
             try
             {
