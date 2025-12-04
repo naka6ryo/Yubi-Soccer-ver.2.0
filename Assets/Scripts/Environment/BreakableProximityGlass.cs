@@ -67,10 +67,7 @@ namespace YubiSoccer.Environment
         [Header("Shatter")]
         [Tooltip("割れた状態のプレハブ(破片含む)。未割当だと見た目のみ非表示にします")]
         [SerializeField] private GameObject shatteredPrefab;
-        [Tooltip("爆散力(Impulse)。0で爆発なし")]
-        [SerializeField, Min(0f)] private float explosionForce = 2.5f;
-        [SerializeField, Min(0f)] private float explosionRadius = 1.5f;
-        [SerializeField] private float upwardsModifier = 0.2f;
+        // （爆発力のパラメータは不要になったため削除）
         [Tooltip("割れ後、元オブジェクトを消すまでの秒数。0で即時")]
         [SerializeField, Min(0f)] private float destroyOriginalDelay = 0.05f;
         [Tooltip("割れプレハブを自動破棄する秒数。0以下で破棄しない")]
@@ -309,15 +306,7 @@ namespace YubiSoccer.Environment
             if (shatteredPrefab != null)
             {
                 shards = Instantiate(shatteredPrefab, transform.position, transform.rotation);
-                if (explosionForce > 0f)
-                {
-                    var rbs = shards.GetComponentsInChildren<Rigidbody>();
-                    foreach (var rb in rbs)
-                    {
-                        if (rb == null) continue;
-                        rb.AddExplosionForce(explosionForce, explosionCenter, Mathf.Max(0.01f, explosionRadius), upwardsModifier, ForceMode.Impulse);
-                    }
-                }
+                // 以前は破片に AddExplosionForce を与えていたが、現在は不要なため処理を行わない
                 if (autoDestroyShardsAfter > 0f)
                 {
                     Destroy(shards, autoDestroyShardsAfter);
