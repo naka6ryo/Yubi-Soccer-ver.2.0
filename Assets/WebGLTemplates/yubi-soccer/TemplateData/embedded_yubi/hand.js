@@ -411,6 +411,11 @@ export class HandTracker {
       // 維持: 何もしない（ただし表示確度は最大にしておく）
       this.state = 'KICK';
       this.stateConf = 1.0;
+    } else if (this.state === 'KICK' && nowSecFloat > (this.kickHoldUntil || 0)) {
+      // KICK 保持期限が切れたら必ず NONE に遷移
+      this.state = 'NONE';
+      this.stateConf = 0;
+      this.kickHoldUntil = 0;
     } else if (desiredState === 'KICK' && this.state !== 'KICK') {
       // 新たに KICK へ遷移した -> 保持期限を設定
       this.state = 'KICK';
