@@ -107,6 +107,8 @@ export class HandTracker {
   this.chargePendingUntil = 0;
   // CHARGE が holdSec を満たして確定したかを表す内部フラグ
   this.chargeHeld = false;
+  // CHARGE 確定通知の重複防止用（startTime を記録）
+  this._lastChargeStartReported = 0;
   // KICK を最低限保持するための有効期限（秒）
   this.kickHoldUntil = 0;
   this.lastTriggerTime = 0;
@@ -383,7 +385,19 @@ export class HandTracker {
     if (isCharge) {
       if (this.chargeStartTime === null) this.chargeStartTime = nowSecFloat;
       const held = (nowSecFloat - this.chargeStartTime) >= (CFG.charge.holdSec || 0.5);
-      if (held) this.chargeHeld = true;
+      if (held) {
+        // CHARGE が確定したことを内部フラグに設定
+        this.chargeHeld = true;
+        // CHARGE 確定の通知が漏れないよう、startTime 毎に一度だけ Unity へ送信する
+        if (this._lastChargeStartReported !== this.chargeStartTime) {
+          this._lastChargeStartReported = this.chargeStartTime;
+          try {
+            this.postParent({ type: 'charge', confidence: 1.0 });
+          } catch (e) {
+            // postParent が存在しないなどの問題は無視して進める
+          }
+        }
+      }
     } else {
       // CHARGE が解除されたとき、hold が成立していたら次の非 NONE を KICK にするフラグを立てる
       if (this.chargeHeld) {
@@ -392,6 +406,8 @@ export class HandTracker {
   this.chargePendingUntil = nowSecFloat + 1.0;
       }
       this.chargeHeld = false;
+      // CHARGE が解除されたら通知履歴をクリアして次回必ず再通知できるようにする
+      this._lastChargeStartReported = 0;
       this.chargeStartTime = null;
     }
 

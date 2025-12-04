@@ -537,16 +537,17 @@ namespace YubiSoccer.Player
             }
         }
 
-        public void ExternalChargeStart()
+        public bool ExternalChargeStart()
         {
-            if (!allowExternalControl) return;
-            if (!IsMine) return;
-            if (state != KickState.Idle) return;
+            if (!allowExternalControl) return false;
+            if (!IsMine) return false;
+            if (state != KickState.Idle) return false;
             state = KickState.Charging;
             chargeTime = 0f;
             if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
             Debug.Log($"[PlayerKickController] Playing SE: チャージ (ownerViewID={OwnerViewID})");
             UpdateChargingVisuals(0f, 0f);
+            return true;
         }
 
         public void ExternalChargeUpdate(float dt)
@@ -581,6 +582,22 @@ namespace YubiSoccer.Player
             {
                 Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        /// <summary>
+        /// 外部から現在チャージ中かどうかを問い合わせる（読み取り専用）
+        /// </summary>
+        public bool IsCurrentlyCharging()
+        {
+            return state == KickState.Charging;
+        }
+
+        /// <summary>
+        /// 外部からチャージ開始可能かを問い合わせる
+        /// </summary>
+        public bool CanStartCharge()
+        {
+            return state == KickState.Idle;
         }
 
         private void UpdateChargingVisuals(float c01, float dt)

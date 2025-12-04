@@ -50,7 +50,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     private float runConfidence = 0f;
     private bool isCharging = false;
     private string currentHandState = "NONE";
+    // 最後に処理した HandStateReceiver の状態（ポーリング同期用）
+    private string lastProcessedHandState = "NONE";
     private SoundManager soundManager;
+    // チャージ要求が発行されたが KickController がすぐには受け付けられなかった場合に保持するフラグ
+    private bool pendingChargeRequest = false;
 
     // プレイヤー固有の AudioController (存在すれば利用して空間再生を行う)
     private YubiSoccer.Player.PlayerAudioController playerAudio;
@@ -213,8 +217,18 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             case "CHARGE":
                 if (!isCharging)
                 {
-                    kickController.ExternalChargeStart();
-                    isCharging = true;
+                    // Try to start charge; if it fails (controller busy), set pending flag
+                    bool started = false;
+                    try { started = kickController.ExternalChargeStart(); } catch { started = false; }
+                    if (started)
+                    {
+                        isCharging = true;
+                        pendingChargeRequest = false;
+                    }
+                    else
+                    {
+                        pendingChargeRequest = true;
+                    }
                 }
                 break;
             default:
@@ -224,6 +238,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
                     kickController.ExternalChargeRelease();
                     isCharging = false;
                 }
+                pendingChargeRequest = false;
                 break;
         }
     }
@@ -273,6 +288,44 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     {
         if (photonView.IsMine)
         {
+            // --- HandStateReceiver の表示（UI）と実際のプレイヤー状態を常に同期する ---
+            // Web->Unity の送信が稀に欠落するケースに備え、Receiver の public な currentState を
+            // 毎フレームチェックして、表示が CHARGE なら必ずチャージ開始処理を呼ぶ。
+            if (receiver != null)
+            {
+                var recvState = (receiver.currentState ?? "NONE").ToUpperInvariant();
+                var recvConf = receiver.currentConfidence;
+                // 状態が変化した、または表示が CHARGE なのにローカルでチャージが始まっていない場合は強制同期
+                if (recvState != lastProcessedHandState || (recvState == "CHARGE" && !isCharging))
+                {
+                    // call the same handler as the event to reuse logic
+                    OnHandStateChanged(recvState, recvConf);
+                    lastProcessedHandState = recvState;
+                }
+                // 受信が CHARGE でかつチャージ開始が保留中なら、改めて開始を試みる
+                if (recvState == "CHARGE" && pendingChargeRequest && !isCharging && kickController != null)
+                {
+                    try
+                    {
+                        if (kickController.CanStartCharge())
+                        {
+                            bool started = kickController.ExternalChargeStart();
+                            if (started)
+                            {
+                                isCharging = true;
+                                pendingChargeRequest = false;
+                            }
+                        }
+                    }
+                    catch { /* ignore errors and keep pending */ }
+                }
+                else if (recvState != "CHARGE")
+                {
+                    // 表示が CHARGE でないなら保留は解除
+                    pendingChargeRequest = false;
+                }
+            }
+
             HandleInput();
             // ハンドステートによる長押しチャージ継続
             if (isCharging)
