@@ -20,12 +20,15 @@ namespace YubiSoccer.Network
             public float lift;
             public int seq;
             public double serverTime;
+            public string uniqueKey; // ActorNumber_Seq
         }
 
         Rigidbody _rb;
         PhotonView _pv;
         readonly Queue<QueuedImpulse> _queue = new Queue<QueuedImpulse>();
-        readonly HashSet<int> _appliedSeq = new HashSet<int>();
+        // 修正: int (seqのみ) だと再接続時に seq=0 に戻ったプレイヤーの入力を無視してしまうため、
+        // "{ActorNumber}_{seq}" の文字列で管理する。
+        readonly HashSet<string> _appliedSeq = new HashSet<string>();
 
         void Awake()
         {
@@ -57,17 +60,21 @@ namespace YubiSoccer.Network
             float lift = (float)data[4];
             // contact: x,y,z は data[5..7]（今は未使用）
             int seq = (int)data[8];
-            // senderActor = (int)data[9];
+            int senderActor = (int)data[9];
             double serverTime = (double)data[10];
 
-            if (_appliedSeq.Contains(seq)) return;
+            // 修正: ユニークキーで判定
+            string uniqueKey = $"{senderActor}_{seq}";
+
+            if (_appliedSeq.Contains(uniqueKey)) return;
 
             _queue.Enqueue(new QueuedImpulse
             {
                 impulse = impulse,
                 lift = lift,
                 seq = seq,
-                serverTime = serverTime
+                serverTime = serverTime,
+                uniqueKey = uniqueKey
             });
         }
 
@@ -78,7 +85,7 @@ namespace YubiSoccer.Network
             while (_queue.Count > 0)
             {
                 var qi = _queue.Dequeue();
-                if (_appliedSeq.Contains(qi.seq)) continue;
+                if (_appliedSeq.Contains(qi.uniqueKey)) continue;
 
                 if (qi.impulse != Vector3.zero)
                 {
@@ -89,7 +96,7 @@ namespace YubiSoccer.Network
                     _rb.AddForce(Vector3.up * qi.lift, ForceMode.Impulse);
                 }
 
-                _appliedSeq.Add(qi.seq);
+                _appliedSeq.Add(qi.uniqueKey);
             }
         }
     }
