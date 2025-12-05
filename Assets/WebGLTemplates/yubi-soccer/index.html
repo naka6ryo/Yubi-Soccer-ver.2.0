@@ -287,12 +287,15 @@
         }
         
         // Unityへジョイスティック位置変更を通知
+        var lastSentJoystickSide = null;
         function updateJoystickPosition(cameraSide){
           if (!window.unityInstance || typeof window.unityInstance.SendMessage !== 'function') return;
+          if (lastSentJoystickSide === cameraSide) return; // Skip if unchanged
           try {
             // カメラが左側ならジョイスティックは右側、カメラが右側ならジョイスティックは左側
             window.unityInstance.SendMessage('JoystickController', 'SetJoystickSide', cameraSide);
             console.log && console.log('[JoystickPosition] Updated joystick side:', cameraSide);
+            lastSentJoystickSide = cameraSide;
           } catch(e) {
             console.warn && console.warn('[JoystickPosition] Failed to update joystick position', e);
           }
