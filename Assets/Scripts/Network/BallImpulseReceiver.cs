@@ -20,6 +20,7 @@ namespace YubiSoccer.Network
             public float lift;
             public int seq;
             public double serverTime;
+            public double lag; // 追加: 受信時のラグ(秒)
             public string uniqueKey; // ActorNumber_Seq
         }
 
@@ -68,12 +69,16 @@ namespace YubiSoccer.Network
 
             if (_appliedSeq.Contains(uniqueKey)) return;
 
+            // ラグ計算 (現在時刻 - 送信時刻)
+            double lag = PhotonNetwork.Time - serverTime;
+
             _queue.Enqueue(new QueuedImpulse
             {
                 impulse = impulse,
                 lift = lift,
                 seq = seq,
                 serverTime = serverTime,
+                lag = lag,
                 uniqueKey = uniqueKey
             });
         }
@@ -94,6 +99,17 @@ namespace YubiSoccer.Network
                 if (qi.lift > 0f)
                 {
                     _rb.AddForce(Vector3.up * qi.lift, ForceMode.Impulse);
+                }
+
+                // ラグ補正 (Fast-Forward)
+                // 物理演算を厳密に進めるのは重いため、簡易的に「速度 * 時間」だけ位置を進める近似を行う
+                if (qi.lag > 0)
+                {
+                    // AddForce直後なので velocity は更新されているはずだが、
+                    // ForceMode.Impulse は即座に velocity を変更する。
+                    // 位置補正: P' = P + V * lag
+                    // ※重力の影響などは無視する簡易近似
+                    _rb.position += _rb.velocity * (float)qi.lag;
                 }
 
                 _appliedSeq.Add(qi.uniqueKey);

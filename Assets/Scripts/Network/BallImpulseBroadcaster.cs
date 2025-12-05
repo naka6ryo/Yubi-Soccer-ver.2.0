@@ -44,7 +44,7 @@ namespace YubiSoccer.Network
 
             var options = new RaiseEventOptions
             {
-                Receivers = ReceiverGroup.All
+                Receivers = ReceiverGroup.Others
             };
             var sendOptions = new SendOptions { Reliability = true };
 
