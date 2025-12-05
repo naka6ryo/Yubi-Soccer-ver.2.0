@@ -123,6 +123,8 @@ GameObject:
   - component: {fileID: 1182831760752411901}
   - component: {fileID: 2819337833356735152}
   - component: {fileID: -7725693663168602268}
+  - component: {fileID: 4623784718558254209}
+  - component: {fileID: 3049237877740100005}
   m_Layer: 0
   m_Name: PlayerBlue
   m_TagString: Untagged
@@ -191,6 +193,7 @@ MonoBehaviour:
   observableSearch: 2
   ObservedComponents:
   - {fileID: 8582209902803411777}
+  - {fileID: 4623784718558254209}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
@@ -511,6 +514,43 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1555769449232906187}
   m_Enabled: 0
+--- !u!114 &4623784718558254209
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555769449232906187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2e680459be319d4a99a3e1e89beba3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  smoothing: 0.2
+--- !u!114 &3049237877740100005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555769449232906187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e8a277385d712148afcbfeeb1314e14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  chargeLoopClip: {fileID: 8300000, guid: 1e1ff5cd2fb4f7740a45e7373e15b852, type: 3}
+  kickClip: {fileID: 8300000, guid: d910cf839678077469f7f42d4eb028b1, type: 3}
+  remoteMaxVolume: 0.7
+  localChargeVolume: 1
+  minDistance: 1
+  maxDistance: 12
+  rolloff: 0
+  minPitch: 0.95
+  maxPitch: 1.25
+  runClip: {fileID: 8300000, guid: bba8f6c351ba3b747ad1c75de6a68ece, type: 3}
+  runVolume: 1
+  remoteRunScale: 0.7
 --- !u!1 &4626179171591283358
 GameObject:
   m_ObjectHideFlags: 0
@@ -1028,11 +1068,15 @@ PrefabInstance:
     - target: {fileID: 6778632355985981360, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
       propertyPath: m_fontAsset
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 6778632355985981360, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
       propertyPath: m_textAlignment
       value: 65535
       objectReference: {fileID: 0}
+    - target: {fileID: 6778632355985981360, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 6778632355985981360, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
@@ -1053,6 +1097,10 @@ PrefabInstance:
       propertyPath: m_Mesh
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 6778632355985981375, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
     - target: {fileID: 6778632356664063848, guid: a9ca23b685b62e94e84d2035d0cf417d, type: 3}
       propertyPath: m_textAlignment
       value: 65535

@@ -7,8 +7,9 @@ using Photon.Pun;
 namespace YubiSoccer.UI
 {
     /// <summary>
-    /// マッチング中に「残り人数/ルーム最大人数」を表示するシンプルなコンポーネント。
-    /// - `playersText` に `TMP_Text` をセットしてください。
+    /// マッチング中に「現在入っている人数/ルーム最大人数」を表示するシンプルなコンポーネント。
+    /// 表示例: "2/4"。
+    /// - `playersText` に `TMP_Text` をセットしてください（TMP 未使用時は `legacyPlayersText` に通常の Text を割り当ててください）。
     /// - オプションで有効化時に自動で更新を開始します。
     /// </summary>
     public class MatchingPlayersDisplay : MonoBehaviour
@@ -79,8 +80,7 @@ namespace YubiSoccer.UI
                 {
                     int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
                     int maxPlayers = PhotonNetwork.CurrentRoom.MaxPlayers;
-                    int remaining = Mathf.Max(0, maxPlayers - playerCount);
-                    outText = $"{remaining}/{maxPlayers}";
+                    outText = $"{playerCount}/{maxPlayers}";
                 }
             }
             catch
