@@ -27,13 +27,10 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        // 既にルームにいる場合は即生成（従来の動作を残す）
+        // 既にルームにいる場合はチーム割り当てを確認して生成
         if (PhotonNetwork.IsConnected && PhotonNetwork.InRoom)
         {
-            if (localPlayerInstance == null)
-            {
-                SpawnLocalPlayer();
-            }
+            TrySpawnLocalPlayer();
             return;
         }
 
@@ -42,14 +39,53 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    /// Photon のルーム参加完了コールバック。ここでプレイヤーを生成する。
+    /// Photon のルーム参加完了コールバック。
     /// </summary>
     public override void OnJoinedRoom()
     {
         Debug.Log($"PlayerCreator: OnJoinedRoom called. PlayerCount={PhotonNetwork.CurrentRoom?.PlayerCount}");
-        if (localPlayerInstance == null)
+        TrySpawnLocalPlayer();
+    }
+
+    /// <summary>
+    /// プレイヤープロパティが更新されたときに呼ばれる
+    /// </summary>
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
+    {
+        // 自分自身のプロパティ更新で、かつまだ生成されていない場合
+        if (targetPlayer.IsLocal && localPlayerInstance == null)
+        {
+            // チーム割り当てが来たか確認
+            if (TeamManager.Instance != null && TeamManager.Instance.HasTeamAssigned(targetPlayer))
+            {
+                Debug.Log("[PlayerCreator] Team assignment received via OnPlayerPropertiesUpdate. Spawning now.");
+                SpawnLocalPlayer();
+            }
+        }
+    }
+
+    /// <summary>
+    /// チーム割り当てを確認して生成を試みる
+    /// </summary>
+    void TrySpawnLocalPlayer()
+    {
+        if (localPlayerInstance != null) return;
+
+        if (TeamManager.Instance == null)
+        {
+            Debug.LogError("[PlayerCreator] TeamManager not found!");
+            return;
+        }
+
+        // チームが割り当てられているか確認
+        if (TeamManager.Instance.HasTeamAssigned(PhotonNetwork.LocalPlayer))
         {
             SpawnLocalPlayer();
+        }
+        else
+        {
+            Debug.Log("[PlayerCreator] Waiting for team assignment from Master Client...");
+            // ここでは何もしない。OnPlayerPropertiesUpdate で生成されるのを待つ。
         }
     }
 

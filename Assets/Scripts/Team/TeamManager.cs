@@ -44,6 +44,9 @@ public class TeamManager : MonoBehaviourPunCallbacks
     /// <summary>
     /// ルーム参加時にチームを自動割り当て
     /// </summary>
+    /// <summary>
+    /// ルーム参加時にチームを割り当て
+    /// </summary>
     public void AssignTeamOnJoinRoom()
     {
         if (!PhotonNetwork.InRoom) return;
@@ -58,21 +61,51 @@ public class TeamManager : MonoBehaviourPunCallbacks
 
         if (useAutoAssignment)
         {
-            AssignTeamAutomatically();
+            // マスタークライアントなら自分自身を割り当て
+            if (PhotonNetwork.IsMasterClient)
+            {
+                // 最初の1人目はTeamA
+                SetPlayerTeam(Team.TeamA);
+                Debug.Log("[TeamManager] MasterClient assigned self to TeamA");
+            }
+            // 非マスターはマスターからの割り当てを待つので何もしない
+        }
+    }
+
+    public override void OnPlayerEnteredRoom(Player newPlayer)
+    {
+        if (useAutoAssignment && PhotonNetwork.IsMasterClient)
+        {
+            AssignTeamByMaster(newPlayer);
         }
     }
 
     /// <summary>
-    /// ActorNumber ベースの自動チーム割り当て
+    /// マスタークライアントが新規プレイヤーにチームを割り当てる
+    /// 人数の少ないチームに優先的に割り振る
     /// </summary>
-    private void AssignTeamAutomatically()
+    private void AssignTeamByMaster(Player player)
     {
-        int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
-        Team team = (actorNumber % 2 == 1) ? Team.TeamA : Team.TeamB;
+        var (countA, countB) = GetTeamCounts();
+        Team assignedTeam;
 
-        SetPlayerTeam(team);
+        if (countA <= countB)
+        {
+            assignedTeam = Team.TeamA;
+        }
+        else
+        {
+            assignedTeam = Team.TeamB;
+        }
 
-        Debug.Log($"[TeamManager] Auto-assigned to {team} (Actor {actorNumber})");
+        // プレイヤーのプロパティを更新（全員に同期される）
+        var props = new Hashtable
+        {
+            { TEAM_PROPERTY_KEY, assignedTeam.ToString() }
+        };
+        player.SetCustomProperties(props);
+        
+        Debug.Log($"[TeamManager] Master assigned {player.NickName} to {assignedTeam} (A:{countA}, B:{countB})");
     }
 
     /// <summary>
@@ -98,6 +131,14 @@ public class TeamManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 指定プレイヤーにチームが割り当てられているか確認
+    /// </summary>
+    public bool HasTeamAssigned(Player player)
+    {
+        return player.CustomProperties.ContainsKey(TEAM_PROPERTY_KEY);
+    }
+
+    /// <summary>
     /// 指定プレイヤーのチームを取得
     /// </summary>
     public Team GetPlayerTeam(Player player)
@@ -114,7 +155,9 @@ public class TeamManager : MonoBehaviourPunCallbacks
             }
         }
 
-        return (player.ActorNumber % 2 == 1) ? Team.TeamA : Team.TeamB;
+        // プロパティが未設定の場合（参加直後など）
+        // ActorNumberでの判定は廃止し、デフォルトはTeamAとする（または未定状態）
+        return Team.TeamA;
     }
 
     /// <summary>
