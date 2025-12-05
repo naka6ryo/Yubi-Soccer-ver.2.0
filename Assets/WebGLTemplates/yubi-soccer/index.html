@@ -15,7 +15,30 @@
     <div id="unity-container" class="unity-desktop">
       <canvas id="unity-canvas" width={{{ WIDTH }}} height={{{ HEIGHT }}} tabindex="-1"></canvas>
       <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
+        <div id="unity-logo">
+          <!-- OP ロゴを WebM で滑らかに再生するため、終了直前で巻き戻してループさせる -->
+          <video id="loadingLogo" autoplay muted playsinline preload="auto">
+            <source src="TemplateData/Yubi-Soccer-OP-logo.webm" type="video/webm" />
+          </video>
+          <script>
+            (function(){
+              const vid = document.getElementById('loadingLogo');
+              if (!vid) return;
+              // 終了の少し手前で時間を戻すことで、ループ時のカクつきを低減する
+              vid.addEventListener('timeupdate', function(){
+                try {
+                  if (!vid.duration || isNaN(vid.duration)) return;
+                  if (vid.duration - vid.currentTime < 0.08) {
+                    vid.currentTime = 0.0;
+                    if (vid.paused) try { vid.play(); } catch(e){}
+                  }
+                } catch(e) { /* ignore */ }
+              });
+              // 一部ブラウザで autoplay がブロックされる場合のフォールバック
+              vid.addEventListener('ended', function(){ try { vid.currentTime = 0.0; vid.play(); } catch(e){} });
+            })();
+          </script>
+        </div>
         <div id="unity-progress-bar-empty">
           <div id="unity-progress-bar-full"></div>
         </div>

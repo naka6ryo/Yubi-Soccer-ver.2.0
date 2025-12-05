@@ -158,6 +158,51 @@ namespace YubiSoccer.Player
         private float chargeTime;
         private float lastKickPowerMultiplier = 1f;
         private float lastCharge01 = 0f;
+        // Public network-exposed charge value (read-only for external callers)
+        // NOTE: For network visuals we send 0 once a kick has started (state != Charging)
+        public float NetworkCharge01 => (enableCharge && state == KickState.Charging) ? Mathf.Clamp01(chargeTime / maxChargeTime) : 0f;
+
+        /// <summary>
+        /// Compute the indicator color for a given charge value (0..1) mirroring local visual logic.
+        /// </summary>
+        public Color ComputeIndicatorColor(float charge01)
+        {
+            float t = Mathf.Clamp01(charge01);
+            float eval = 0f;
+            try { eval = Mathf.Clamp01(chargeToIndicatorColor != null ? chargeToIndicatorColor.Evaluate(t) : t); } catch { eval = t; }
+            if (colorIndicatorWithCharge)
+            {
+                if (useIndicatorGradient && indicatorColorGradient != null)
+                {
+                    return indicatorColorGradient.Evaluate(eval);
+                }
+                else
+                {
+                    return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, eval);
+                }
+            }
+            return indicatorColorAtZeroCharge;
+        }
+
+        /// <summary>
+        /// Compute the indicator radius corresponding to a given charge (0..1).
+        /// Mirrors the logic used when scaling hitbox with charge.
+        /// </summary>
+        /// <param name="charge01"></param>
+        /// <returns></returns>
+        public float ComputeRadiusForCharge(float charge01)
+        {
+            float t = Mathf.Clamp01(charge01);
+            if (scaleHitboxWithCharge)
+            {
+                float eval = 0f;
+                try { eval = Mathf.Clamp01(chargeToRadius != null ? chargeToRadius.Evaluate(t) : t); } catch { eval = t; }
+                float r = Mathf.Lerp(zeroChargeMaxRadius, maxRadius, eval);
+                return Mathf.Clamp(r, baseRadius, maxRadius);
+            }
+            return maxRadius;
+        }
+
         private float activeMaxRadius; // 今回キック時に到達する半径
         private float activeExpandSpeed; // 今回キックの拡大速度
         private float activeShrinkSpeed; // 今回キックの縮小速度
@@ -168,6 +213,7 @@ namespace YubiSoccer.Player
 
         // サウンド用変数
         private SoundManager soundManager;
+        private PlayerAudioController playerAudio;
         [SerializeField] private float strongKickWall = 0.7f; // 強いキックの閾値
 
         // --- 所有者ガード用 ---
@@ -197,6 +243,7 @@ namespace YubiSoccer.Player
                 radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
             if (radiusIndicator != null)
                 radiusIndicator.SetCenter(transform);
+            playerAudio = GetComponentInChildren<PlayerAudioController>(true);
         }
 
         void Start()
@@ -282,7 +329,7 @@ namespace YubiSoccer.Player
                         if (Input.GetKeyDown(kickKey))
                         {
                             state = KickState.Charging;
-                            soundManager?.PlaySE("チャージ");
+                            if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
                             chargeTime = 0f;
                             UpdateChargingVisuals(0f, 0f);
                         }
@@ -300,7 +347,7 @@ namespace YubiSoccer.Player
                             float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                             lastCharge01 = charge01;
                             lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-                            soundManager?.StopSE();
+                            if (playerAudio != null) playerAudio.StopChargingLocal(); else soundManager?.StopSE();
                             BeginKick();
                         }
                         break;
@@ -344,8 +391,28 @@ namespace YubiSoccer.Player
                 }
 
                 // キックの強さで音を切り替えて再生
-                if (lastCharge01 >= strongKickWall) soundManager?.PlaySE("強いキック");
-                else soundManager?.PlaySE("普通のキック");
+                if (lastCharge01 >= strongKickWall)
+                {
+                    if (playerAudio != null) playerAudio.PlayKickLocal(true); else soundManager?.PlaySE("強いキック");
+                }
+                else
+                {
+                    if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
+                }
+
+                // 所有者は自身のキックを他クライアントにも通知して、他クライアントで位置付きに鳴らす
+                try
+                {
+                    if (ownerView != null && ownerView.IsMine)
+                    {
+                        Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+                        ownerView.RPC("RPC_OtherPlayerKick", Photon.Pun.RpcTarget.Others, kickWorldCenter, lastCharge01 >= strongKickWall, lastCharge01);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[PlayerKickController] RPC_OtherPlayerKick send failed: {ex.Message}");
+                }
 
                 // 視覚的反動を開始（1回のみ）
                 StartRecoil();
@@ -461,7 +528,7 @@ namespace YubiSoccer.Player
                 }
                 lastKickPowerMultiplier = 1f;
                 lastCharge01 = 0f;
-                soundManager?.PlaySE("普通のキック");
+                if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
                 BeginKick();
             }
             catch (System.Exception ex)
@@ -470,16 +537,17 @@ namespace YubiSoccer.Player
             }
         }
 
-        public void ExternalChargeStart()
+        public bool ExternalChargeStart()
         {
-            if (!allowExternalControl) return;
-            if (!IsMine) return;
-            if (state != KickState.Idle) return;
+            if (!allowExternalControl) return false;
+            if (!IsMine) return false;
+            if (state != KickState.Idle) return false;
             state = KickState.Charging;
             chargeTime = 0f;
-            soundManager?.PlaySE("チャージ");
+            if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
             Debug.Log($"[PlayerKickController] Playing SE: チャージ (ownerViewID={OwnerViewID})");
             UpdateChargingVisuals(0f, 0f);
+            return true;
         }
 
         public void ExternalChargeUpdate(float dt)
@@ -507,13 +575,29 @@ namespace YubiSoccer.Player
                 float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
                 lastCharge01 = charge01;
                 lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
-                soundManager?.StopSE();
+                if (playerAudio != null) playerAudio.StopChargingLocal(); else soundManager?.StopSE();
                 BeginKick();
             }
             catch (System.Exception ex)
             {
                 Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        /// <summary>
+        /// 外部から現在チャージ中かどうかを問い合わせる（読み取り専用）
+        /// </summary>
+        public bool IsCurrentlyCharging()
+        {
+            return state == KickState.Charging;
+        }
+
+        /// <summary>
+        /// 外部からチャージ開始可能かを問い合わせる
+        /// </summary>
+        public bool CanStartCharge()
+        {
+            return state == KickState.Idle;
         }
 
         private void UpdateChargingVisuals(float c01, float dt)
@@ -712,6 +796,30 @@ namespace YubiSoccer.Player
             if (useIndicatorGradient && indicatorColorGradient != null)
                 return indicatorColorGradient.Evaluate(ct);
             return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
+        }
+
+        // RPC: 他クライアントのキックを受け取って、そのクライアント上で位置付きに再生する
+        [Photon.Pun.PunRPC]
+        private void RPC_OtherPlayerKick(Vector3 worldPos, bool strong, float charge01)
+        {
+            // このメソッドは "RpcTarget.Others" に送信されるため、受信側では ownerState が NotMine のはず
+            try
+            {
+                if (playerAudio != null)
+                {
+                    // チャージループを明示的に停止してから、ローカルの挙動と同様に PlayOneShot で鳴らす
+                    playerAudio.StopRemoteCharge();
+                    playerAudio.PlayKickRemote(strong);
+                }
+                else
+                {
+                    // フォールバック: SoundManager に位置付き再生機能がない場合は無視
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[PlayerKickController] RPC_OtherPlayerKick failed to play audio: {ex.Message}");
+            }
         }
 
         private void OnDrawGizmosSelected()
