@@ -715,7 +715,12 @@ namespace YubiSoccer.Player
             {
                 if (IsMine)
                 {
+                    // ローカルで即座に力を加える (遅延ゼロ)
+                    if (impulse != Vector3.zero) rb.AddForce(impulse, ForceMode.Impulse);
+                    if (lift > 0f) rb.AddForce(Vector3.up * lift, ForceMode.Impulse);
+
                     Vector3 contact = hitPoint;
+                    // 他人だけに送る (Broadcaster側で ReceiverGroup.Others に変更済み)
                     BallImpulseBroadcaster.RaiseImpulse(ballPv.ViewID, impulse, lift, contact);
                 }
             }
