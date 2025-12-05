@@ -93,6 +93,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Log("Connecting to Photon...");
             PhotonNetwork.ConnectUsingSettings();
         }
+
+        PhotonNetwork.SendRate = 60;
+        PhotonNetwork.SerializationRate = 30;
     }
 
     private void OnEnable()
