@@ -129,6 +129,15 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         }
 
         // Ensure camera is only active for the local player
+        if (playerCamera == null)
+        {
+            playerCamera = Camera.main;
+            if (playerCamera == null)
+            {
+                Debug.LogWarning("[PlayerController] Main Camera not found in scene!");
+            }
+        }
+
         if (playerCamera != null)
         {
             playerCamera.gameObject.SetActive(photonView.IsMine);

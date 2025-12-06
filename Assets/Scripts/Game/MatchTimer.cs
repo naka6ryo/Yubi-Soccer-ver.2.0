@@ -40,8 +40,12 @@ namespace YubiSoccer.Game
 
         public float RemainingSeconds { get; private set; }
         public bool IsRunning { get; private set; }
+        public bool IsPaused { get; private set; } = true;
 
         private bool isFinished = false;
+
+        private int _cachedStartTime;
+        private float _cachedDuration;
 
         public override void OnEnable()
         {
@@ -52,6 +56,8 @@ namespace YubiSoccer.Game
 
         private void Update()
         {
+            if (IsPaused) return;
+
             if (IsRunning)
             {
                 UpdateTimer();
@@ -81,114 +87,115 @@ namespace YubiSoccer.Game
             };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props);
             
-            try { Debug.Log($"[MatchTimer] Master started timer: duration={seconds:F1}s, start={startTime}"); } catch { }
+            Debug.Log($"[MatchTimer] Master started timer: duration={seconds:F1}s, start={startTime}");
         }
 
-        public void StopTimer()
-        {
-            // 停止＝プロパティ削除または無効値をセット
-            if (!PhotonNetwork.IsMasterClient) return;
-            
-            // StartTimeを削除して停止扱いにする
-            var props = new Hashtable
-            {
-                { START_TIME_KEY, null },
-                { DURATION_KEY, null }
-            };
-            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
-        }
-
-        public void ClearTimerText()
-        {
-            SetText("");
-        }
-
-        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
-        {
-            if (propertiesThatChanged.ContainsKey(START_TIME_KEY) || propertiesThatChanged.ContainsKey(DURATION_KEY))
-            {
-                CheckTimerState();
-            }
-        }
-
-        private void CheckTimerState()
-        {
-            if (!PhotonNetwork.InRoom) return;
-
-            var props = PhotonNetwork.CurrentRoom.CustomProperties;
-            if (props.TryGetValue(START_TIME_KEY, out object startObj) && props.TryGetValue(DURATION_KEY, out object durObj))
-            {
-                int startTime = (int)startObj;
-                float duration = (float)durObj;
-
-                // 開始時刻と現在時刻から残り時間を計算
-                int elapsedMs = unchecked(PhotonNetwork.ServerTimestamp - startTime);
-                float elapsedSec = elapsedMs / 1000f;
-                RemainingSeconds = duration - elapsedSec;
-
-                if (RemainingSeconds > 0)
+                public void StopTimer()
                 {
-                    IsRunning = true;
-                    isFinished = false;
+                    IsPaused = true;
+                    IsRunning = false;
+                    
+                    // 停止＝プロパティ削除または無効値をセット
+                    if (!PhotonNetwork.IsMasterClient) return;
+        
+                    // StartTimeを削除して停止扱いにする
+                    var props = new Hashtable
+                    {
+                        { START_TIME_KEY, null },
+                        { DURATION_KEY, null }
+                    };
+                    PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+                }
+        
+                public void ClearTimerText()
+                {
+                    SetText("");
+                }
+        
+                public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+                {
+                    if (propertiesThatChanged.ContainsKey(START_TIME_KEY) || propertiesThatChanged.ContainsKey(DURATION_KEY))
+                    {
+                        CheckTimerState();
+                    }
+                }
+        
+                private void CheckTimerState()
+                {
+                    if (!PhotonNetwork.InRoom) return;
+        
+                    var props = PhotonNetwork.CurrentRoom.CustomProperties;
+                    if (props.TryGetValue(START_TIME_KEY, out object startObj) && props.TryGetValue(DURATION_KEY, out object durObj))
+                    {
+                        int startTime = (int)startObj;
+                        float duration = (float)durObj;
+        
+                        _cachedStartTime = startTime;
+                        _cachedDuration = duration;
+        
+                        // 開始時刻と現在時刻から残り時間を計算
+                        int elapsedMs = unchecked(PhotonNetwork.ServerTimestamp - startTime);
+                        float elapsedSec = elapsedMs / 1000f;
+                        RemainingSeconds = duration - elapsedSec;
+        
+                        if (RemainingSeconds > 0)
+                        {
+                            IsRunning = true;
+                            isFinished = false;
+                            IsPaused = false; // タイマーが正常に開始できるので、ここで一時停止を解除
+                            UpdateText(RemainingSeconds);
+                        }
+                        else
+                        {
+                            // 既に終わっている
+                            FinishTimer();
+                        }
+                    }
+                    else
+                    {
+                        // タイマー情報がない＝停止中
+                        IsRunning = false;
+                        // 表示をクリアするか、初期状態にするかは要件次第だが、ここでは何もしないかクリア
+                        // ClearTimerText(); 
+                    }
+                }
+        
+                private void UpdateTimer()
+                {
+                    // _cachedStartTimeと_cachedDurationが設定されていることを前提とする
+                    // CheckTimerState()で初期化される想定
+                    if (!IsRunning) return; // タイマーが実行中でない場合は何もしない
+        
+                    int elapsedMs = unchecked(PhotonNetwork.ServerTimestamp - _cachedStartTime);
+                    float elapsedSec = elapsedMs / 1000f;
+                    RemainingSeconds = _cachedDuration - elapsedSec;
+        
+                    if (RemainingSeconds <= 0f)
+                    {
+                        RemainingSeconds = 0f;
+                        FinishTimer();
+                    }
+                    
                     UpdateText(RemainingSeconds);
                 }
-                else
+        
+                private void FinishTimer()
                 {
-                    // 既に終わっている
-                    FinishTimer();
+                    IsRunning = false;
+                    if (isFinished) return; // 既に終了処理済みならスキップ
+        
+                    isFinished = true;
+                    UpdateText(0f);
+        
+                    if (clearTextWhenFinished)
+                    {
+                        SetText("");
+                    }
+                    Debug.Log("[MatchTimer] Finished (Synced)");
+        
+                    // 試合終了イベントを発火
+                    OnMatchFinished?.Invoke();
                 }
-            }
-            else
-            {
-                // タイマー情報がない＝停止中
-                IsRunning = false;
-                // 表示をクリアするか、初期状態にするかは要件次第だが、ここでは何もしないかクリア
-                // ClearTimerText(); 
-            }
-        }
-
-        private void UpdateTimer()
-        {
-            if (!PhotonNetwork.InRoom) return;
-
-            var props = PhotonNetwork.CurrentRoom.CustomProperties;
-            if (props.TryGetValue(START_TIME_KEY, out object startObj) && props.TryGetValue(DURATION_KEY, out object durObj))
-            {
-                int startTime = (int)startObj;
-                float duration = (float)durObj;
-
-                int elapsedMs = unchecked(PhotonNetwork.ServerTimestamp - startTime);
-                float elapsedSec = elapsedMs / 1000f;
-                RemainingSeconds = duration - elapsedSec;
-
-                if (RemainingSeconds <= 0f)
-                {
-                    RemainingSeconds = 0f;
-                    FinishTimer();
-                }
-                
-                UpdateText(RemainingSeconds);
-            }
-        }
-
-        private void FinishTimer()
-        {
-            IsRunning = false;
-            if (isFinished) return; // 既に終了処理済みならスキップ
-
-            isFinished = true;
-            UpdateText(0f);
-
-            if (clearTextWhenFinished)
-            {
-                SetText("");
-            }
-            try { Debug.Log("[MatchTimer] Finished (Synced)"); } catch { }
-
-            // 試合終了イベントを発火
-            OnMatchFinished?.Invoke();
-        }
-
         private void UpdateText(float remain)
         {
             int sec = Mathf.CeilToInt(remain);

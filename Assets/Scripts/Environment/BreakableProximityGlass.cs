@@ -493,27 +493,17 @@ namespace YubiSoccer.Environment
 #if !UNITY_WEBGL
             if (useTagSearch && !string.IsNullOrEmpty(ballTag))
             {
-                try
+                var tagged = GameObject.FindGameObjectsWithTag(ballTag);
+                if (tagged != null && tagged.Length > 0)
                 {
-                    var tagged = GameObject.FindGameObjectsWithTag(ballTag);
-                    if (tagged != null && tagged.Length > 0)
+                    ball = ChooseNearest(tagged);
+                    if (ball != null)
                     {
-                        ball = ChooseNearest(tagged);
-                        if (ball != null)
+                        if (debugLog)
                         {
-                            if (debugLog)
-                            {
-                                Debug.Log($"[BreakableProximityGlass] タグ '{ballTag}' から最近傍を採用: {ball.name}", this);
-                            }
-                            return;
+                            Debug.Log($"[BreakableProximityGlass] タグ '{ballTag}' から最近傍を採用: {ball.name}", this);
                         }
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    if (debugLog)
-                    {
-                        Debug.LogWarning($"[BreakableProximityGlass] タグ '{ballTag}' の検索で例外: {ex.Message}。検索をスキップしてフォールバックします。", this);
+                        return;
                     }
                 }
             }
@@ -527,12 +517,9 @@ namespace YubiSoccer.Environment
                 {
                     var tag = extraBallTags[i];
                     if (string.IsNullOrEmpty(tag)) continue;
-                    try
-                    {
-                        var arr = GameObject.FindGameObjectsWithTag(tag);
-                        if (arr != null && arr.Length > 0) all.AddRange(arr);
-                    }
-                    catch { /* 無効なタグ名は無視 */ }
+                    
+                    var arr = GameObject.FindGameObjectsWithTag(tag);
+                    if (arr != null && arr.Length > 0) all.AddRange(arr);
                 }
                 if (all.Count > 0)
                 {
