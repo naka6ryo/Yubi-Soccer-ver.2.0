@@ -79,6 +79,13 @@ namespace YubiSoccer.UI
         public void Play()
         {
             if (playing != null) StopCoroutine(playing);
+
+            // 試合開始前に、マスタークライアントが既存のタイマーをリセットする
+            if (Photon.Pun.PhotonNetwork.IsMasterClient && matchTimer != null)
+            {
+                matchTimer.StopTimer();
+            }
+            
             playing = StartCoroutine(CoPlay());
         }
 
