@@ -29,11 +29,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4779657217022878626}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.00190571, y: -0, z: 6.548362e-11, w: 0.9999982}
+  m_LocalRotation: {x: 0.0019024009, y: 0, z: 0, w: 0.9999982}
   m_LocalPosition: {x: 0.1501, y: -0.02808, z: -1.47857}
   m_LocalScale: {x: 1, y: 0.94399935, z: 1.9347395}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 7446615886049932217}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0.218, y: 0, z: 0}
 --- !u!33 &7440332139619187472
@@ -122,8 +123,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f6df822da3905345a8bddbf168100c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  redGoalParticle: {fileID: 120290270443208822}
+  blueGoalParticle: {fileID: 0}
   ballTag: Ball
   explicitBall: {fileID: 0}
+  useTagSearch: 0
+  findRetryInterval: 0.5
+  extraBallTags:
+  - SoccerBall
+  - Ball
   minDistance: 0.5
   maxDistance: 12
   farAlpha: 0
@@ -152,15 +160,25 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  renderers: []
+  useMidlineDistance: 0
+  midlineAxis: 0
+  renderers:
+  - {fileID: 2901953162269795398}
   colorPropertyName: 
+  extraColorPropertyCandidates:
+  - _Tint
+  - _UnlitColor
   forceTransparentSettings: 1
-  shatteredPrefab: {fileID: 100010, guid: 5be3aba8512efd34491b993aa744dd9d, type: 3}
-  explosionForce: 2.5
-  explosionRadius: 1.5
-  upwardsModifier: 0.2
+  debugLog: 0
+  usePropertyBlock: 1
+  glassAnchorMode: 2
+  glassAnchorOverride: {fileID: 0}
+  ballAnchorMode: 0
+  ballAnchorOverride: {fileID: 0}
+  shatteredPrefab: {fileID: 2311640576533437947, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
   destroyOriginalDelay: 0.05
   autoDestroyShardsAfter: 10
+  keepOriginalForRespawn: 1
 --- !u!114 &2828259323003679772
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -176,3 +194,76 @@ MonoBehaviour:
   awardToTeam: 0
   ballTag: Ball
   rearmDelay: 1
+--- !u!1001 &3879989179698458480
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 6786018282302770605}
+    m_Modifications:
+    - target: {fileID: 2311640576533437947, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_Name
+      value: Particle System
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.6830127
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.18301266
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.6830127
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.18301266
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -30
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+--- !u!114 &120290270443208822 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: -5443964888353526010, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+  m_PrefabInstance: {fileID: 3879989179698458480}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bf8a4e2b073aff408f8136d9da6ca09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &7446615886049932217 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5949198121568328905, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+  m_PrefabInstance: {fileID: 3879989179698458480}
+  m_PrefabAsset: {fileID: 0}

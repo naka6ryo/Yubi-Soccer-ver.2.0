@@ -63,6 +63,27 @@ namespace YubiSoccer.Game
         void Start()
         {
             soundManager = SoundManager.Instance;
+            if (ScoreManager.Instance != null)
+            {
+                ScoreManager.Instance.OnScoreChanged += HandleScoreChanged;
+            }
+            else
+            {
+                Debug.LogWarning("[GoalResetManager] ScoreManager instance not found in Start.");
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (ScoreManager.Instance != null)
+            {
+                ScoreManager.Instance.OnScoreChanged -= HandleScoreChanged;
+            }
+        }
+
+        private void HandleScoreChanged(Team team, int score)
+        {
+            HandleGoal(team);
         }
 
         /// <summary>
@@ -165,16 +186,6 @@ namespace YubiSoccer.Game
                 if (col is SphereCollider) return true;
             }
             return false;
-        }
-
-        private void OnEnable()
-        {
-            GoalTrigger.OnGoalScored += HandleGoal;
-        }
-
-        private void OnDisable()
-        {
-            GoalTrigger.OnGoalScored -= HandleGoal;
         }
 
         private void HandleGoal(Team scoredFor)
