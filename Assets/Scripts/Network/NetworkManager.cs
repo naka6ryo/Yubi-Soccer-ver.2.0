@@ -428,12 +428,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 }
             }
 
-            // スコアをリセット（マッチング中の加算や前回の結果をクリア）
+            // スコアとタイマーをリセット（マッチング中の加算や前回の結果をクリア）
             var props = new ExitGames.Client.Photon.Hashtable 
             { 
                 { "gameStarted", true },
                 { "ScoreA", 0 },
-                { "ScoreB", 0 }
+                { "ScoreB", 0 },
+                { "StartTime", null }, // タイマーリセット
+                { "Duration", null }   // タイマーリセット
             };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props);
 
