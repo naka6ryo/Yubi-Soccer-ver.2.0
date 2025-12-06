@@ -115,6 +115,22 @@ namespace YubiSoccer.UI
         {
             if (PhotonNetwork.IsMasterClient)
             {
+                // 再戦時もスコアをリセットする
+                if (ScoreManager.Instance != null)
+                {
+                    ScoreManager.Instance.ResetScores();
+                }
+                else
+                {
+                    // ScoreManagerがない場合（稀）は直接プロパティを操作
+                    var props = new ExitGames.Client.Photon.Hashtable 
+                    { 
+                        { "ScoreA", 0 },
+                        { "ScoreB", 0 }
+                    };
+                    PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+                }
+
                 PhotonNetwork.LoadLevel(gameSceneName);
             }
         }
