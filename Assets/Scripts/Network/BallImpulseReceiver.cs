@@ -109,7 +109,7 @@ namespace YubiSoccer.Network
                     // ForceMode.Impulse は即座に velocity を変更する。
                     // 位置補正: P' = P + V * lag
                     // ※重力の影響などは無視する簡易近似
-                    _rb.position += _rb.velocity * (float)qi.lag;
+                    _rb.position += _rb.linearVelocity * (float)qi.lag;
                 }
 
                 _appliedSeq.Add(qi.uniqueKey);
