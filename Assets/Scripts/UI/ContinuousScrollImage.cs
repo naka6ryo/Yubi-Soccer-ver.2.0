@@ -101,8 +101,6 @@ namespace YubiSoccer.UI
 
         private void EnsureTiles()
         {
-            if (_containerRt == null) _containerRt = GetComponent<RectTransform>();
-
             // Create child tiles if missing
             Transform tA = transform.Find("_ScrollTileA");
             Transform tB = transform.Find("_ScrollTileB");

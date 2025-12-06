@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using YubiSoccer.Network;
+using YubiSoccer.Game;
+using YubiSoccer.Field;
 
 namespace YubiSoccer.Environment
 {
@@ -14,6 +16,10 @@ namespace YubiSoccer.Environment
     [RequireComponent(typeof(Collider))]
     public class BreakableProximityGlass : MonoBehaviour
     {
+        [SerializeField] private Confetti redGoalParticle;
+        [SerializeField] private Confetti blueGoalParticle;
+        private GoalTrigger goalTrigger;
+
         // 距離アンカー指定
         private enum DistanceAnchorMode { TransformPosition, RenderersBoundsCenter, ColliderClosestPoint }
         private enum BallAnchorMode { TransformPosition, RigidbodyPosition, ColliderClosestPoint }
@@ -374,25 +380,8 @@ namespace YubiSoccer.Environment
                 if (r != null) r.enabled = false;
             }
             if (col != null) col.enabled = false;
-
-            GameObject shards = null;
-            if (shatteredPrefab != null)
-            {
-                shards = Instantiate(shatteredPrefab, transform.position, transform.rotation);
-                // 以前は破片に AddExplosionForce を与えていたが、現在は不要なため処理を行わない
-                // 通常は autoDestroyShardsAfter に従うが、シャッターモード中はシーン遷移まで保持する
-                if (!s_keepShardsUntilSceneChange && autoDestroyShardsAfter > 0f)
-                {
-                    Destroy(shards, autoDestroyShardsAfter);
-                }
-            }
-            lastShards = shards;
-            // 元オブジェクトの破棄 or 復元用に保持
-            if (!keepOriginalForRespawn)
-            {
-                if (destroyOriginalDelay <= 0f) Destroy(gameObject);
-                else Destroy(gameObject, destroyOriginalDelay);
-            }
+            
+            PlayConfetti();
         }
 
         /// <summary>
@@ -444,6 +433,7 @@ namespace YubiSoccer.Environment
         /// </summary>
         public void ResetIntact()
         {
+            HideConfetti();
             // 破片が残っていれば片付け
             if (lastShards != null)
             {
@@ -503,27 +493,17 @@ namespace YubiSoccer.Environment
 #if !UNITY_WEBGL
             if (useTagSearch && !string.IsNullOrEmpty(ballTag))
             {
-                try
+                var tagged = GameObject.FindGameObjectsWithTag(ballTag);
+                if (tagged != null && tagged.Length > 0)
                 {
-                    var tagged = GameObject.FindGameObjectsWithTag(ballTag);
-                    if (tagged != null && tagged.Length > 0)
+                    ball = ChooseNearest(tagged);
+                    if (ball != null)
                     {
-                        ball = ChooseNearest(tagged);
-                        if (ball != null)
+                        if (debugLog)
                         {
-                            if (debugLog)
-                            {
-                                Debug.Log($"[BreakableProximityGlass] タグ '{ballTag}' から最近傍を採用: {ball.name}", this);
-                            }
-                            return;
+                            Debug.Log($"[BreakableProximityGlass] タグ '{ballTag}' から最近傍を採用: {ball.name}", this);
                         }
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    if (debugLog)
-                    {
-                        Debug.LogWarning($"[BreakableProximityGlass] タグ '{ballTag}' の検索で例外: {ex.Message}。検索をスキップしてフォールバックします。", this);
+                        return;
                     }
                 }
             }
@@ -537,12 +517,9 @@ namespace YubiSoccer.Environment
                 {
                     var tag = extraBallTags[i];
                     if (string.IsNullOrEmpty(tag)) continue;
-                    try
-                    {
-                        var arr = GameObject.FindGameObjectsWithTag(tag);
-                        if (arr != null && arr.Length > 0) all.AddRange(arr);
-                    }
-                    catch { /* 無効なタグ名は無視 */ }
+                    
+                    var arr = GameObject.FindGameObjectsWithTag(tag);
+                    if (arr != null && arr.Length > 0) all.AddRange(arr);
                 }
                 if (all.Count > 0)
                 {
@@ -1005,5 +982,29 @@ namespace YubiSoccer.Environment
             Gizmos.color = prevCol;
         }
 #endif
+
+        private void PlayConfetti()
+        {
+            if (goalTrigger == null) goalTrigger = GetComponent<GoalTrigger>();
+            if (goalTrigger == null) return;
+
+            switch (goalTrigger.AwardToTeam)
+            {
+                case Team.TeamA:
+                    redGoalParticle?.Show();
+                    blueGoalParticle?.Hide();
+                    break;
+                case Team.TeamB:
+                    blueGoalParticle?.Show();
+                    redGoalParticle?.Hide();
+                    break;
+            }
+        }
+
+        private void HideConfetti()
+        {
+            redGoalParticle?.Hide();
+            blueGoalParticle?.Hide();
+        }
     }
 }

@@ -163,6 +163,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0344aabda963d08438a614a22175027c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  rb: {fileID: 0}
+  climbBlockMask:
+    serializedVersion: 2
+    m_Bits: 0
+  maxSlopeAngle: 50
+  frontCheckDistance: 0.6
   verboseLog: 1
   moveSpeed: 8
   rotationSpeed: 120

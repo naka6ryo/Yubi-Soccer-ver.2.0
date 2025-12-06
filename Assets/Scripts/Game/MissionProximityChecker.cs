@@ -45,23 +45,19 @@ namespace YubiSoccer.Game
             // ボール Transform を自動検索（タグ -> 名前に 'ball' を含むオブジェクト -> Rigidbody を持つ最初の ball 名称）
             if (ballTransform == null)
             {
-                try
-                {
-                    var ball = GameObject.FindWithTag("Ball");
-                    if (ball != null) ballTransform = ball.transform;
-                }
-                catch { /* FindWithTag が例外を投げる可能性を防ぐ */ }
+                var ball = GameObject.FindWithTag("Ball");
+                if (ball != null) ballTransform = ball.transform;
 
                 if (ballTransform == null)
                 {
-                    // 名前に 'ball' が含まれるオブジェクトを探す
-                    var all = GameObject.FindObjectsOfType<GameObject>();
-                    foreach (var go in all)
+                    // Rigidbody を持つオブジェクトの中から名前に 'ball' が含まれるものを探す
+                    var allRbs = FindObjectsOfType<Rigidbody>(); // FindObjectsOfType は既に GetComponent を含む
+                    foreach (var rb in allRbs)
                     {
-                        if (go == null) continue;
-                        if (go.name != null && go.name.ToLower().Contains("ball"))
+                        if (rb == null || rb.gameObject == null) continue;
+                        if (rb.gameObject.name != null && rb.gameObject.name.ToLower().Contains("ball"))
                         {
-                            ballTransform = go.transform;
+                            ballTransform = rb.transform;
                             break;
                         }
                     }
@@ -114,38 +110,18 @@ namespace YubiSoccer.Game
                     }
                 }
             }
-            else
+            else // playerLayerMask が未設定の場合
             {
-                // レイヤーマスクが未設定ならタグ検索（既存の実装）を実行
-                var players = GameObject.FindGameObjectsWithTag(playerTag);
-                if (players != null && players.Length > 0)
+                var cols = Physics.OverlapSphere(ballPos, radius);
+                if (cols != null && cols.Length > 0)
                 {
-                    float r2 = radius * radius;
-                    foreach (var p in players)
+                    foreach (var c in cols)
                     {
-                        if (p == null) continue;
-                        var d2 = (p.transform.position - ballPos).sqrMagnitude;
-                        if (d2 <= r2)
+                        if (c == null) continue;
+                        if (!string.IsNullOrEmpty(playerTag) && c.CompareTag(playerTag))
                         {
                             found = true;
                             break;
-                        }
-                    }
-                }
-                else
-                {
-                    // タグ検索で見つからない場合は OverlapSphere でタグを持つコライダを探すフォールバック
-                    var cols = Physics.OverlapSphere(ballPos, radius);
-                    if (cols != null && cols.Length > 0)
-                    {
-                        foreach (var c in cols)
-                        {
-                            if (c == null) continue;
-                            if (!string.IsNullOrEmpty(playerTag) && c.CompareTag(playerTag))
-                            {
-                                found = true;
-                                break;
-                            }
                         }
                     }
                 }

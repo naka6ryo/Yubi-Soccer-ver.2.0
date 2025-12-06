@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using UnityEngine;
 using YubiSoccer.Game;
+using Photon.Pun;
 
 namespace YubiSoccer.Field
 {
@@ -25,6 +26,7 @@ namespace YubiSoccer.Field
         private bool armed = true;
 
         private SoundManager soundManager;
+        public Team AwardToTeam => awardToTeam;
 
         private void Reset()
         {
@@ -50,40 +52,14 @@ namespace YubiSoccer.Field
             soundManager = SoundManager.Instance;
         }
 
-        private void Update()
-        {
-            // SoundManagerが存在しない場合は処理をスキップ
-            if (soundManager == null || SoundManager.Instance == null)
-                return;
-
-            // 1キーを押したらSEを再生
-            if (Input.GetKeyDown(KeyCode.Alpha1))
-            {
-                soundManager.PlaySE("決定");
-                UnityEngine.Debug.Log("[GoalTrigger] Played SE: 決定");
-            }
-
-            // 2キーを押したらBGMを再生
-            if (Input.GetKeyDown(KeyCode.Alpha2))
-            {
-                SoundManager.Instance.PlayBGM("タイトル");
-            }
-
-            // 3キーを押したらSEを再生
-            if (Input.GetKeyDown(KeyCode.Alpha3))
-            {
-                SoundManager.Instance.PlayBGM("試合中");
-            }
-
-            // 4キーを押したらBGMを停止
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                SoundManager.Instance.StopBGM();
-            }
-        }
+        // Updateメソッド（キー入力監視）は削除しました。
+        // デバッグ機能が必要な場合は、単一の GameManager 等で管理してください。
 
         private void OnTriggerEnter(Collider other)
         {
+            // ゴール判定はマスタークライアントのみが行う（二重加点防止）
+            if (!PhotonNetwork.IsMasterClient) return;
+
             if (!armed) return;
 
             // ボール判定
@@ -127,9 +103,6 @@ namespace YubiSoccer.Field
             {
                 UnityEngine.Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
             }
-
-            // ゴールイベント通知
-            try { OnGoalScored?.Invoke(awardToTeam); } catch (System.Exception e) { UnityEngine.Debug.LogException(e); }
 
             // 再武装までのディレイ
             if (rearmDelay > 0f)

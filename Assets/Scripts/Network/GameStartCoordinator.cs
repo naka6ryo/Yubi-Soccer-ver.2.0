@@ -5,6 +5,7 @@ using ExitGames.Client.Photon;
 using Photon.Pun.UtilityScripts;
 using YubiSoccer.UI;
 using System.Collections;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// Multi Player シーン内で各クライアントのロード完了を通知し、
@@ -23,6 +24,13 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
     void Start()
     {
+        // シーン再読込時にプロパティをクリア（マスターのみ）
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // ResetAllPlayerProperties(); // ← 削除: 参加者のロード完了フラグを消してしまうため
+            ResetRoomProperties();
+        }
+
         soundManager = SoundManager.Instance;
 
         // 【修正箇所】
@@ -49,6 +57,31 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         {
             Debug.LogWarning("[GameStartCoordinator] Start called but client is not connected or leaving. Skipping initialization.");
         }
+    }
+
+    /// <summary>
+    /// 全プレイヤーのロード完了プロパティをクリア（マスターのみ実行）
+    /// </summary>
+    private void ResetAllPlayerProperties()
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+        Debug.Log("[GameStartCoordinator] Resetting all player properties");
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            var clearProps = new Hashtable { { PROP_PLAYER_LOADED, null } };
+            player.SetCustomProperties(clearProps);
+        }
+    }
+
+    /// <summary>
+    /// ルームプロパティのカウントダウン開始時刻をクリア（マスターのみ実行）
+    /// </summary>
+    private void ResetRoomProperties()
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+        Debug.Log("[GameStartCoordinator] Resetting room properties");
+        var clearProps = new Hashtable { { PROP_COUNTDOWN_START, null } };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(clearProps);
     }
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
@@ -162,7 +195,18 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         }
     }
 
+    public override void OnDisable()
+    {
+        base.OnDisable();
+        CleanupLocalPlayerProperty();
+    }
+
     void OnDestroy()
+    {
+        CleanupLocalPlayerProperty();
+    }
+
+    private void CleanupLocalPlayerProperty()
     {
         // ネットワークが生きていて、操作可能な状態かチェックする
         if (PhotonNetwork.IsConnectedAndReady && PhotonNetwork.InRoom)

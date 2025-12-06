@@ -63,6 +63,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             Debug.Log($"[NetworkManager] Title scene configured: '{titleSceneName}'");
         }
+        if (startGameButton != null && PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        {
+            startGameButton.SetVisible(true);
+        }
     }
 
     void Start()
@@ -93,6 +97,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Log("Connecting to Photon...");
             PhotonNetwork.ConnectUsingSettings();
         }
+
+        PhotonNetwork.SendRate = 60;
+        PhotonNetwork.SerializationRate = 30;
     }
 
     private void OnEnable()
@@ -408,8 +415,30 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         try
         {
             Log($"Master starting game... Loading '{gameSceneName}'");
-            var props = new ExitGames.Client.Photon.Hashtable { { "gameStarted", true } };
+            
+            // ゲーム開始ボタン押下時に、マスタークライアントの操作をロックする（ユーザー要望）
+            var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+            foreach (var p in players)
+            {
+                if (p.photonView.IsMine)
+                {
+                    p.SetInputEnabled(false);
+                    Debug.Log("[NetworkManager] Locked local player input on StartGame.");
+                    break;
+                }
+            }
+
+            // スコアとタイマーをリセット（マッチング中の加算や前回の結果をクリア）
+            var props = new ExitGames.Client.Photon.Hashtable 
+            { 
+                { "gameStarted", true },
+                { "ScoreA", 0 },
+                { "ScoreB", 0 },
+                { "StartTime", null }, // タイマーリセット
+                { "Duration", null }   // タイマーリセット
+            };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+
             // Play wipe locally before invoking Photon network load — wait for completion
             try
             {

@@ -5,15 +5,20 @@ using YubiSoccer.Game;
 namespace YubiSoccer.UI
 {
     /// <summary>
-    /// 試合終了時のリザルト画面を表示
+    /// リザルト画面と再戦UIの表示と入力を管理
     /// </summary>
     public class ResultUI : MonoBehaviour
     {
-        [Header("UI References")]
+        [Header("Result UI References")]
         [SerializeField] private GameObject resultPanel;
         [SerializeField] private TMP_Text winnerText;
-        [SerializeField] private TMP_Text redScoreText;  // TEAM A (赤)
-        [SerializeField] private TMP_Text blueScoreText; // TEAM B (青)
+        [SerializeField] private TMP_Text redScoreText;
+        [SerializeField] private TMP_Text blueScoreText;
+
+        [Header("Rematch UI References")]
+        [SerializeField] private GameObject rematchButton;
+        [SerializeField] private GameObject titleButton;
+        [SerializeField] private TMP_Text statusText;
 
         [Header("Hide on Result")]
         [Tooltip("リザルト表示時に非表示にするGameObjectのリスト")]
@@ -23,12 +28,11 @@ namespace YubiSoccer.UI
         [SerializeField] private string redWinMessage = "TEAM A WIN!";
         [SerializeField] private string blueWinMessage = "TEAM B WIN!";
         [SerializeField] private string drawMessage = "DRAW!";
-        [SerializeField] private Color redTeamColor = new Color(1f, 0.2f, 0.2f); // 赤
-        [SerializeField] private Color blueTeamColor = new Color(0.2f, 0.5f, 1f); // 青
+        [SerializeField] private Color redTeamColor = new Color(1f, 0.2f, 0.2f);
+        [SerializeField] private Color blueTeamColor = new Color(0.2f, 0.5f, 1f);
 
-        [Header("Back To Title Button")]
-        [Tooltip("リザルト表示時にだけ表示したい戻るボタンの GameObject")]
-        [SerializeField] private GameObject backToTitleButton;
+        public event System.Action OnRematchRequested;
+        public event System.Action OnTitleRequested;
 
         [Header("Sound Effects")]
         [Tooltip("リザルト表示時に順番に再生する SE (3つ)。隙間なく連続再生されます。")]
@@ -36,17 +40,17 @@ namespace YubiSoccer.UI
 
         private AudioSource audioSource;
 
-        private void OnEnable()
-        {
-            // MatchTimer の試合終了イベントを購読
-            MatchTimer.OnMatchFinished += ShowResult;
-        }
+        // private void OnEnable()
+        // {
+        //     // MatchTimer の試合終了イベントを購読
+        //     MatchTimer.OnMatchFinished += ShowResult;
+        // }
 
-        private void OnDisable()
-        {
-            // イベント購読解除
-            MatchTimer.OnMatchFinished -= ShowResult;
-        }
+        // private void OnDisable()
+        // {
+        //     // イベント購読解除
+        //     MatchTimer.OnMatchFinished -= ShowResult;
+        // }
 
         private void Awake()
         {
@@ -65,67 +69,117 @@ namespace YubiSoccer.UI
                 resultPanel.SetActive(false);
             }
 
-            // テキストも初期化（Panelが非表示でも念のため）
-            if (winnerText != null)
-            {
-                winnerText.text = "";
-            }
-            if (redScoreText != null)
-            {
-                redScoreText.text = "";
-            }
-            if (blueScoreText != null)
-            {
-                blueScoreText.text = "";
-            }
-
-            if (backToTitleButton != null)
-            {
-                backToTitleButton.SetActive(false);
-            }
+            ShowButtons(false);
+            ResetTexts();
         }
 
         /// <summary>
         /// リザルト画面を表示
         /// </summary>
-        private void ShowResult()
+        public void ShowResult(int redScore, int blueScore)
         {
             if (resultPanel == null)
             {
-                Debug.LogError("[ResultUI] resultPanel is not assigned!");
+                Debug.LogError("[ResultRematchUI] resultPanel is not assigned!");
                 return;
             }
-
-            // ScoreManager からスコア情報を取得
-            var scoreManager = ScoreManager.Instance;
-            if (scoreManager == null)
-            {
-                Debug.LogError("[ResultUI] ScoreManager not found!");
-                return;
-            }
-
-            int redScore = scoreManager.GetScore(Team.TeamA);
-            int blueScore = scoreManager.GetScore(Team.TeamB);
 
             // 勝敗判定
-            string winnerMessage;
-            if (redScore > blueScore)
-            {
-                winnerMessage = redWinMessage;
-            }
-            else if (blueScore > redScore)
-            {
-                winnerMessage = blueWinMessage;
-            }
-            else
-            {
-                winnerMessage = drawMessage;
-            }
+            string winnerMessage = GetWinnerMessage(redScore, blueScore);
 
             // UI更新
+            UpdateResultTexts(winnerMessage, redScore, blueScore);
+
+            // 指定されたオブジェクトを非表示にする
+            HideObjects();
+
+            // パネルとボタンを表示
+            resultPanel.SetActive(true);
+            ShowButtons(true);
+            YubiSoccer.Environment.BreakableProximityGlass.StartShutterForAll();
+
+            // ステータステキストをクリア
+            if (statusText != null)
+            {
+                statusText.text = "";
+            }
+            // SE を順次再生
+            PlayResultSoundEffects();
+        }
+
+        /// <summary>
+        /// 他のプレイヤーを待っている状態を表示
+        /// </summary>
+        public void ShowWaitingForPlayers()
+        {
+            if (statusText != null)
+            {
+                statusText.text = "他のプレイヤーの同意を待っています...";
+            }
+            SetButtonsInteractable(false);
+        }
+
+        /// <summary>
+        /// プレイヤーが退出した通知を表示
+        /// </summary>
+        public void ShowPlayerLeft()
+        {
+            if (statusText != null)
+            {
+                statusText.text = "プレイヤーが退出しました";
+            }
+            SetButtonsInteractable(true);
+        }
+
+        /// <summary>
+        /// UIをリセット
+        /// </summary>
+        public void ResetUI()
+        {
+            if (statusText != null)
+            {
+                statusText.text = "";
+            }
+            SetButtonsInteractable(true);
+        }
+
+        /// <summary>
+        /// 再戦ボタンのクリックイベントを登録
+        /// </summary>
+        public void RegisterRematchButton(UnityEngine.UI.Button button)
+        {
+            if (button != null)
+            {
+                button.onClick.AddListener(() => OnRematchRequested?.Invoke());
+            }
+        }
+
+        /// <summary>
+        /// タイトルボタンのクリックイベントを登録
+        /// </summary>
+        public void RegisterTitleButton(UnityEngine.UI.Button button)
+        {
+            if (button != null)
+            {
+                button.onClick.AddListener(() => OnTitleRequested?.Invoke());
+            }
+        }
+
+        private string GetWinnerMessage(int redScore, int blueScore)
+        {
+            if (redScore > blueScore)
+                return redWinMessage;
+            else if (blueScore > redScore)
+                return blueWinMessage;
+            else
+                return drawMessage;
+        }
+
+        private void UpdateResultTexts(string winner, int redScore, int blueScore)
+        {
             if (winnerText != null)
             {
-                winnerText.text = winnerMessage;
+                winnerText.text = winner;
                 // 色を勝者に合わせて変更（赤勝ち=>赤、青勝ち=>青、引き分け=>白）
                 if (redScore > blueScore)
                 {
@@ -152,23 +206,18 @@ namespace YubiSoccer.UI
                 blueScoreText.text = blueScore.ToString();
                 blueScoreText.color = blueTeamColor;
             }
+        }
 
-            // 指定されたオブジェクトを非表示にする
-            HideObjects();
-
-            // パネルを表示
-            // 同時にシャッター演出を有効化して、シーン遷移まで破片を保持する
-            YubiSoccer.Environment.BreakableProximityGlass.StartShutterForAll();
-            resultPanel.SetActive(true);
-
-            // リザルトUIと同じタイミングでボタン表示
-            if (backToTitleButton != null)
-            {
-                backToTitleButton.SetActive(true);
-            }
-
-            // SE を順次再生
-            PlayResultSoundEffects();
+        private void ResetTexts()
+        {
+            if (winnerText != null)
+                winnerText.text = "";
+            if (redScoreText != null)
+                redScoreText.text = "";
+            if (blueScoreText != null)
+                blueScoreText.text = "";
+            if (statusText != null)
+                statusText.text = "";
         }
 
         /// <summary>
@@ -216,22 +265,27 @@ namespace YubiSoccer.UI
             }
         }
 
-        /// <summary>
-        /// リトライボタン用（任意）
-        /// </summary>
-        public void OnRetryButtonClicked()
+        private void ShowButtons(bool show)
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene(
-                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
-            );
+            if (rematchButton != null)
+                rematchButton.SetActive(show);
+            if (titleButton != null)
+                titleButton.SetActive(show);
         }
 
-        /// <summary>
-        /// タイトルに戻るボタン用（任意）
-        /// </summary>
-        public void OnBackToTitleButtonClicked()
+        private void SetButtonsInteractable(bool interactable)
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("GameTitleEdition");
+            if (rematchButton != null)
+            {
+                var btn = rematchButton.GetComponent<UnityEngine.UI.Button>();
+                if (btn != null) btn.interactable = interactable;
+            }
+
+            if (titleButton != null)
+            {
+                var btn = titleButton.GetComponent<UnityEngine.UI.Button>();
+                if (btn != null) btn.interactable = interactable;
+            }
         }
     }
 }

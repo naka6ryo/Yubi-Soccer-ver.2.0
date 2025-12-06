@@ -1,6 +1,9 @@
 using System;
 using TMPro;
 using UnityEngine;
+using Photon.Pun;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
 namespace YubiSoccer.Game
 {
@@ -12,9 +15,9 @@ namespace YubiSoccer.Game
 
     /// <summary>
     /// スコアの集計とTextMeshPro表示を行うマネージャ。
-    /// シーンに1つ配置し、A/BそれぞれのTMP_Textを割り当ててください。
+    /// Photonのルームプロパティを使用してスコアを同期します。
     /// </summary>
-    public class ScoreManager : MonoBehaviour
+    public class ScoreManager : MonoBehaviourPunCallbacks
     {
         public static ScoreManager Instance { get; private set; }
 
@@ -30,9 +33,13 @@ namespace YubiSoccer.Game
         [Tooltip("1回の非表示/表示それぞれの待ち秒数。合計で times*2*interval 秒")]
         [SerializeField, Min(0f)] private float blinkInterval = 0.12f;
 
-        [Header("Initial Scores")]
-        [SerializeField] private int teamAScore = 0;
-        [SerializeField] private int teamBScore = 0;
+        // ローカルキャッシュ（表示用）
+        private int teamAScore = 0;
+        private int teamBScore = 0;
+
+        // ルームプロパティのキー
+        private const string SCORE_A_KEY = "ScoreA";
+        private const string SCORE_B_KEY = "ScoreB";
 
         public event Action<Team, int> OnScoreChanged; // (team, newScore)
 
@@ -50,41 +57,58 @@ namespace YubiSoccer.Game
             }
             Instance = this;
             soundManager = SoundManager.Instance;
-            UpdateUI();
         }
 
+        public override void OnEnable()
+        {
+            base.OnEnable();
+            // 初期化時に現在のルームプロパティからスコアを読み込む
+            if (PhotonNetwork.InRoom)
+            {
+                UpdateScoresFromProperties(PhotonNetwork.CurrentRoom.CustomProperties);
+            }
+        }
+
+        /// <summary>
+        /// スコアをリセット（マスタークライアントのみ実行可能）
+        /// </summary>
         public void ResetScores(int a = 0, int b = 0)
         {
-            teamAScore = Mathf.Max(0, a);
-            teamBScore = Mathf.Max(0, b);
-            UpdateUI();
+            if (!PhotonNetwork.IsMasterClient) return;
+
+            var props = new Hashtable
+            {
+                { SCORE_A_KEY, a },
+                { SCORE_B_KEY, b }
+            };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
         }
 
+        /// <summary>
+        /// スコアを加算（マスタークライアントのみ実行可能）
+        /// </summary>
         public void AddScore(Team team, int delta = 1)
         {
+            if (!PhotonNetwork.IsMasterClient) return;
+
             delta = Mathf.Max(0, delta);
-            // SoundManager may not be initialized in some scenes (null), guard against NRE
-            if (soundManager == null) soundManager = SoundManager.Instance;
-            if (soundManager != null)
+            int currentA = teamAScore;
+            int currentB = teamBScore;
+
+            // プロパティから最新値を取得して加算するのが安全だが、
+            // ここではローカルキャッシュ（同期済み）をベースにする
+            if (team == Team.TeamA)
             {
-                try { soundManager.PlaySE("スコア増加"); } catch { }
+                int newScore = currentA + delta;
+                var props = new Hashtable { { SCORE_A_KEY, newScore } };
+                PhotonNetwork.CurrentRoom.SetCustomProperties(props);
             }
-            switch (team)
+            else
             {
-                case Team.TeamA:
-                    teamAScore += delta;
-                    OnScoreChanged?.Invoke(Team.TeamA, teamAScore);
-                    if (enableBlinkOnGoal) StartBlink(Team.TeamA);
-                    else UpdateTeamText(Team.TeamA);
-                    break;
-                case Team.TeamB:
-                    teamBScore += delta;
-                    OnScoreChanged?.Invoke(Team.TeamB, teamBScore);
-                    if (enableBlinkOnGoal) StartBlink(Team.TeamB);
-                    else UpdateTeamText(Team.TeamB);
-                    break;
+                int newScore = currentB + delta;
+                var props = new Hashtable { { SCORE_B_KEY, newScore } };
+                PhotonNetwork.CurrentRoom.SetCustomProperties(props);
             }
-            // もう片方は変更なしなので触らない
         }
 
         public int GetScore(Team team)
@@ -92,12 +116,67 @@ namespace YubiSoccer.Game
             return team == Team.TeamA ? teamAScore : teamBScore;
         }
 
-        private void UpdateUI()
+        /// <summary>
+        /// ルームプロパティが更新されたときに呼ばれる（全クライアント）
+        /// </summary>
+        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
         {
-            if (teamAScoreText != null)
-                teamAScoreText.text = teamAScore.ToString();
-            if (teamBScoreText != null)
-                teamBScoreText.text = teamBScore.ToString();
+            bool changed = false;
+            if (propertiesThatChanged.ContainsKey(SCORE_A_KEY))
+            {
+                int newScore = (int)propertiesThatChanged[SCORE_A_KEY];
+                if (newScore != teamAScore)
+                {
+                    teamAScore = newScore;
+                    OnScoreChanged?.Invoke(Team.TeamA, teamAScore);
+                    HandleScoreUpdateEffect(Team.TeamA);
+                    changed = true;
+                }
+            }
+
+            if (propertiesThatChanged.ContainsKey(SCORE_B_KEY))
+            {
+                int newScore = (int)propertiesThatChanged[SCORE_B_KEY];
+                if (newScore != teamBScore)
+                {
+                    teamBScore = newScore;
+                    OnScoreChanged?.Invoke(Team.TeamB, teamBScore);
+                    HandleScoreUpdateEffect(Team.TeamB);
+                    changed = true;
+                }
+            }
+            
+            // 初回同期などでエフェクトなしで更新したい場合もあるが、
+            // 基本的には UpdateUI は HandleScoreUpdateEffect 内で呼ばれるか、
+            // 点滅なしなら即更新される。
+        }
+
+        private void UpdateScoresFromProperties(Hashtable props)
+        {
+            if (props.TryGetValue(SCORE_A_KEY, out object valA))
+            {
+                teamAScore = (int)valA;
+                UpdateTeamText(Team.TeamA);
+            }
+            if (props.TryGetValue(SCORE_B_KEY, out object valB))
+            {
+                teamBScore = (int)valB;
+                UpdateTeamText(Team.TeamB);
+            }
+        }
+
+        private void HandleScoreUpdateEffect(Team team)
+        {
+            // SE再生
+            if (soundManager == null) soundManager = SoundManager.Instance;
+            if (soundManager != null)
+            {
+                soundManager.PlaySE("スコア増加");
+            }
+
+            // 点滅演出
+            if (enableBlinkOnGoal) StartBlink(team);
+            else UpdateTeamText(team);
         }
 
         private void UpdateTeamText(Team team)
