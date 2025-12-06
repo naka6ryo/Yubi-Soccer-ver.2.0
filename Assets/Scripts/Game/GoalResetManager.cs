@@ -60,20 +60,30 @@ namespace YubiSoccer.Game
             TryCaptureSceneDefaultBall();
         }
 
-        void Start()
+        protected virtual void Start()
         {
             soundManager = SoundManager.Instance;
+            SubscribeGoalEvents();
+        }
+
+        protected virtual void OnDestroy()
+        {
+            UnsubscribeGoalEvents();
+        }
+
+        protected virtual void SubscribeGoalEvents()
+        {
             if (ScoreManager.Instance != null)
             {
                 ScoreManager.Instance.OnScoreChanged += HandleScoreChanged;
             }
             else
             {
-                Debug.LogWarning("[GoalResetManager] ScoreManager instance not found in Start.");
+                Debug.LogWarning("[GoalResetManager] ScoreManager instance not found when subscribing to goal events.");
             }
         }
 
-        private void OnDestroy()
+        protected virtual void UnsubscribeGoalEvents()
         {
             if (ScoreManager.Instance != null)
             {
@@ -81,9 +91,9 @@ namespace YubiSoccer.Game
             }
         }
 
-        private void HandleScoreChanged(Team team, int score)
+        protected virtual void HandleScoreChanged(Team team, int score)
         {
-            HandleGoal(team);
+            TriggerGoalReset(team);
         }
 
         /// <summary>
@@ -188,7 +198,7 @@ namespace YubiSoccer.Game
             return false;
         }
 
-        private void HandleGoal(Team scoredFor)
+        protected void TriggerGoalReset(Team scoredFor)
         {
             StopAllCoroutines();
 
