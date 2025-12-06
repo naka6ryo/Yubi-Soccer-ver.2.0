@@ -63,6 +63,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             Debug.Log($"[NetworkManager] Title scene configured: '{titleSceneName}'");
         }
+        if (startGameButton != null && PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        {
+            startGameButton.SetVisible(true);
+        }
     }
 
     void Start()
