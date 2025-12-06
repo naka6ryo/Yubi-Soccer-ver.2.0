@@ -27,7 +27,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         // シーン再読込時にプロパティをクリア（マスターのみ）
         if (PhotonNetwork.IsMasterClient)
         {
-            ResetAllPlayerProperties();
+            // ResetAllPlayerProperties(); // ← 削除: 参加者のロード完了フラグを消してしまうため
             ResetRoomProperties();
         }
 
@@ -195,7 +195,17 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         }
     }
 
+    void OnDisable()
+    {
+        CleanupLocalPlayerProperty();
+    }
+
     void OnDestroy()
+    {
+        CleanupLocalPlayerProperty();
+    }
+
+    private void CleanupLocalPlayerProperty()
     {
         // ネットワークが生きていて、操作可能な状態かチェックする
         if (PhotonNetwork.IsConnectedAndReady && PhotonNetwork.InRoom)
