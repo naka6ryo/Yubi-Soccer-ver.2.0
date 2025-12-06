@@ -2019,9 +2019,9 @@ MonoBehaviour:
   redTeamColor: {r: 1, g: 0.2, b: 0.2, a: 1}
   blueTeamColor: {r: 0.2, g: 0.5, b: 1, a: 1}
   resultSoundEffects:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 8300000, guid: 93d0f569c85804d2ea3a572e98870a4d, type: 3}
+  - {fileID: 8300000, guid: 93d0f569c85804d2ea3a572e98870a4d, type: 3}
+  - {fileID: 8300000, guid: d4586c05d18464d449f8ed980399d70b, type: 3}
 --- !u!114 &519320684
 MonoBehaviour:
   m_ObjectHideFlags: 0
