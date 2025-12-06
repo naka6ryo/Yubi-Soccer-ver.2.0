@@ -72,7 +72,7 @@ namespace YubiSoccer.UI
 
         private void Awake()
         {
-            Debug.Log("[VideoPlayerController] Awake called");
+            // Debug.Log("[VideoPlayerController] Awake called");
 
             // VideoPlayerの初期化
             if (videoPlayer == null)
@@ -81,11 +81,11 @@ namespace YubiSoccer.UI
                 if (videoPlayer == null)
                 {
                     videoPlayer = gameObject.AddComponent<VideoPlayer>();
-                    Debug.Log("[VideoPlayerController] Created VideoPlayer component");
+                    // Debug.Log("[VideoPlayerController] Created VideoPlayer component");
                 }
                 else
                 {
-                    Debug.Log("[VideoPlayerController] Found existing VideoPlayer component");
+                    // Debug.Log("[VideoPlayerController] Found existing VideoPlayer component");
                 }
             }
 
@@ -96,11 +96,11 @@ namespace YubiSoccer.UI
                 if (audioSource == null)
                 {
                     audioSource = gameObject.AddComponent<AudioSource>();
-                    Debug.Log("[VideoPlayerController] Created AudioSource component");
+                    // Debug.Log("[VideoPlayerController] Created AudioSource component");
                 }
                 else
                 {
-                    Debug.Log("[VideoPlayerController] Found existing AudioSource component");
+                    // Debug.Log("[VideoPlayerController] Found existing AudioSource component");
                 }
             }
 
@@ -109,18 +109,18 @@ namespace YubiSoccer.UI
             {
                 fadeImage.color = fadeStartColor;
                 fadeImage.gameObject.SetActive(true);
-                Debug.Log("[VideoPlayerController] Fade image initialized");
+                // Debug.Log("[VideoPlayerController] Fade image initialized");
             }
             else if (fadeInOnStart && fadeImage == null)
             {
-                Debug.LogWarning("[VideoPlayerController] Fade In On Start is enabled but Fade Image is not assigned!");
+                // Debug.LogWarning("[VideoPlayerController] Fade In On Start is enabled but Fade Image is not assigned!");
             }
 
             // ローディングパネルを初期状態で非表示にする
             if (loadingPanel != null)
             {
                 loadingPanel.SetActive(false);
-                Debug.Log("[VideoPlayerController] Loading panel hidden");
+                // Debug.Log("[VideoPlayerController] Loading panel hidden");
             }
 
             // タップして開始ボタンを初期状態で非表示（透明）にする
@@ -128,7 +128,7 @@ namespace YubiSoccer.UI
             {
                 tapToStartButton.alpha = 0f;
                 tapToStartButton.gameObject.SetActive(false);
-                Debug.Log("[VideoPlayerController] Tap to start button hidden");
+                // Debug.Log("[VideoPlayerController] Tap to start button hidden");
             }
 
             SetupVideoPlayer();
@@ -137,16 +137,16 @@ namespace YubiSoccer.UI
         private void Start()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Debug.Log($"[VideoPlayerController] Start called (WebGL) - playOnAwake: {playOnAwake}, webGLVideoFileName: {webGLVideoFileName}");
+            // Debug.Log($"[VideoPlayerController] Start called (WebGL) - playOnAwake: {playOnAwake}, webGLVideoFileName: {webGLVideoFileName}");
 #else
-            Debug.Log($"[VideoPlayerController] Start called - playOnAwake: {playOnAwake}, videoClip: {(videoClip != null ? videoClip.name : "NULL")}");
+            // Debug.Log($"[VideoPlayerController] Start called - playOnAwake: {playOnAwake}, videoClip: {(videoClip != null ? videoClip.name : "NULL")}");
 #endif
 
 #if UNITY_WEBGL && !UNITY_EDITOR
             // WebGLビルドの場合
             if (skipVideoOnWebGL)
             {
-                Debug.Log("[VideoPlayerController] WebGL: Skipping video, showing loading panel directly");
+                // Debug.Log("[VideoPlayerController] WebGL: Skipping video, showing loading panel directly");
                 SkipToLoading();
                 return;
             }
@@ -154,27 +154,27 @@ namespace YubiSoccer.UI
             // WebGLでは常にURLから読み込む
             if (playOnAwake && !string.IsNullOrEmpty(webGLVideoFileName))
             {
-                Debug.Log("[VideoPlayerController] WebGL: Attempting to play video from URL...");
+                // Debug.Log("[VideoPlayerController] WebGL: Attempting to play video from URL...");
                 
                 // タップして開始ボタンがあれば表示して待機
                 if (tapToStartButton != null)
                 {
-                    Debug.Log("[VideoPlayerController] WebGL: Showing tap to start button");
+                    // Debug.Log("[VideoPlayerController] WebGL: Showing tap to start button");
                     waitingForTapToStart = true;
                     StartCoroutine(ShowTapToStartButton());
                 }
                 else
                 {
                     // ボタンなし: 従来通り自動再生
-                    Debug.Log("[VideoPlayerController] WebGL: Auto-playing video");
+                    // Debug.Log("[VideoPlayerController] WebGL: Auto-playing video");
                     if (fadeInOnStart)
                     {
-                        Debug.Log("[VideoPlayerController] WebGL: Preparing video with fade-in...");
+                        // Debug.Log("[VideoPlayerController] WebGL: Preparing video with fade-in...");
                         videoPlayer.Prepare();
                     }
                     else
                     {
-                        Debug.Log("[VideoPlayerController] WebGL: Playing video without fade...");
+                        // Debug.Log("[VideoPlayerController] WebGL: Playing video without fade...");
                         Play();
                     }
                 }
@@ -183,11 +183,11 @@ namespace YubiSoccer.UI
             {
                 if (!playOnAwake)
                 {
-                    Debug.LogWarning("[VideoPlayerController] WebGL: Play On Awake is disabled!");
+                    // Debug.LogWarning("[VideoPlayerController] WebGL: Play On Awake is disabled!");
                 }
                 if (string.IsNullOrEmpty(webGLVideoFileName))
                 {
-                    Debug.LogError("[VideoPlayerController] WebGL: Video file name is not set!");
+                    // Debug.LogError("[VideoPlayerController] WebGL: Video file name is not set!");
                 }
                 SkipToLoading();
             }
@@ -195,12 +195,12 @@ namespace YubiSoccer.UI
             // その他のプラットフォーム
             if (playOnAwake && videoClip != null)
             {
-                Debug.Log("[VideoPlayerController] Attempting to play video...");
+                // Debug.Log("[VideoPlayerController] Attempting to play video...");
 
                 // タップして開始ボタンがあれば表示して待機
                 if (tapToStartButton != null)
                 {
-                    Debug.Log("[VideoPlayerController] Showing tap to start button");
+                    // Debug.Log("[VideoPlayerController] Showing tap to start button");
                     waitingForTapToStart = true;
                     StartCoroutine(ShowTapToStartButton());
                 }
@@ -209,12 +209,12 @@ namespace YubiSoccer.UI
                     // ボタンなし: 従来通り自動再生
                     if (fadeInOnStart)
                     {
-                        Debug.Log("[VideoPlayerController] Preparing video with fade-in...");
+                        // Debug.Log("[VideoPlayerController] Preparing video with fade-in...");
                         videoPlayer.Prepare();
                     }
                     else
                     {
-                        Debug.Log("[VideoPlayerController] Playing video without fade...");
+                        // Debug.Log("[VideoPlayerController] Playing video without fade...");
                         Play();
                     }
                 }
@@ -223,11 +223,11 @@ namespace YubiSoccer.UI
             {
                 if (!playOnAwake)
                 {
-                    Debug.LogWarning("[VideoPlayerController] Play On Awake is disabled!");
+                    // Debug.LogWarning("[VideoPlayerController] Play On Awake is disabled!");
                 }
                 if (videoClip == null)
                 {
-                    Debug.LogError("[VideoPlayerController] Video Clip is not assigned!");
+                    // Debug.LogError("[VideoPlayerController] Video Clip is not assigned!");
                 }
             }
 #endif
@@ -242,12 +242,12 @@ namespace YubiSoccer.UI
             videoPlayer.source = VideoSource.Url;
             string videoUrl = System.IO.Path.Combine(Application.streamingAssetsPath, webGLVideoFileName);
             videoPlayer.url = videoUrl;
-            Debug.Log($"[VideoPlayerController] WebGL: Loading video from URL: {videoUrl}");
+            // Debug.Log($"[VideoPlayerController] WebGL: Loading video from URL: {videoUrl}");
 #else
             // その他のプラットフォームではVideoClipを使用
             videoPlayer.source = VideoSource.VideoClip;
             videoPlayer.clip = videoClip;
-            Debug.Log($"[VideoPlayerController] Loading video clip: {(videoClip != null ? videoClip.name : "NULL")}");
+            // Debug.Log($"[VideoPlayerController] Loading video clip: {(videoClip != null ? videoClip.name : "NULL")}");
 #endif
 
             videoPlayer.isLooping = loop;
@@ -324,7 +324,7 @@ namespace YubiSoccer.UI
             }
 
             tapToStartButton.alpha = 1f;
-            Debug.Log("[VideoPlayerController] Tap to start button faded in");
+            // Debug.Log("[VideoPlayerController] Tap to start button faded in");
 
             // フェードイン完了後、点滅アニメーションを開始
             blinkCoroutine = StartCoroutine(BlinkTapToStartButton());
