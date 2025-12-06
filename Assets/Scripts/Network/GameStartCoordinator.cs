@@ -195,8 +195,9 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         }
     }
 
-    void OnDisable()
+    public override void OnDisable()
     {
+        base.OnDisable();
         CleanupLocalPlayerProperty();
     }
 
