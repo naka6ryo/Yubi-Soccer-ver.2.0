@@ -140,8 +140,8 @@ namespace YubiSoccer.UI
         /// </summary>
         private void HandlePlayerLeft()
         {
-            resultUI.ShowPlayerLeft();
-            resultUI.ResetUI();
+            // 相手が退出したら自分も退出してタイトルへ（全員解散）
+            PhotonNetwork.LeaveRoom();
         }
 
         // ---------------------------------------------------
