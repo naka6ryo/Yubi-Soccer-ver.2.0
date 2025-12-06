@@ -6949,10 +6949,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da765e46028419546921a5119c4992da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  goalRect: {fileID: 0}
-  goalText: {fileID: 0}
+  goalRect: {fileID: 333789756}
+  goalText: {fileID: 333789757}
   stateCanvasGroup: {fileID: 0}
-  stateRootGameObject: {fileID: 0}
+  stateRootGameObject: {fileID: 704316550}
   goalString: GOAL
   teamAColor: {r: 1, g: 0.033346012, b: 0, a: 1}
   teamBColor: {r: 0.10196078, g: 0.28260645, b: 1, a: 1}
@@ -7042,8 +7042,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d989a4f3afaef04429aa7594c3600273, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  teamAScoreText: {fileID: 0}
-  teamBScoreText: {fileID: 0}
+  teamAScoreText: {fileID: 573280627}
+  teamBScoreText: {fileID: 1061329608}
   enableBlinkOnGoal: 1
   blinkTimes: 3
   blinkInterval: 0.3
