@@ -498,6 +498,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2246224660690771900, guid: 565bacec654e2a64dab8ec23bbcbb4d7, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -838,6 +842,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5716294538180104762, guid: aeb3f06708c47dc4c89a28b9fba5a3c0, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7343520005664123066, guid: aeb3f06708c47dc4c89a28b9fba5a3c0, type: 3}
+      propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -4980,6 +4988,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2246224660690771900, guid: 565bacec654e2a64dab8ec23bbcbb4d7, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6214,6 +6226,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7343520005664123066, guid: aeb3f06708c47dc4c89a28b9fba5a3c0, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7277,6 +7293,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2246224660690771900, guid: 565bacec654e2a64dab8ec23bbcbb4d7, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7517,6 +7537,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1170907039}
     m_Modifications:
+    - target: {fileID: -2278573329774537242, guid: 9dab8772c52fc7c4893fb63a2cf3ab36, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5017618134789240218, guid: 9dab8772c52fc7c4893fb63a2cf3ab36, type: 3}
       propertyPath: m_Name
       value: SM_S_Gate (1)
