@@ -2782,8 +2782,6 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 2622047773225124214, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
   m_PrefabInstance: {fileID: 551702087}
   m_PrefabAsset: {fileID: 0}
-<<<<<<< Updated upstream
-=======
 --- !u!114 &551702091 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2667643766096201603, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
@@ -2931,7 +2929,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 573280625}
   m_CullTransparentMesh: 1
->>>>>>> Stashed changes
 --- !u!1 &584355139
 GameObject:
   m_ObjectHideFlags: 0
