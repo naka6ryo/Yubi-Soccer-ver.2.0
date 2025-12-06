@@ -56,8 +56,9 @@ namespace YubiSoccer.Field
 
         private void OnTriggerEnter(Collider other)
         {
-            // ゴール判定はマスタークライアントのみが行う（二重加点防止）
-            if (!PhotonNetwork.IsMasterClient) return;
+            // マルチ時はMasterのみ、未入室・オフライン時は許可してチュートリアルでも動くようにする
+            bool canScoreHere = !PhotonNetwork.IsConnected || !PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient;
+            if (!canScoreHere) return;
 
             if (!armed) return;
 
@@ -103,8 +104,7 @@ namespace YubiSoccer.Field
                 UnityEngine.Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
             }
 
-            // ゴールイベント通知
-            try { OnGoalScored?.Invoke(awardToTeam); } catch (System.Exception e) { UnityEngine.Debug.LogException(e); }
+            // 二重通知しない
 
             // 再武装までのディレイ
             if (rearmDelay > 0f)

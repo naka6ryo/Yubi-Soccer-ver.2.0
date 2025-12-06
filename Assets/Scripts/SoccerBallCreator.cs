@@ -13,17 +13,15 @@ public class SoccerBallCreator : MonoBehaviour
     void Start()
     {
         soundManager = SoundManager.Instance;
-        // 部屋に入っていない場合はスキップ
-        if (!PhotonNetwork.IsConnected || !PhotonNetwork.InRoom)
+        // オフラインまたはチュートリアルの場合も実行（ローカルボール生成）
+        // マルチプレイ時はMasterClientのみが実行
+        bool shouldSpawn = !PhotonNetwork.IsConnected || !PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient;
+        if (!shouldSpawn)
         {
-            Debug.LogWarning("PlayerSpawner: Not in a room. Skipping player spawn.");
             return;
         }
 
-        if (PhotonNetwork.IsMasterClient)
-        {
-            SpawnLocalSoccerBall();
-        }
+        SpawnLocalSoccerBall();
     }
 
     public void SpawnLocalSoccerBall()
@@ -45,7 +43,17 @@ public class SoccerBallCreator : MonoBehaviour
 
         try
         {
-            localSoccerBallInstance = PhotonNetwork.Instantiate(soccerPrefabName, spawnPos, Quaternion.identity);
+            // オフライン時は通常の Instantiate、オンライン時は PhotonNetwork.Instantiate
+            if (PhotonNetwork.IsConnected && PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient)
+            {
+                localSoccerBallInstance = PhotonNetwork.Instantiate(soccerPrefabName, spawnPos, Quaternion.identity);
+            }
+            else
+            {
+                // オフライン・チュートリアル時はローカルボール生成
+                localSoccerBallInstance = Instantiate(prefab, spawnPos, Quaternion.identity);
+            }
+
             if (localSoccerBallInstance != null)
             {
                 // 生成したボールTransformを全BreakableProximityGlassへ配布（タグ検索不要で安全）
@@ -61,6 +69,7 @@ public class SoccerBallCreator : MonoBehaviour
                     if (rb != null)
                     {
                         goalResetManager.RegisterBall(rb);
+                        Debug.Log("[SoccerBallCreator] Registered ball with GoalResetManager.");
                     }
                 }
             }
