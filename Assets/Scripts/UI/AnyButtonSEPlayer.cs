@@ -90,8 +90,8 @@ namespace YubiSoccer.UI
                     b.onClick.AddListener(playAction);
                     hookedIds.Add(id);
                     hookedButtons.Add(b);
-                    Debug.Log($"AnyButtonSEPlayer: Hooked Button '{GetGameObjectPath(b.gameObject)}'.");
-                }
+                        // Debug.Log($"AnyButtonSEPlayer: Hooked Button '{GetGameObjectPath(b.gameObject)}'.");
+                    }
                 catch (System.Exception ex)
                 {
                     Debug.LogWarning("AnyButtonSEPlayer: Failed to add listener to Button " + b.name + " : " + ex);

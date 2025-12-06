@@ -92,7 +92,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         }
 
         // Start は必ずログを出してインスタンスの所有状態を確認しやすくする
-        Debug.Log($"[PlayerController] Start called on {gameObject.name} IsMine={photonView.IsMine}");
+        // Debug.Log($"[PlayerController] Start called on {gameObject.name} IsMine={photonView.IsMine}");
 
         // Find HandStateReceiver in the scene（購読はローカルのみ）
         receiver = FindFirstObjectByType<HandStateReceiver>();
@@ -105,7 +105,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             if (photonView.IsMine)
             {
                 receiver.onStateChanged.AddListener(OnHandStateChanged);
-                if (verboseLog) Debug.Log($"[PlayerController] Registered HandStateReceiver listener on {gameObject.name} (IsMine=true)");
+                // if (verboseLog) Debug.Log($"[PlayerController] Registered HandStateReceiver listener on {gameObject.name} (IsMine=true)");
             }
             else
             {
@@ -166,13 +166,13 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (kickController != null && !BelongsToThisPlayer(kickController))
         {
             var other = kickController.GetComponentInParent<PhotonView>();
-            Debug.LogError($"[PlayerController] Miswired kickController (mine={photonView.ViewID}, theirs={(other ? other.ViewID : -1)}). Clearing reference.");
+            // Debug.LogError($"[PlayerController] Miswired kickController (mine={photonView.ViewID}, theirs={(other ? other.ViewID : -1)}). Clearing reference.");
             kickController = null;
         }
         if (kickHitbox != null && !BelongsToThisPlayer(kickHitbox))
         {
             var other = kickHitbox.GetComponentInParent<PhotonView>();
-            Debug.LogError($"[PlayerController] Miswired kickHitbox (mine={photonView.ViewID}, theirs={(other ? other.ViewID : -1)}). Clearing reference.");
+            // Debug.LogError($"[PlayerController] Miswired kickHitbox (mine={photonView.ViewID}, theirs={(other ? other.ViewID : -1)}). Clearing reference.");
             kickHitbox = null;
         }
 
