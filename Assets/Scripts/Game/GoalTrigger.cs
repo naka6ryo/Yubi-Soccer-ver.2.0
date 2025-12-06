@@ -104,9 +104,6 @@ namespace YubiSoccer.Field
                 UnityEngine.Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
             }
 
-            // ゴールイベント通知
-            try { OnGoalScored?.Invoke(awardToTeam); } catch (System.Exception e) { UnityEngine.Debug.LogException(e); }
-
             // 再武装までのディレイ
             if (rearmDelay > 0f)
             {

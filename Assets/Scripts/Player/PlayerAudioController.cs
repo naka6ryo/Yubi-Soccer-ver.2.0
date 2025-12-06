@@ -1,5 +1,6 @@
 using Photon.Pun;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace YubiSoccer.Player
 {
@@ -45,6 +46,10 @@ namespace YubiSoccer.Player
         private AudioSource remoteRunSource; // remote 用の走行SE専用 3D (charge ソースと分離)
         private PhotonView pv;
 
+        // Object Pool for spatial clips
+        private List<AudioSource> _spatialClipPool;
+        private int _poolSize = 5; // プールの初期サイズ
+
         void Awake()
         {
             pv = GetComponentInParent<PhotonView>();
@@ -83,6 +88,17 @@ namespace YubiSoccer.Player
             // PlayOneShot で明示的な音量を渡すようにするため、ソースの base volume は 1 に固定する
             if (localRunSource != null) localRunSource.volume = 1.0f;
             if (remoteRunSource != null) remoteRunSource.volume = 1.0f;
+
+            // --- Object Pool 初期化 ---
+            _spatialClipPool = new List<AudioSource>(_poolSize);
+            for (int i = 0; i < _poolSize; i++)
+            {
+                var go = new GameObject($"SpatialAudioSource_Pool_{i}");
+                go.transform.SetParent(transform); // このオブジェクトの子として整理
+                var src = go.AddComponent<AudioSource>();
+                go.SetActive(false);
+                _spatialClipPool.Add(src);
+            }
         }
 
         // Editor: Inspector の値を変更したら既存の AudioSource に即時反映する
@@ -237,21 +253,40 @@ namespace YubiSoccer.Player
 
         private System.Collections.IEnumerator PlaySpatialClipAtPoint(AudioClip clip, Vector3 pos, float volume)
         {
-            var go = new GameObject("TempAudio_PlayClipAtPoint");
-            go.transform.position = pos;
-            var src = go.AddComponent<AudioSource>();
-            src.spatialBlend = 1f;
-            src.rolloffMode = rolloff;
-            src.minDistance = Mathf.Max(0.01f, minDistance);
-            src.maxDistance = Mathf.Max(src.minDistance + 0.01f, maxDistance);
-            src.playOnAwake = false;
-            src.clip = clip;
-            src.volume = Mathf.Clamp01(volume);
-            src.Play();
-            float wait = clip != null ? clip.length + 0.1f : 1f;
-            yield return new WaitForSeconds(wait);
-            if (src != null) Destroy(src);
-            if (go != null) Destroy(go);
+            AudioSource source = null;
+            // プールから利用可能なソースを探す
+            foreach (var src in _spatialClipPool)
+            {
+                if (src != null && !src.gameObject.activeSelf)
+                {
+                    source = src;
+                    break;
+                }
+            }
+
+            // プールに空きがない場合は何もしない（または、新規作成も可能だが、GCを避けるためここでは何もしない）
+            if (source == null)
+            {
+                yield break;
+            }
+
+            source.transform.position = pos;
+            source.spatialBlend = 1f;
+            source.rolloffMode = rolloff;
+            source.minDistance = Mathf.Max(0.01f, minDistance);
+            source.maxDistance = Mathf.Max(source.minDistance + 0.01f, maxDistance);
+            source.clip = clip;
+            source.volume = Mathf.Clamp01(volume);
+            source.gameObject.SetActive(true);
+            source.Play();
+
+            float waitTime = clip != null ? clip.length + 0.1f : 1f;
+            yield return new WaitForSeconds(waitTime); // 可変時間のため、ここではnewを許容
+
+            if (source != null)
+            {
+                source.gameObject.SetActive(false);
+            }
         }
     }
 }
