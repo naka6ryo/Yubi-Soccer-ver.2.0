@@ -43,6 +43,9 @@ namespace YubiSoccer.Game
 
         private bool isFinished = false;
 
+        private int _cachedStartTime;
+        private float _cachedDuration;
+
         public override void OnEnable()
         {
             base.OnEnable();
@@ -81,7 +84,7 @@ namespace YubiSoccer.Game
             };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props);
             
-            try { Debug.Log($"[MatchTimer] Master started timer: duration={seconds:F1}s, start={startTime}"); } catch { }
+            Debug.Log($"[MatchTimer] Master started timer: duration={seconds:F1}s, start={startTime}");
         }
 
         public void StopTimer()
@@ -149,26 +152,21 @@ namespace YubiSoccer.Game
 
         private void UpdateTimer()
         {
-            if (!PhotonNetwork.InRoom) return;
+            // _cachedStartTimeと_cachedDurationが設定されていることを前提とする
+            // CheckTimerState()で初期化される想定
+            if (!IsRunning) return; // タイマーが実行中でない場合は何もしない
 
-            var props = PhotonNetwork.CurrentRoom.CustomProperties;
-            if (props.TryGetValue(START_TIME_KEY, out object startObj) && props.TryGetValue(DURATION_KEY, out object durObj))
+            int elapsedMs = unchecked(PhotonNetwork.ServerTimestamp - _cachedStartTime);
+            float elapsedSec = elapsedMs / 1000f;
+            RemainingSeconds = _cachedDuration - elapsedSec;
+
+            if (RemainingSeconds <= 0f)
             {
-                int startTime = (int)startObj;
-                float duration = (float)durObj;
-
-                int elapsedMs = unchecked(PhotonNetwork.ServerTimestamp - startTime);
-                float elapsedSec = elapsedMs / 1000f;
-                RemainingSeconds = duration - elapsedSec;
-
-                if (RemainingSeconds <= 0f)
-                {
-                    RemainingSeconds = 0f;
-                    FinishTimer();
-                }
-                
-                UpdateText(RemainingSeconds);
+                RemainingSeconds = 0f;
+                FinishTimer();
             }
+            
+            UpdateText(RemainingSeconds);
         }
 
         private void FinishTimer()
@@ -183,7 +181,7 @@ namespace YubiSoccer.Game
             {
                 SetText("");
             }
-            try { Debug.Log("[MatchTimer] Finished (Synced)"); } catch { }
+            Debug.Log("[MatchTimer] Finished (Synced)");
 
             // 試合終了イベントを発火
             OnMatchFinished?.Invoke();

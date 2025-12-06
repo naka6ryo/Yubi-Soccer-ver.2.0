@@ -111,26 +111,19 @@ namespace YubiSoccer.Game
 
         private void TryCaptureSceneDefaultBall()
         {
-            try
+            var scene = SceneManager.GetActiveScene();
+            var roots = scene.GetRootGameObjects();
+            foreach (var root in roots)
             {
-                var scene = SceneManager.GetActiveScene();
-                var roots = scene.GetRootGameObjects();
-                foreach (var root in roots)
+                var found = FindFirstBallInHierarchy(root);
+                if (found != null)
                 {
-                    var found = FindFirstBallInHierarchy(root);
-                    if (found != null)
-                    {
-                        sceneDefaultBallPos = found.transform.position;
-                        sceneDefaultBallRot = found.transform.rotation;
-                        sceneDefaultBallSet = true;
-                        Debug.Log($"[GoalResetManager] Captured scene default ball from '{found.name}' at {sceneDefaultBallPos}");
-                        return;
-                    }
+                    sceneDefaultBallPos = found.transform.position;
+                    sceneDefaultBallRot = found.transform.rotation;
+                    sceneDefaultBallSet = true;
+                    Debug.Log($"[GoalResetManager] Captured scene default ball from '{found.name}' at {sceneDefaultBallPos}");
+                    return;
                 }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning("[GoalResetManager] TryCaptureSceneDefaultBall failed: " + ex);
             }
         }
 
@@ -259,83 +252,7 @@ namespace YubiSoccer.Game
                 Debug.LogError("[GoalResetManager] ballRigidbody is null! Cannot reset ball.");
                 return;
             }
-            if (!initialPositionSet)
-            {
-                Debug.LogWarning("[GoalResetManager] Initial position not set! Attempting to find ball...");
 
-                // 1) まず BallNetworkSync を探す
-                var ballSync = FindObjectOfType<YubiSoccer.Network.BallNetworkSync>();
-                if (ballSync != null)
-                {
-                    RegisterBall(ballSync.GetComponent<Rigidbody>());
-                }
-                else
-                {
-                    // 2) タグによる検索 (一般的なタグ名を試す)
-                    string[] tagsToTry = new[] { "Ball", "SoccerBall" };
-                    Rigidbody found = null;
-                    foreach (var t in tagsToTry)
-                    {
-                        try
-                        {
-                            var gos = GameObject.FindGameObjectsWithTag(t);
-                            if (gos != null && gos.Length > 0)
-                            {
-                                foreach (var g in gos)
-                                {
-                                    if (g == null) continue;
-                                    var rb = g.GetComponent<Rigidbody>();
-                                    if (rb != null)
-                                    {
-                                        found = rb;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        catch { }
-                        if (found != null) break;
-                    }
-
-                    // 3) 名前・コライダ・Rigidbody ヒューリスティック検索 (最終手段)
-                    if (found == null)
-                    {
-                        var allRbs = Object.FindObjectsOfType<Rigidbody>(true);
-                        float bestScore = float.MinValue;
-                        foreach (var rb in allRbs)
-                        {
-                            if (rb == null) continue;
-                            float score = 0f;
-                            var name = rb.gameObject.name.ToLowerInvariant();
-                            if (name.Contains("ball")) score += 10f;
-                            // SphereCollider を持つとボールっぽい
-                            var sc = rb.GetComponent<Collider>();
-                            if (sc != null && sc is SphereCollider) score += 5f;
-                            // 物理が有効そうなものを好む
-                            if (!rb.isKinematic) score += 2f;
-                            // 質量がそこそこなら優先
-                            if (rb.mass > 0.1f && rb.mass < 50f) score += 1f;
-
-                            if (score > bestScore)
-                            {
-                                bestScore = score;
-                                found = rb;
-                            }
-                        }
-                    }
-
-                    if (found != null)
-                    {
-                        RegisterBall(found);
-                        Debug.Log("[GoalResetManager] Found ball via fallback search: " + found.name);
-                    }
-                    else
-                    {
-                        Debug.LogError("[GoalResetManager] Cannot find ball to reset!");
-                        return;
-                    }
-                }
-            }
 
             // 速度をゼロにする
             ballRigidbody.linearVelocity = Vector3.zero;
@@ -357,7 +274,7 @@ namespace YubiSoccer.Game
                 var g = glasses[i];
                 if (g == null) continue;
                 // 可能なら復元
-                try { g.ResetIntact(); } catch { }
+                g.ResetIntact();
             }
         }
 
