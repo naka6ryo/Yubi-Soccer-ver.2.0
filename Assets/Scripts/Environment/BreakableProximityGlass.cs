@@ -378,7 +378,7 @@ namespace YubiSoccer.Environment
             GameObject shards = null;
             if (shatteredPrefab != null)
             {
-                shards = Instantiate(shatteredPrefab, transform.position, transform.rotation);
+                shards = Instantiate(shatteredPrefab, transform.position, shatteredPrefab.transform.rotation, null);
                 // 以前は破片に AddExplosionForce を与えていたが、現在は不要なため処理を行わない
                 // 通常は autoDestroyShardsAfter に従うが、シャッターモード中はシーン遷移まで保持する
                 if (!s_keepShardsUntilSceneChange && autoDestroyShardsAfter > 0f)
