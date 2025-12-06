@@ -415,7 +415,7 @@ namespace YubiSoccer.Player
                 }
 
                 // 視覚的反動を開始（1回のみ）
-                StartRecoil();
+                // StartRecoil();
 
                 // 発動準備
                 kickedThisActivation.Clear();
