@@ -35,7 +35,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         }
 
         // ルームに入っていなければ OnJoinedRoom() を待つ
-        Debug.Log("PlayerCreator: Not in room yet. Waiting for OnJoinedRoom...");
+        // Debug.Log("PlayerCreator: Not in room yet. Waiting for OnJoinedRoom...");
     }
 
     /// <summary>
@@ -43,7 +43,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
     /// </summary>
     public override void OnJoinedRoom()
     {
-        Debug.Log($"PlayerCreator: OnJoinedRoom called. PlayerCount={PhotonNetwork.CurrentRoom?.PlayerCount}");
+        // Debug.Log($"PlayerCreator: OnJoinedRoom called. PlayerCount={PhotonNetwork.CurrentRoom?.PlayerCount}");
         TrySpawnLocalPlayer();
     }
 
@@ -58,7 +58,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
             // チーム割り当てが来たか確認
             if (TeamManager.Instance != null && TeamManager.Instance.HasTeamAssigned(targetPlayer))
             {
-                Debug.Log("[PlayerCreator] Team assignment received via OnPlayerPropertiesUpdate. Spawning now.");
+                // Debug.Log("[PlayerCreator] Team assignment received via OnPlayerPropertiesUpdate. Spawning now.");
                 SpawnLocalPlayer();
             }
         }
@@ -73,7 +73,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
 
         if (TeamManager.Instance == null)
         {
-            Debug.LogError("[PlayerCreator] TeamManager not found!");
+            // Debug.LogError("[PlayerCreator] TeamManager not found!");
             return;
         }
 
@@ -84,7 +84,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         }
         else
         {
-            Debug.Log("[PlayerCreator] Waiting for team assignment from Master Client...");
+            // Debug.Log("[PlayerCreator] Waiting for team assignment from Master Client...");
             // ここでは何もしない。OnPlayerPropertiesUpdate で生成されるのを待つ。
         }
     }
@@ -93,7 +93,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
     {
         if (TeamManager.Instance == null)
         {
-            Debug.LogError("[PlayerCreator] TeamManager not found!");
+            // Debug.LogError("[PlayerCreator] TeamManager not found!");
             return;
         }
 
@@ -105,13 +105,13 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         var teamPrefab = Resources.Load<GameObject>(prefabName);
         if (teamPrefab == null)
         {
-            Debug.LogWarning($"[PlayerCreator] Team prefab '{prefabName}' not found in Resources. Falling back to base '{playerPrefabName}'.");
+            // Debug.LogWarning($"[PlayerCreator] Team prefab '{prefabName}' not found in Resources. Falling back to base '{playerPrefabName}'.");
 
             // フォールバック: 共通プレハブ
             teamPrefab = Resources.Load<GameObject>(playerPrefabName);
             if (teamPrefab == null)
             {
-                Debug.LogError($"[PlayerCreator] Base prefab '{playerPrefabName}' also not found in Resources. Abort spawn.");
+                // Debug.LogError($"[PlayerCreator] Base prefab '{playerPrefabName}' also not found in Resources. Abort spawn.");
                 return;
             }
         }
@@ -123,17 +123,17 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
             1821.66f
         );
 
-        Debug.Log($"PlayerSpawner: Instantiating '{playerPrefabName}' at {spawnPos}");
+        // Debug.Log($"PlayerSpawner: Instantiating '{playerPrefabName}' at {spawnPos}");
 
         try
         {
             localPlayerInstance = PhotonNetwork.Instantiate(teamPrefab.name, spawnPos, Quaternion.identity);
-            Debug.Log($"[PlayerCreator] Spawned player as {team} using prefab '{teamPrefab.name}'");
+            // Debug.Log($"[PlayerCreator] Spawned player as {team} using prefab '{teamPrefab.name}'");
             SetupAudioListener(localPlayerInstance);
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"PlayerSpawner: Failed to instantiate player: {ex}");
+            // Debug.LogError($"PlayerSpawner: Failed to instantiate player: {ex}");
         }
 
         // Instantiate の直後にローカルプレイヤーの詳細ログをオンにする (エディタ/デバッグ用)
@@ -143,7 +143,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
             if (pc != null)
             {
                 pc.SetVerboseLogging(true);
-                Debug.Log("PlayerSpawner: Enabled verbose logging on local player instance.");
+                // Debug.Log("PlayerSpawner: Enabled verbose logging on local player instance.");
             }
             else
             {
@@ -189,7 +189,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
     {
         if (playerInstance == null)
         {
-            Debug.LogWarning("[PlayerCreator] playerInstance is null - skipping AudioListener setup");
+            // Debug.LogWarning("[PlayerCreator] playerInstance is null - skipping AudioListener setup");
             return;
         }
 
@@ -197,7 +197,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         var pv = playerInstance.GetComponent<PhotonView>();
         if (pv == null || !pv.IsMine)
         {
-            Debug.LogWarning("[PlayerCreator] Player is not mine - skipping AudioListener setup");
+            // Debug.LogWarning("[PlayerCreator] Player is not mine - skipping AudioListener setup");
             return;
         }
 
@@ -211,7 +211,7 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
             if (controller != null && controller.playerCamera != null)
             {
                 targetObject = controller.playerCamera.gameObject;
-                Debug.Log("[PlayerCreator] AudioListener will be added to PlayerCamera");
+                // Debug.Log("[PlayerCreator] AudioListener will be added to PlayerCamera");
             }
             else
             {
@@ -234,14 +234,14 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         if (listener == null)
         {
             listener = targetObject.AddComponent<AudioListener>();
-            Debug.Log($"[PlayerCreator] Added AudioListener to {targetObject.name}");
+            // Debug.Log($"[PlayerCreator] Added AudioListener to {targetObject.name}");
         }
 
         // AudioListenerManager に登録して管理を一任する
         if (AudioListenerManager.Instance != null)
         {
             AudioListenerManager.Instance.RegisterLocalListener(listener, true);
-            Debug.Log($"[PlayerCreator] Registered AudioListener on {targetObject.name} to AudioListenerManager.");
+            // Debug.Log($"[PlayerCreator] Registered AudioListener on {targetObject.name} to AudioListenerManager.");
         }
         else
         {

@@ -85,14 +85,14 @@ namespace YubiSoccer.Field
             soundManager.PlaySE("歓声02");
             soundManager.SetSEVolume(1.0f);
 
-            if (soundManager != null)
-            {
-                UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール");
-            }
-            else
-            {
-                UnityEngine.Debug.LogWarning("[GoalTrigger] soundManager が見つかりません。");
-            }
+            // if (soundManager != null)
+            // {
+            //     UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール");
+            // }
+            // else
+            // {
+            //     UnityEngine.Debug.LogWarning("[GoalTrigger] soundManager が見つかりません。");
+            // }
 
             // スコア加算
             if (ScoreManager.Instance != null)
