@@ -11,6 +11,19 @@ using YubiSoccer.Player;
 [RequireComponent(typeof(PhotonView))]
 public class PlayerController : MonoBehaviourPun, IPunObservable
 {
+    [Tooltip("物理移動に使う Rigidbody。未設定なら自動取得")]
+    [SerializeField] private Rigidbody rb;
+    [Tooltip("登りたくないレイヤー（これらに当たったら進まない）")]
+    [SerializeField] private LayerMask climbBlockMask = 0;
+    [Tooltip("登れる最大傾斜角")]
+    [SerializeField] private float maxSlopeAngle = 50f;
+    [Tooltip("正面の段差・壁判定距離")]
+    [SerializeField] private float frontCheckDistance = 0.6f;
+
+    // 入力バッファ（FixedUpdate で使用）
+    private float bufferedForward = 0f;
+    private float bufferedTurn = 0f;
+
     // デバッグログを詳細に出すかどうか（Inspector から切り替え可能）
     [SerializeField]
     [Tooltip("詳細ログを有効にすると HandState イベント受信などのデバッグログを出します。通常は OFF にしてください。")]
@@ -67,6 +80,17 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
     void Start()
     {
+        if (rb == null)
+            rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.constraints |= RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerController] Rigidbody not found; movement will not work.");
+        }
+
         // Start は必ずログを出してインスタンスの所有状態を確認しやすくする
         Debug.Log($"[PlayerController] Start called on {gameObject.name} IsMine={photonView.IsMine}");
 
@@ -393,14 +417,18 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             }
         }
     }
+    private void FixedUpdate()
+    {
+        if (!photonView.IsMine) return;
+        if (rb == null) return;
+        ApplyMovementPhysics();
+    }
 
     void HandleInput()
     {
         float forward = 0f;
         if (Input.GetKey(KeyCode.W)) forward = 1f;
 
-        // イベントベースで更新された isRunning フラグを使用
-        // confidence の閾値を下げて、より確実に反応するように改善
         if (isRunning && runConfidence > 0.5f)
         {
             forward = 1f;
@@ -410,24 +438,54 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if (Input.GetKey(KeyCode.A)) turn = -1f;
         else if (Input.GetKey(KeyCode.D)) turn = 1f;
 
-        // ジョイスティックの入力（キーボード入力がない場合）
         if (turn == 0f && joystick != null)
         {
             float joyInput = joystick.Horizontal;
             turn = 2 * joyInput;
         }
 
-        if (forward != 0f)
+        // 入力をバッファリングし、移動フラグを更新
+        bufferedForward = forward;
+        bufferedTurn = turn;
+        isMoving = Mathf.Abs(forward) > 0.001f;
+    }
+
+    private void ApplyMovementPhysics()
+    {
+        // 回転を先に適用
+        if (Mathf.Abs(bufferedTurn) > 0.001f)
         {
-            transform.Translate(Vector3.forward * forward * moveSpeed * Time.deltaTime);
-        }
-        if (turn != 0f)
-        {
-            transform.Rotate(Vector3.up, turn * rotationSpeed * Time.deltaTime);
+            var deltaRot = Quaternion.Euler(0f, bufferedTurn * rotationSpeed * Time.fixedDeltaTime, 0f);
+            rb.MoveRotation(rb.rotation * deltaRot);
         }
 
-        // 移動中フラグを更新
-        isMoving = Mathf.Abs(forward) > 0.001f;
+        if (Mathf.Abs(bufferedForward) <= 0.001f) return;
+
+        // 接地法線を取得（地面に投影して登りを防ぐ）
+        Vector3 moveDir = rb.transform.forward;
+        if (Physics.Raycast(rb.position + Vector3.up * 0.1f, Vector3.down, out var hit, 1.5f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (IsBlockedLayer(hit.collider.gameObject.layer))
+            {
+                return;
+            }
+            float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
+            if (slopeAngle > maxSlopeAngle)
+            {
+                // 急斜面なら移動しない
+                return;
+            }
+            moveDir = Vector3.ProjectOnPlane(moveDir, hit.normal).normalized;
+        }
+
+        // 正面の壁・他プレイヤーへの乗り上がり防止（段差が高いときは進まない）
+        if (Physics.Raycast(rb.position + Vector3.up * 0.2f, moveDir, frontCheckDistance, climbBlockMask, QueryTriggerInteraction.Ignore))
+        {
+            return;
+        }
+
+        Vector3 targetPos = rb.position + moveDir * bufferedForward * moveSpeed * Time.fixedDeltaTime;
+        rb.MovePosition(targetPos);
     }
 
     // AudioListener の多重存在による警告を抑制するため、プレイヤー(prefab)に含まれる AudioListener を
@@ -475,6 +533,11 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
                 remoteIsMoving = false;
             }
         }
+    }
+
+    private bool IsBlockedLayer(int layer)
+    {
+        return (climbBlockMask.value & (1 << layer)) != 0;
     }
 
     // ---- Helper ----

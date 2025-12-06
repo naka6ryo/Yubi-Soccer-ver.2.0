@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2324890408771182024}
   - component: {fileID: 4014506153473303064}
   - component: {fileID: 1677541855572997840}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Capsule
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -123,7 +123,7 @@ GameObject:
   - component: {fileID: 569121856484202705}
   - component: {fileID: 5974142199750279750}
   - component: {fileID: 1182831760752411901}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -159,12 +159,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0344aabda963d08438a614a22175027c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  rb: {fileID: 1182831760752411901}
+  climbBlockMask:
+    serializedVersion: 2
+    m_Bits: 1792
+  maxSlopeAngle: 50
+  frontCheckDistance: 0.8
+  verboseLog: 0
   moveSpeed: 3
   rotationSpeed: 120
   lerpRate: 10
   playerCamera: {fileID: 5114838246848122034}
+  kickController: {fileID: 0}
+  physicsKickOnly: 0
+  kickHitbox: {fileID: 0}
+  runSEInterval: 1
   joystick: {fileID: 0}
-  verboseLog: 0
 --- !u!114 &569121856484202705
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -236,7 +246,7 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
-  m_Constraints: 0
+  m_Constraints: 112
   m_CollisionDetection: 0
 --- !u!1 &8778997366463236887
 GameObject:
@@ -249,7 +259,7 @@ GameObject:
   - component: {fileID: 5860559450722647689}
   - component: {fileID: 5114838246848122034}
   - component: {fileID: 5609316346443623861}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: PlayerCamera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}

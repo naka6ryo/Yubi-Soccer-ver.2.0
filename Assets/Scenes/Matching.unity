@@ -2347,6 +2347,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PlanarHologram (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 3477599853816937883, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
+      propertyPath: m_Layer
+      value: 9
+      objectReference: {fileID: 0}
     - target: {fileID: 7418987878201782180, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
       propertyPath: m_Enabled
       value: 1
@@ -4117,6 +4121,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PlanarHologram
       objectReference: {fileID: 0}
+    - target: {fileID: 3477599853816937883, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
+      propertyPath: m_Layer
+      value: 9
+      objectReference: {fileID: 0}
     - target: {fileID: 5159516687054182295, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
       propertyPath: effectDuration
       value: 2
@@ -4921,6 +4929,10 @@ PrefabInstance:
     - target: {fileID: 3477599853816937883, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
       propertyPath: m_Name
       value: PlanarHologram (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3477599853816937883, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
+      propertyPath: m_Layer
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 7418987878201782180, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
       propertyPath: m_Enabled
@@ -6203,6 +6215,10 @@ PrefabInstance:
     - target: {fileID: 3477599853816937883, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
       propertyPath: m_Name
       value: PlanarHologram (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3477599853816937883, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
+      propertyPath: m_Layer
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 7418987878201782180, guid: 14ffc5bf5a6bb064cab5d48c41b7e841, type: 3}
       propertyPath: m_Enabled
