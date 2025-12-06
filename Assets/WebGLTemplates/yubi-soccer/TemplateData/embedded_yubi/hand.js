@@ -42,6 +42,15 @@ const CFG = {
     anyBendAngleRad: 2.65,
     anyBendMcpAngleRad: 2.65,
   },
+  render: {
+    overlayMaxFps: 24,
+    sceneMaxFps: 30,
+    drawLandmarks: true,
+    mobileDisableOverlay: false,
+    overlayDprCap: 1.5,
+    overlayMaxWidth: 1280,
+    overlayMaxHeight: 720,
+  },
 };
 
 
@@ -179,6 +188,9 @@ export class HandTracker {
     // 推論入力用のオフスクリーン Canvas
     this.procCanvas = document.createElement('canvas');
     this.procCtx = this.procCanvas.getContext('2d', { willReadFrequently: true });
+    if (this.procCtx && typeof this.procCtx.imageSmoothingEnabled === 'boolean') {
+      this.procCtx.imageSmoothingEnabled = false;
+    }
 
     // ジョイスティック機能を削除して片手検出に簡素化
     // Scene transform smoothing state
@@ -187,6 +199,23 @@ export class HandTracker {
     this.sceneSmoothFactor = 0.12;
     // Debug DOM element for CHARGE tuning (created lazily)
     this._dbgDiv = null;
+
+    this.renderCfg = {
+      overlayMaxFps: (CFG.render && CFG.render.overlayMaxFps) || 30,
+      sceneMaxFps: (CFG.render && CFG.render.sceneMaxFps) || 30,
+      drawLandmarks: CFG.render ? CFG.render.drawLandmarks !== false : true,
+      overlayDprCap: (CFG.render && CFG.render.overlayDprCap) || 2,
+      overlayMaxWidth: (CFG.render && CFG.render.overlayMaxWidth) || null,
+      overlayMaxHeight: (CFG.render && CFG.render.overlayMaxHeight) || null,
+      mobileDisableOverlay: !!(CFG.render && CFG.render.mobileDisableOverlay),
+    };
+    if (this.renderCfg.mobileDisableOverlay) {
+      this.renderCfg.drawLandmarks = false;
+    }
+    this._overlayIntervalMs = 1000 / Math.max(1, this.renderCfg.overlayMaxFps);
+    this._sceneIntervalMs = 1000 / Math.max(1, this.renderCfg.sceneMaxFps);
+    this._lastOverlayDraw = 0;
+    this._lastSceneUpdate = 0;
   }
 
   async init() {
@@ -202,11 +231,15 @@ export class HandTracker {
     for (const base of bases) {
       try {
         const filesetResolver = await FilesetResolver.forVisionTasks(base);
-        // モデルはローカル優先で候補を試す
+        // 軽量モデル（lite）を優先して候補に追加
         const modelCandidates = [
+          `${bases[0]}hand_landmarker_lite.task`,
+          `${base}hand_landmarker_lite.task`,
+          // 公式 GCS の lite モデル
+          'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/lite/1/hand_landmarker_lite.task',
+          // fallback: 通常モデル
           `${bases[0]}hand_landmarker.task`,
           `${base}hand_landmarker.task`,
-          // 公式 GCS の安定ミラー
           'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
         ];
         let modelPath = null;
@@ -262,53 +295,70 @@ export class HandTracker {
     this.lastTs = now;
     this.fps = lerp(this.fps || 30, 1 / Math.max(dt, 1e-3), 0.1);
 
-  const video = this.video;
-  const size = this.getInputSize();
+    const video = this.video;
+    const size = this.getInputSize();
     let lmResult = null;
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-      // オフスクリーン Canvas にダウンサンプリングして渡す
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const aspect = vw / vh;
-      let pw, ph;
-      if (aspect >= 1) { // 横長
-        pw = size; ph = Math.round(size / aspect);
-      } else { // 縦長
-        ph = size; pw = Math.round(size * aspect);
-      }
-      this.procCanvas.width = pw;
-      this.procCanvas.height = ph;
-      this.procCtx.drawImage(video, 0, 0, pw, ph);
-      // 検出はスロットルして実行。検出は遅延実行されるが、描画は直前の結果を使う。
-      const shouldDetect = (now - this.lastDetectTime) >= this.detectIntervalMs;
+      const detectIntervalMs = this._currentDetectIntervalMs();
+      const shouldDetect = (now - this.lastDetectTime) >= detectIntervalMs;
       if (shouldDetect) {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const aspect = vw / Math.max(1, vh);
+        let pw, ph;
+        if (aspect >= 1) {
+          pw = size;
+          ph = Math.max(1, Math.round(size / aspect));
+        } else {
+          ph = size;
+          pw = Math.max(1, Math.round(size * aspect));
+        }
+        if (this.procCanvas.width !== pw || this.procCanvas.height !== ph) {
+          this.procCanvas.width = pw;
+          this.procCanvas.height = ph;
+        }
+        if (this.procCtx) {
+          this.procCtx.drawImage(video, 0, 0, pw, ph);
+        }
         try {
           const res = await this.handLandmarker.detectForVideo(this.procCanvas, now);
           this.lastDetectTime = now;
           this.lastDetectResult = res;
           lmResult = res;
         } catch (e) {
-          // 検出失敗時は前回の結果を使用
           lmResult = this.lastDetectResult;
         }
       } else {
-        // スロットル中はキャッシュされた結果を使う
         lmResult = this.lastDetectResult;
       }
     }
 
     const canvas = this.overlay;
     const ctx = this.ctx;
-    // DPR 対応: 実描画サイズを CSS ピクセルに一致させる
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = canvas.clientWidth || window.innerWidth;
     const cssH = canvas.clientHeight || window.innerHeight;
-    if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
-      canvas.width = Math.floor(cssW * dpr);
-      canvas.height = Math.floor(cssH * dpr);
+    let overlayUpdated = false;
+    const shouldRenderOverlay = this.renderCfg.drawLandmarks && ctx && ((now - this._lastOverlayDraw) >= this._overlayIntervalMs);
+    if (shouldRenderOverlay) {
+      let dpr = Math.min(window.devicePixelRatio || 1, this.renderCfg.overlayDprCap || 2);
+      if (this.renderCfg.overlayMaxWidth) {
+        dpr = Math.min(dpr, this.renderCfg.overlayMaxWidth / Math.max(1, cssW));
+      }
+      if (this.renderCfg.overlayMaxHeight) {
+        dpr = Math.min(dpr, this.renderCfg.overlayMaxHeight / Math.max(1, cssH));
+      }
+      dpr = Math.max(0.5, dpr);
+      const targetW = Math.max(1, Math.floor(cssW * dpr));
+      const targetH = Math.max(1, Math.floor(cssH * dpr));
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      ctx.setTransform(targetW / Math.max(1, cssW), 0, 0, targetH / Math.max(1, cssH), 0, 0);
+      ctx.clearRect(0, 0, cssW, cssH);
+      overlayUpdated = true;
+      this._lastOverlayDraw = now;
     }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 以降は CSS ピクセル系で描く
-    ctx.clearRect(0, 0, cssW, cssH);
 
   let normalizedLandmarks = null;
   let isCharge = false;
@@ -318,8 +368,9 @@ export class HandTracker {
       normalizedLandmarks = hands[0];
       this.landmarksBuf.push({ t: now / 1000, lm: normalizedLandmarks });
       this.lastSeenTime = now / 1000;
-      // 2D 描画（片手のみ表示）
-      this.drawLandmarks(ctx, normalizedLandmarks, cssW, cssH, video.videoWidth, video.videoHeight);
+      if (overlayUpdated) {
+        this.drawLandmarks(ctx, normalizedLandmarks, cssW, cssH, video.videoWidth, video.videoHeight);
+      }
       // CHARGE 判定: 人差し指の PIP(6) を基準に MCP(5) と DIP(7) との角度を測る
       // さらに中指(PIP 10, MCP 9, DIP 11) も同様に CHARGE として扱う
       try {
@@ -490,13 +541,17 @@ export class HandTracker {
   this.actionState.chargePending = !!(this.chargePending && nowSecFloat <= this.chargePendingUntil);
 
   this.onResult && this.onResult({ fps: this.fps, state: this.state, confidence: this.stateConf, charge: isCharge, actionState: this.actionState });
-  // デバッグ HUD 表示 (DOM 側へ移動)。
-  this.drawHUD(this.ctx, this.overlay, this.fps, !!normalizedLandmarks, isCharge);
+  if (overlayUpdated) {
+    this.drawHUD(this.ctx, this.overlay, this.fps, !!normalizedLandmarks, isCharge);
+  }
 
-  // update scene transform to center/zoom on the hand (gentler tuning)
-  try {
-    this.updateSceneTransform(normalizedLandmarks);
-  } catch (e) { /* ignore */ }
+  const shouldUpdateScene = (now - this._lastSceneUpdate) >= this._sceneIntervalMs;
+  if (shouldUpdateScene) {
+    this._lastSceneUpdate = now;
+    try {
+      this.updateSceneTransform(normalizedLandmarks);
+    } catch (e) { /* ignore */ }
+  }
 
     // 次フレーム
     requestAnimationFrame(() => this.processLoop());
@@ -597,6 +652,15 @@ export class HandTracker {
       y: y,
       z: z,
     }));
+  }
+
+  _currentDetectIntervalMs() {
+    const base = this.detectIntervalMs;
+    const fps = this.fps || 30;
+    if (fps < 18) return base * 3;
+    if (fps < 24) return base * 2;
+    if (fps < 28) return base * 1.5;
+    return base;
   }
 
   drawLandmarks(ctx, lm, cssW, cssH, videoW, videoH) {
