@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3282613341646594428}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: BaseCharacter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -46,7 +46,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 647510253368560022}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: SoccerPlayerBlue
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -80,7 +80,7 @@ GameObject:
   - component: {fileID: 8831988263516116894}
   - component: {fileID: 835262575217595144}
   - component: {fileID: 8263082674207493782}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Shirt
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -168,7 +168,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7328399724059777450}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Specifics
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -204,7 +204,7 @@ GameObject:
   - component: {fileID: 3581954071610810340}
   - component: {fileID: 8651936709401643721}
   - component: {fileID: 9051571349457588564}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: RightEye
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -291,7 +291,7 @@ GameObject:
   - component: {fileID: 3757615934555054790}
   - component: {fileID: 6767614647342951937}
   - component: {fileID: 5189142027513532137}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Body
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -400,7 +400,7 @@ GameObject:
   - component: {fileID: 731063526048545585}
   - component: {fileID: 7329402329413293}
   - component: {fileID: 6220865785656560176}
-  m_Layer: 5
+  m_Layer: 10
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -476,7 +476,7 @@ GameObject:
   - component: {fileID: 1374891331774193951}
   - component: {fileID: 8427056883420332605}
   - component: {fileID: 8601067060079366037}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Lower Shirt
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -562,7 +562,7 @@ GameObject:
   - component: {fileID: 3497755254143583922}
   - component: {fileID: 5684317872326203342}
   - component: {fileID: 1212169577503160995}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: LeftEye
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -647,7 +647,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4834714242569153614}
   - component: {fileID: 2562422136903061935}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: TeamLogo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -735,7 +735,7 @@ GameObject:
   - component: {fileID: 1923074665994811407}
   - component: {fileID: 7573115001243168712}
   - component: {fileID: 2992439048024515609}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Shirt Hem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -822,7 +822,7 @@ GameObject:
   - component: {fileID: 6778632355898361708}
   - component: {fileID: 6778632355898361711}
   - component: {fileID: 6778632355898361710}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: LeftArm
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -932,7 +932,7 @@ GameObject:
   - component: {fileID: 6778632355985981363}
   - component: {fileID: 6778632355985981375}
   - component: {fileID: 6778632355985981360}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Number
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1109,7 +1109,7 @@ GameObject:
   - component: {fileID: 6778632356272795209}
   - component: {fileID: 6778632356272795208}
   - component: {fileID: 6778632356272795211}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: RightArm
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1220,7 +1220,7 @@ GameObject:
   - component: {fileID: 6778632356284121382}
   - component: {fileID: 6778632356284121401}
   - component: {fileID: 6778632356284121400}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: RightSleeve
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1328,7 +1328,7 @@ GameObject:
   - component: {fileID: 6778632357326896046}
   - component: {fileID: 6778632357326896033}
   - component: {fileID: 6778632357326896032}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: LeftSleeve
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1435,7 +1435,7 @@ GameObject:
   - component: {fileID: 3373172530941941410}
   - component: {fileID: 2979182796363837524}
   - component: {fileID: 6703737537785803219}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Hair
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1521,7 +1521,7 @@ GameObject:
   - component: {fileID: 4900034382189729284}
   - component: {fileID: 4455447175045405532}
   - component: {fileID: 5331961707118507314}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Shorts
   m_TagString: Untagged
   m_Icon: {fileID: 0}
