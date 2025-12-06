@@ -369,7 +369,6 @@ namespace YubiSoccer.Environment
                 if (rb != null) ball = rb.transform; else ball = other.transform;
             }
             Shatter(transform.position);
-            PlayConfetti();
         }
 
         private void Shatter(Vector3 explosionCenter)
