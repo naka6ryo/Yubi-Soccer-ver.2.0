@@ -1,5 +1,5 @@
-using System.Linq;
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Ensure there is always exactly one enabled AudioListener in the scene.
@@ -31,6 +31,7 @@ public class AudioListenerManager : MonoBehaviour
     }
 
     private AudioListener activeListener;
+    private readonly List<AudioListener> _enabledListeners = new List<AudioListener>();
 
     void Awake()
     {
@@ -63,7 +64,16 @@ public class AudioListenerManager : MonoBehaviour
             // Non-owner: ensure this one is disabled
             listener.enabled = false;
             // If there is no enabled listener anywhere, try to enable one (prefer main camera child's listener)
-            if (!all.Any(x => x.enabled))
+            bool anyEnabled = false;
+            foreach (var al in all)
+            {
+                if (al.enabled)
+                {
+                    anyEnabled = true;
+                    break;
+                }
+            }
+            if (!anyEnabled)
             {
                 EnsureFallbackEnabled(all);
             }
@@ -75,7 +85,7 @@ public class AudioListenerManager : MonoBehaviour
     /// </summary>
     public void ReconcileListeners()
     {
-        var all = FindObjectsOfType<AudioListener>(true);
+        var all = FindObjectsOfType<AudioListener>(true); // 一度だけ取得
         if (all == null || all.Length == 0)
         {
             // create fallback on main camera or a new gameobject
@@ -84,11 +94,32 @@ public class AudioListenerManager : MonoBehaviour
         }
 
         // If more than one enabled, disable all but one (prefer Camera.main)
-        var enabled = all.Where(x => x.enabled).ToArray();
-        if (enabled.Length > 1)
+        _enabledListeners.Clear();
+        foreach (var listener in all)
         {
-            AudioListener prefer = enabled.FirstOrDefault(x => x.gameObject.GetComponent<Camera>() == Camera.main) ?? enabled[0];
-            foreach (var al in enabled)
+            if (listener.enabled)
+            {
+                _enabledListeners.Add(listener);
+            }
+        }
+
+        if (_enabledListeners.Count > 1)
+        {
+            AudioListener prefer = null;
+            foreach (var listener in _enabledListeners)
+            {
+                if (listener.gameObject.GetComponent<Camera>() == Camera.main)
+                {
+                    prefer = listener;
+                    break;
+                }
+            }
+            if (prefer == null)
+            {
+                prefer = _enabledListeners[0];
+            }
+
+            foreach (var al in _enabledListeners)
             {
                 al.enabled = (al == prefer);
             }
@@ -97,17 +128,17 @@ public class AudioListenerManager : MonoBehaviour
         }
 
         // If none enabled, enable a preferred one
-        if (enabled.Length == 0)
+        if (_enabledListeners.Count == 0)
         {
-            EnsureFallbackEnabled(all);
+            EnsureFallbackEnabled(all); // キャッシュされたallを渡す
             return;
         }
 
         // Exactly one enabled
-        activeListener = enabled[0];
+        activeListener = _enabledListeners[0];
     }
 
-    private void EnsureFallbackEnabled(AudioListener[] all)
+    private void EnsureFallbackEnabled(AudioListener[] all) // allを引数として受け取る
     {
         // Prefer listener on Camera.main
         if (Camera.main != null)

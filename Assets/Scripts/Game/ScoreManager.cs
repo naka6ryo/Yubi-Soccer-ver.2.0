@@ -171,7 +171,7 @@ namespace YubiSoccer.Game
             if (soundManager == null) soundManager = SoundManager.Instance;
             if (soundManager != null)
             {
-                try { soundManager.PlaySE("スコア増加"); } catch { }
+                soundManager.PlaySE("スコア増加");
             }
 
             // 点滅演出

@@ -37,6 +37,7 @@ namespace YubiSoccer.Player
         Coroutine _routine;
         bool _charging;
         float _chargeT; // 0..1
+        private WaitForSeconds _tapHoldWFS; // キャッシュ用
 
         void Awake()
         {
@@ -49,6 +50,7 @@ namespace YubiSoccer.Player
             {
                 targetCollider.isTrigger = false;
             }
+            _tapHoldWFS = new WaitForSeconds(tapHoldTime);
         }
 
         void CacheBaseSize()
@@ -103,7 +105,7 @@ namespace YubiSoccer.Player
             // 拡大
             yield return ScaleTo(tapScale, tapExpandTime);
             // ホールド
-            if (tapHoldTime > 0f) yield return new WaitForSeconds(tapHoldTime);
+            if (tapHoldTime > 0f) yield return _tapHoldWFS;
             // 縮小
             yield return ScaleTo(1f, tapShrinkTime);
             _routine = null;

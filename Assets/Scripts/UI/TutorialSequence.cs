@@ -75,6 +75,8 @@ namespace YubiSoccer.UI
         private int currentIndex = -1;
         private bool isOpen = false;
         private UnityEngine.Events.UnityAction missionOpenAction;
+        private CanvasGroup mpCg; // Cached CanvasGroup for missionPanel
+        private Canvas mpCanvas; // Cached Canvas for missionPanel
 
         private void Awake()
         {
@@ -107,6 +109,15 @@ namespace YubiSoccer.UI
                 canvasGroup.alpha = 0f;
                 canvasGroup.interactable = false;
                 canvasGroup.blocksRaycasts = false;
+            }
+
+            // Cache missionPanel components
+            if (missionPanel != null)
+            {
+                mpCg = missionPanel.GetComponent<CanvasGroup>();
+                if (mpCg == null) mpCg = missionPanel.AddComponent<CanvasGroup>();
+                mpCanvas = missionPanel.GetComponent<Canvas>();
+                if (mpCanvas == null) mpCanvas = missionPanel.AddComponent<Canvas>();
             }
 
             // Initialize video UI if assigned
@@ -271,32 +282,30 @@ namespace YubiSoccer.UI
                 // Show mission panel if configured
                 if (showMissionOnClose && missionPanel != null)
                 {
-                    try
+                    // If missionPanel is a child of the fading CanvasGroup, move it out so parent alpha doesn't hide it
+                    if (canvasGroup != null && missionPanel.transform.IsChildOf(canvasGroup.transform))
                     {
-                        // If missionPanel is a child of the fading CanvasGroup, move it out so parent alpha doesn't hide it
-                        if (canvasGroup != null && missionPanel.transform.IsChildOf(canvasGroup.transform))
-                        {
-                            var newParent = canvasGroup.transform.parent;
-                            missionPanel.transform.SetParent(newParent, false);
-                        }
+                        var newParent = canvasGroup.transform.parent;
+                        missionPanel.transform.SetParent(newParent, false);
+                    }
 
-                        // Ensure missionPanel has its own CanvasGroup visible
-                        var mpCg = missionPanel.GetComponent<CanvasGroup>();
-                        if (mpCg == null) mpCg = missionPanel.AddComponent<CanvasGroup>();
+                    // Ensure missionPanel has its own CanvasGroup visible
+                    if (mpCg != null)
+                    {
                         mpCg.alpha = 1f;
                         mpCg.interactable = true;
                         mpCg.blocksRaycasts = true;
+                    }
 
-                        // If missionPanel has a Canvas, bring it to front by increasing sorting order
-                        var mpCanvas = missionPanel.GetComponent<Canvas>();
-                        if (mpCanvas == null) mpCanvas = missionPanel.AddComponent<Canvas>();
+                    // If missionPanel has a Canvas, bring it to front by increasing sorting order
+                    if (mpCanvas != null)
+                    {
                         mpCanvas.overrideSorting = true;
                         mpCanvas.sortingOrder = 1000;
-
-                        Debug.Log($"TutorialSequence: Attempting to activate missionPanel='{GetGameObjectPath(missionPanel)}' (activeInHierarchy={missionPanel.activeInHierarchy})");
-                        missionPanel.SetActive(true);
                     }
-                    catch { missionPanel.SetActive(true); }
+
+                    Debug.Log($"TutorialSequence: Attempting to activate missionPanel='{GetGameObjectPath(missionPanel)}' (activeInHierarchy={missionPanel.activeInHierarchy})");
+                    missionPanel.SetActive(true);
                 }
             }
         }
@@ -335,26 +344,24 @@ namespace YubiSoccer.UI
             // Show mission panel if configured
             if (showMissionOnClose && missionPanel != null)
             {
-                try
+                if (canvasGroup != null && missionPanel.transform.IsChildOf(canvasGroup.transform))
                 {
-                    if (canvasGroup != null && missionPanel.transform.IsChildOf(canvasGroup.transform))
-                    {
-                        var newParent = canvasGroup.transform.parent;
-                        missionPanel.transform.SetParent(newParent, false);
-                    }
-                    var mpCg = missionPanel.GetComponent<CanvasGroup>();
-                    if (mpCg == null) mpCg = missionPanel.AddComponent<CanvasGroup>();
+                    var newParent = canvasGroup.transform.parent;
+                    missionPanel.transform.SetParent(newParent, false);
+                }
+                if (mpCg != null)
+                {
                     mpCg.alpha = 1f;
                     mpCg.interactable = true;
                     mpCg.blocksRaycasts = true;
-                    var mpCanvas = missionPanel.GetComponent<Canvas>();
-                    if (mpCanvas == null) mpCanvas = missionPanel.AddComponent<Canvas>();
+                }
+                if (mpCanvas != null)
+                {
                     mpCanvas.overrideSorting = true;
                     mpCanvas.sortingOrder = 1000;
-                    Debug.Log($"TutorialSequence: Attempting to activate missionPanel='{GetGameObjectPath(missionPanel)}' (activeInHierarchy={missionPanel.activeInHierarchy})");
-                    missionPanel.SetActive(true);
                 }
-                catch { missionPanel.SetActive(true); }
+                Debug.Log($"TutorialSequence: Attempting to activate missionPanel='{GetGameObjectPath(missionPanel)}' (activeInHierarchy={missionPanel.activeInHierarchy})");
+                missionPanel.SetActive(true);
             }
         }
 
