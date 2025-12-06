@@ -4619,6 +4619,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2311640576533437947, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
     - target: {fileID: 2330167771701634547, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
+      propertyPath: blueGoalParticle
+      value: 
+      objectReference: {fileID: 1634839890}
+    - target: {fileID: 2330167771701634547, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
       propertyPath: usePlaneDistance
       value: 1
       objectReference: {fileID: 0}
@@ -4693,6 +4697,17 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 2622047773225124214, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
   m_PrefabInstance: {fileID: 1634839887}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1634839890 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2667643766096201603, guid: 27d0fe4ef74db3242a0bc6ba38cfd4e2, type: 3}
+  m_PrefabInstance: {fileID: 1634839887}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bf8a4e2b073aff408f8136d9da6ca09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1654448257
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5782,9 +5797,17 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 0}
     - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+      propertyPath: redGoalParticle
+      value: 
+      objectReference: {fileID: 1955321140}
+    - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
       propertyPath: shatteredPrefab
       value: 
       objectReference: {fileID: 2311640576533437947, guid: a4bd35b20df96be458966adb4fbc5fc0, type: 3}
+    - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+      propertyPath: blueGoalParticle
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 561848787523684693, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
       propertyPath: usePlaneDistance
       value: 1
@@ -5868,6 +5891,17 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 2901953162269795398, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
   m_PrefabInstance: {fileID: 1955321137}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1955321140 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 120290270443208822, guid: d47f7e0a20237e8449457a023156d50f, type: 3}
+  m_PrefabInstance: {fileID: 1955321137}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bf8a4e2b073aff408f8136d9da6ca09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1979192689
 GameObject:
   m_ObjectHideFlags: 0

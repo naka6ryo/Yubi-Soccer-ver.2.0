@@ -26,6 +26,7 @@ namespace YubiSoccer.Field
         private bool armed = true;
 
         private SoundManager soundManager;
+        public Team AwardToTeam => awardToTeam;
 
         private void Reset()
         {
