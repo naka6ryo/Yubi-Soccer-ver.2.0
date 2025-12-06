@@ -426,6 +426,15 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
 
     void HandleInput()
     {
+        if (!inputEnabled)
+        {
+            // 入力無効時は移動を停止
+            bufferedForward = 0f;
+            bufferedTurn = 0f;
+            isMoving = false;
+            return;
+        }
+
         float forward = 0f;
         if (Input.GetKey(KeyCode.W)) forward = 1f;
 
@@ -548,4 +557,17 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         var pv = c.GetComponentInParent<PhotonView>();
         return pv != null && pv == photonView;
     }
+
+    /// <summary>
+    /// 外部からプレイヤーの操作（移動・回転）を有効/無効にする
+    /// </summary>
+    public void SetInputEnabled(bool enabled)
+    {
+        // ここではフラグ管理を追加せず、単純にコンポーネントの有効無効で制御するか、
+        // あるいは専用のフラグを設けるのが安全です。
+        // 今回はシンプルに enabled プロパティで制御すると PhotonView の同期まで止まる可能性があるため、
+        // 入力処理を行う Update/FixedUpdate 内でチェックするフラグを追加します。
+        inputEnabled = enabled;
+    }
+    private bool inputEnabled = true; // デフォルトは有効
 }
