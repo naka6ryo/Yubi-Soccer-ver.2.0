@@ -230,38 +230,24 @@ public class PlayerCreator : MonoBehaviourPunCallbacks
         }
 
         // 既存の AudioListener を確認
-        var existingListener = targetObject.GetComponent<AudioListener>();
-        if (existingListener != null)
+        var listener = targetObject.GetComponent<AudioListener>();
+        if (listener == null)
         {
-            // 既に存在する場合は有効化のみ
-            existingListener.enabled = true;
-            Debug.Log($"[PlayerCreator] AudioListener already exists on {targetObject.name} - enabled it");
-        }
-        else
-        {
-            // 存在しない場合は追加
-            var listener = targetObject.AddComponent<AudioListener>();
-            listener.enabled = true;
+            listener = targetObject.AddComponent<AudioListener>();
             Debug.Log($"[PlayerCreator] Added AudioListener to {targetObject.name}");
         }
 
-        // シーン内の他の AudioListener を無効化（安全のため）
-        DisableOtherAudioListeners(targetObject);
-    }
-
-    /// <summary>
-    /// シーン内の他の AudioListener を無効化する（複数存在を防ぐ）
-    /// </summary>
-    void DisableOtherAudioListeners(GameObject excludeTarget)
-    {
-        var allListeners = FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
-        foreach (var listener in allListeners)
+        // AudioListenerManager に登録して管理を一任する
+        if (AudioListenerManager.Instance != null)
         {
-            if (listener.gameObject != excludeTarget)
-            {
-                listener.enabled = false;
-                Debug.Log($"[PlayerCreator] Disabled AudioListener on {listener.gameObject.name}");
-            }
+            AudioListenerManager.Instance.RegisterLocalListener(listener, true);
+            Debug.Log($"[PlayerCreator] Registered AudioListener on {targetObject.name} to AudioListenerManager.");
+        }
+        else
+        {
+            // フォールバック: Manager が見つからない場合は従来通り手動で有効化
+            listener.enabled = true;
+            Debug.LogWarning("[PlayerCreator] AudioListenerManager not found. Manually enabled listener.");
         }
     }
 
