@@ -40,7 +40,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
             // 自分の読み込み完了をルームのプレイヤープロパティに設定
             var props = new ExitGames.Client.Photon.Hashtable { { PROP_PLAYER_LOADED, true } };
             PhotonNetwork.LocalPlayer.SetCustomProperties(props);
-            Debug.Log("[GameStartCoordinator] Set playerLoaded=true");
+            // Debug.Log("[GameStartCoordinator] Set playerLoaded=true");
 
             // マスターは即チェック（既に全員揃っている可能性がある）
             if (PhotonNetwork.IsMasterClient)
@@ -65,7 +65,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
     private void ResetAllPlayerProperties()
     {
         if (!PhotonNetwork.IsMasterClient) return;
-        Debug.Log("[GameStartCoordinator] Resetting all player properties");
+        // Debug.Log("[GameStartCoordinator] Resetting all player properties");
         foreach (var player in PhotonNetwork.PlayerList)
         {
             var clearProps = new Hashtable { { PROP_PLAYER_LOADED, null } };
@@ -79,7 +79,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
     private void ResetRoomProperties()
     {
         if (!PhotonNetwork.IsMasterClient) return;
-        Debug.Log("[GameStartCoordinator] Resetting room properties");
+        // Debug.Log("[GameStartCoordinator] Resetting room properties");
         var clearProps = new Hashtable { { PROP_COUNTDOWN_START, null } };
         PhotonNetwork.CurrentRoom.SetCustomProperties(clearProps);
     }
@@ -89,7 +89,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         if (!PhotonNetwork.IsMasterClient) return;
         if (changedProps.ContainsKey(PROP_PLAYER_LOADED))
         {
-            Debug.Log($"[GameStartCoordinator] PlayerPropertiesUpdate: {targetPlayer.NickName} loaded={changedProps[PROP_PLAYER_LOADED]}");
+            // Debug.Log($"[GameStartCoordinator] PlayerPropertiesUpdate: {targetPlayer.NickName} loaded={changedProps[PROP_PLAYER_LOADED]}");
             CheckAllPlayersLoadedAndStart();
         }
     }
@@ -99,7 +99,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         // 全クライアントがルームプロパティ更新を受け取る
         if (propertiesThatChanged.ContainsKey(PROP_COUNTDOWN_START))
         {
-            Debug.Log("[GameStartCoordinator] OnRoomPropertiesUpdate: countdown start detected");
+            // Debug.Log("[GameStartCoordinator] OnRoomPropertiesUpdate: countdown start detected");
             CheckCountdownStart();
         }
     }
@@ -112,7 +112,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
         // 既にカウントダウン開始済みならスキップ（二重実行防止）
         if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(PROP_COUNTDOWN_START))
         {
-            Debug.Log("[GameStartCoordinator] Countdown already started - skipping");
+            // Debug.Log("[GameStartCoordinator] Countdown already started - skipping");
             return;
         }
 
@@ -121,12 +121,12 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
             object v;
             if (!p.CustomProperties.TryGetValue(PROP_PLAYER_LOADED, out v) || !(v is bool) || !(bool)v)
             {
-                Debug.Log($"[GameStartCoordinator] Player not ready yet: {p.NickName}");
+                // Debug.Log($"[GameStartCoordinator] Player not ready yet: {p.NickName}");
                 return;
             }
         }
 
-        Debug.Log("[GameStartCoordinator] All players loaded -> starting networked countdown");
+        // Debug.Log("[GameStartCoordinator] All players loaded -> starting networked countdown");
 
         // マスターが未来のサーバ時刻（現在 + 猶予時間）をカウント開始時刻として設定
         int startTimeMs = PhotonNetwork.ServerTimestamp + Mathf.RoundToInt(countdownStartDelay * 1000f);
@@ -135,7 +135,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
             { PROP_COUNTDOWN_START, startTimeMs }
         };
         PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
-        Debug.Log($"[GameStartCoordinator] Master set countdown start time: {startTimeMs} (ServerNow={PhotonNetwork.ServerTimestamp}, Delay={countdownStartDelay}s)");
+        // Debug.Log($"[GameStartCoordinator] Master set countdown start time: {startTimeMs} (ServerNow={PhotonNetwork.ServerTimestamp}, Delay={countdownStartDelay}s)");
     }
 
     /// <summary>
@@ -153,7 +153,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
             int nowMs = PhotonNetwork.ServerTimestamp;
             int remainMs = startTimeMs - nowMs;
 
-            Debug.Log($"[GameStartCoordinator] Countdown start property detected: startTime={startTimeMs} now={nowMs} remain={remainMs}ms");
+            // Debug.Log($"[GameStartCoordinator] Countdown start property detected: startTime={startTimeMs} now={nowMs} remain={remainMs}ms");
 
             if (remainMs <= 0)
             {
@@ -164,7 +164,7 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
                 }
                 
                 // 既に開始時刻を過ぎている → 即座に開始
-                Debug.Log("[GameStartCoordinator] Start time already passed - starting immediately");
+                // Debug.Log("[GameStartCoordinator] Start time already passed - starting immediately");
                 if (countDown != null) countDown.Play();
                 else Debug.LogWarning("[GameStartCoordinator] CountdownUI が割り当てられていません。");
             }
@@ -178,13 +178,13 @@ public class GameStartCoordinator : MonoBehaviourPunCallbacks
 
     private IEnumerator CoWaitAndStartCountdown(float waitSeconds)
     {
-        Debug.Log($"[GameStartCoordinator] Waiting {waitSeconds:F2}s before starting countdown UI");
+        // Debug.Log($"[GameStartCoordinator] Waiting {waitSeconds:F2}s before starting countdown UI");
         yield return new WaitForSecondsRealtime(waitSeconds);
         
         // 待機中に切断された場合のガード
         if (this == null) yield break;
 
-        Debug.Log("[GameStartCoordinator] Starting countdown UI now (synchronized)");
+        // Debug.Log("[GameStartCoordinator] Starting countdown UI now (synchronized)");
         if (countDown != null)
         {
             countDown.Play();

@@ -85,7 +85,7 @@ namespace YubiSoccer.Utilities
         /// </summary>
         private void DisableKinematicOnSceneBalls()
         {
-            Debug.Log("[SpawnController] PlayerCamera activated — disabling kinematic on soccer ball(s)");
+            // Debug.Log("[SpawnController] PlayerCamera activated — disabling kinematic on soccer ball(s)");
             var handled = false;
 
             // Try common tags first
@@ -160,12 +160,12 @@ namespace YubiSoccer.Utilities
                     rb.isKinematic = false;
                     rb.useGravity = true;
                     rb.WakeUp();
-                    Debug.Log($"[SpawnController] Disabled kinematic on: {go.name}");
+                    // Debug.Log($"[SpawnController] Disabled kinematic on: {go.name}");
                 }
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning("[SpawnController] Failed to disable kinematic on " + go.name + ": " + ex);
+                // Debug.LogWarning("[SpawnController] Failed to disable kinematic on " + go.name + ": " + ex);
             }
         }
     }

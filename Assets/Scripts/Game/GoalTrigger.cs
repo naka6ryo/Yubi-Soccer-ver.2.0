@@ -77,17 +77,17 @@ namespace YubiSoccer.Field
 
             // ゴールイベント通知（スコア加算前に通知して、UIアニメーションを先に開始）
             OnGoalScored?.Invoke(awardToTeam);
+
+            // SE再生は ScoreManager 側で全員に対して行われるため、ここでは削除
             // soundManager.PlaySE("ゴール");
-            soundManager.PlaySE("ゴール");
-            // サウンドマネージャーの音量を上げる
-            soundManager.SetSEVolume(10.0f);
-            soundManager.PlaySE("歓声01");
-            soundManager.PlaySE("歓声02");
-            soundManager.SetSEVolume(1.0f);
+            // soundManager.SetSEVolume(10.0f);
+            // soundManager.PlaySE("歓声01");
+            // soundManager.PlaySE("歓声02");
+            // soundManager.SetSEVolume(1.0f);
 
             if (soundManager != null)
             {
-                UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール");
+                // UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール"); // ログも抑制
             }
             else
             {
