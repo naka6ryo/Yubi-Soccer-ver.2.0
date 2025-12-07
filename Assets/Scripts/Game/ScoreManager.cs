@@ -171,7 +171,14 @@ namespace YubiSoccer.Game
             if (soundManager == null) soundManager = SoundManager.Instance;
             if (soundManager != null)
             {
-                soundManager.PlaySE("スコア増加");
+                // soundManager.PlaySE("スコア増加"); // 削除
+                
+                // ゴール歓声を再生
+                soundManager.PlaySE("ゴール");
+                soundManager.SetSEVolume(10.0f);
+                soundManager.PlaySE("歓声01");
+                soundManager.PlaySE("歓声02");
+                soundManager.SetSEVolume(1.0f);
             }
 
             // 点滅演出
