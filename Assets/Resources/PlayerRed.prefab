@@ -547,7 +547,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chargeLoopClip: {fileID: 8300000, guid: 1e1ff5cd2fb4f7740a45e7373e15b852, type: 3}
   kickClip: {fileID: 8300000, guid: 71a5ed5a738fe8045af2d0d98e9fbcf3, type: 3}
-  remoteMaxVolume: 0.7
+  remoteMaxVolume: 0.8
   localChargeVolume: 1
   minDistance: 1
   maxDistance: 12
