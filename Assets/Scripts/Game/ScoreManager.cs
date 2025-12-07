@@ -111,6 +111,29 @@ namespace YubiSoccer.Game
             }
         }
 
+        /// <summary>
+        /// オフライン/チュートリアル用にローカルでスコアを加算する。
+        /// Photon に接続していない場合でも Score UI を更新できるようにする。
+        /// </summary>
+        public void AddScoreLocal(Team team, int delta = 1)
+        {
+            delta = Mathf.Max(0, delta);
+            if (delta == 0) return;
+
+            if (team == Team.TeamA)
+            {
+                teamAScore += delta;
+                OnScoreChanged?.Invoke(Team.TeamA, teamAScore);
+                HandleScoreUpdateEffect(Team.TeamA);
+            }
+            else
+            {
+                teamBScore += delta;
+                OnScoreChanged?.Invoke(Team.TeamB, teamBScore);
+                HandleScoreUpdateEffect(Team.TeamB);
+            }
+        }
+
         public int GetScore(Team team)
         {
             return team == Team.TeamA ? teamAScore : teamBScore;

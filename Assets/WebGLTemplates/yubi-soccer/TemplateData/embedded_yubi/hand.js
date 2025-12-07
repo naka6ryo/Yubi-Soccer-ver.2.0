@@ -697,11 +697,8 @@ export class HandTracker {
     }
     ctx.stroke();
 
-    for (const p of screen) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 点（関節）の個別描画は負荷になるため省略する
+    // 必要なら指先等ごく一部だけ描くように最適化してください。
     // No hand の簡易表示
     if (this.noHandCount > 15) {
       ctx.fillStyle = 'rgba(255,255,255,0.9)';

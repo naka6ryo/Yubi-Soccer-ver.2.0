@@ -60,20 +60,31 @@ namespace YubiSoccer.Game
             TryCaptureSceneDefaultBall();
         }
 
-        void Start()
+        protected virtual void Start()
         {
             soundManager = SoundManager.Instance;
+            SubscribeGoalEvents();
+            EnsureInitialBallRegistration();
+        }
+
+        protected virtual void OnDestroy()
+        {
+            UnsubscribeGoalEvents();
+        }
+
+        protected virtual void SubscribeGoalEvents()
+        {
             if (ScoreManager.Instance != null)
             {
                 ScoreManager.Instance.OnScoreChanged += HandleScoreChanged;
             }
             else
             {
-                Debug.LogWarning("[GoalResetManager] ScoreManager instance not found in Start.");
+                Debug.LogWarning("[GoalResetManager] ScoreManager instance not found when subscribing to goal events.");
             }
         }
 
-        private void OnDestroy()
+        protected virtual void UnsubscribeGoalEvents()
         {
             if (ScoreManager.Instance != null)
             {
@@ -81,9 +92,17 @@ namespace YubiSoccer.Game
             }
         }
 
-        private void HandleScoreChanged(Team team, int score)
+        protected virtual void HandleScoreChanged(Team team, int score)
         {
-            HandleGoal(team);
+            TriggerGoalReset(team);
+        }
+
+        private void EnsureInitialBallRegistration()
+        {
+            if (ballRigidbody != null && !initialPositionSet)
+            {
+                RegisterBall(ballRigidbody);
+            }
         }
 
         /// <summary>
@@ -181,7 +200,7 @@ namespace YubiSoccer.Game
             return false;
         }
 
-        private void HandleGoal(Team scoredFor)
+        protected void TriggerGoalReset(Team scoredFor)
         {
             StopAllCoroutines();
 
@@ -258,12 +277,11 @@ namespace YubiSoccer.Game
         /// </summary>
         private void ResetBall()
         {
-            if (ballRigidbody == null)
+            if ((ballRigidbody == null || !initialPositionSet) && !TryFindAndRegisterBall())
             {
-                Debug.LogError("[GoalResetManager] ballRigidbody is null! Cannot reset ball.");
+                Debug.LogError("[GoalResetManager] Cannot resolve ball for reset.");
                 return;
             }
-
 
             // 速度をゼロにする
             ballRigidbody.linearVelocity = Vector3.zero;
@@ -275,6 +293,78 @@ namespace YubiSoccer.Game
 
             // 位置・回転を初期値に戻す（PhotonTransformView/BallNetworkSync があれば自動で同期される）
             ballRigidbody.transform.SetPositionAndRotation(initialPos, initialRot);
+        }
+
+        private bool TryFindAndRegisterBall()
+        {
+            Rigidbody found = null;
+
+            var ballSync = FindObjectOfType<YubiSoccer.Network.BallNetworkSync>(true);
+            if (ballSync != null)
+            {
+                found = ballSync.GetComponent<Rigidbody>();
+            }
+
+            if (found == null)
+            {
+                string[] tagsToTry = new[] { "Ball", "SoccerBall" };
+                for (int i = 0; i < tagsToTry.Length && found == null; i++)
+                {
+                    var tag = tagsToTry[i];
+                    if (string.IsNullOrEmpty(tag)) continue;
+                    try
+                    {
+                        var gos = GameObject.FindGameObjectsWithTag(tag);
+                        if (gos == null) continue;
+                        for (int g = 0; g < gos.Length; g++)
+                        {
+                            var go = gos[g];
+                            if (go == null) continue;
+                            var rb = go.GetComponent<Rigidbody>();
+                            if (rb != null)
+                            {
+                                found = rb;
+                                break;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // 無効タグは無視
+                    }
+                }
+            }
+
+            if (found == null)
+            {
+                var allRbs = Object.FindObjectsOfType<Rigidbody>(true);
+                float bestScore = float.MinValue;
+                for (int i = 0; i < allRbs.Length; i++)
+                {
+                    var rb = allRbs[i];
+                    if (rb == null) continue;
+                    float score = 0f;
+                    var name = rb.gameObject.name.ToLowerInvariant();
+                    if (name.Contains("ball")) score += 10f;
+                    var sc = rb.GetComponent<Collider>();
+                    if (sc is SphereCollider) score += 5f;
+                    if (!rb.isKinematic) score += 2f;
+                    if (rb.mass > 0.1f && rb.mass < 50f) score += 1f;
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        found = rb;
+                    }
+                }
+            }
+
+            if (found == null)
+            {
+                return false;
+            }
+
+            RegisterBall(found);
+            return initialPositionSet;
         }
 
         private void ResetExistingGlasses()

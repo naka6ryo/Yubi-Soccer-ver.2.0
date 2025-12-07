@@ -226,7 +226,12 @@
           if (!isSecureOrLocalhost()) {
             throw new Error('このページは HTTPS で提供されていないため、カメラにアクセスできません。公開URL(HTTPS)で開いてください。');
           }
-          const constraints = deviceId ? { video: { deviceId: { exact: deviceId } }, audio: false } : { video: { facingMode: 'user' }, audio: false };
+          // Force camera capture to target 30 FPS to reduce CPU/GPU load on overlay and processing.
+          // Use ideal/max frameRate so browsers that don't support exact will fallback gracefully.
+          const videoConstraints = deviceId
+            ? { deviceId: { exact: deviceId }, frameRate: { ideal: 30, max: 30 } }
+            : { facingMode: 'user', frameRate: { ideal: 30, max: 30 } };
+          const constraints = { video: videoConstraints, audio: false };
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
           video.srcObject = stream;
           await video.play();

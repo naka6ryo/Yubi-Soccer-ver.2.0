@@ -373,15 +373,58 @@ namespace YubiSoccer.Environment
 
         private void Shatter(Vector3 explosionCenter)
         {
+            if (shattered) return;
             shattered = true;
+
             // 見た目を消す
-            foreach (var r in renderers)
+            if (renderers != null)
             {
-                if (r != null) r.enabled = false;
+                foreach (var r in renderers)
+                {
+                    if (r != null) r.enabled = false;
+                }
             }
             if (col != null) col.enabled = false;
-            
+
+            SpawnShatteredPrefab();
+            HandleOriginalObjectLifecycle();
             PlayConfetti();
+        }
+
+        private void SpawnShatteredPrefab()
+        {
+            if (shatteredPrefab == null)
+            {
+                lastShards = null;
+                return;
+            }
+
+            var parent = transform.parent;
+            var shards = Instantiate(shatteredPrefab, transform.position, transform.rotation, parent);
+            shards.transform.localScale = transform.localScale;
+            lastShards = shards;
+
+            if (!s_keepShardsUntilSceneChange && autoDestroyShardsAfter > 0f)
+            {
+                Destroy(shards, autoDestroyShardsAfter);
+            }
+        }
+
+        private void HandleOriginalObjectLifecycle()
+        {
+            if (keepOriginalForRespawn)
+            {
+                return;
+            }
+
+            if (destroyOriginalDelay <= 0f)
+            {
+                Destroy(gameObject);
+            }
+            else
+            {
+                Destroy(gameObject, destroyOriginalDelay);
+            }
         }
 
         /// <summary>
