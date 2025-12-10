@@ -1,0 +1,9 @@
+fileFormatVersion: 2
+guid: 5ea6fb1bdfca96e40a8a88d309b2bbab
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/ShieldCollisionResponse.cs
+  uploadId: 745700

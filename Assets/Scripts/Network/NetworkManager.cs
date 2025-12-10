@@ -1,10 +1,15 @@
 using System;
 using System.Linq;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
+using UnityEngine.SceneManagement;
+using UnityEngine.Events;
+using YubiSoccer.UI;
 
 // Simple NetworkManager using Photon PUN 2.
 // - QuickMatch(): join random room (MaxPlayers=2) or create one if none available.
@@ -23,12 +28,56 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool autoConnectOnStart = true;
 
     [Header("UI (optional)")]
-    public TMP_Text statusText;
+
+    [Tooltip("ゲーム開始ボタン（マッチングシーンに配置）")]
+    public StartGameButton startGameButton;
+    [Tooltip("ステータス表示クラス（オプション）")]
+    public StatusDisplay statusDisplay;
+
+    [Header("GameScene")]
+    [Tooltip("部屋が満員になったらマスターがロードするシーン名。Build Settings に登録してください。")]
+    public string gameSceneName = "Multi Player Stadium";
+
+    [Header("MatchingScene")]
+    [Tooltip("マッチングシーンの名前")]
+    public string matchingSceneName = "Matching";
+
+    [Header("TitleScene")]
+    [Tooltip("タイトル（ホーム）シーン名")]
+    public string titleSceneName = "GameTitleEdition";
 
     bool joinAfterConnect = false;
+    string pendingRoomName = null; // オリジナルルーム作成/参加用のルーム名を保持
+    byte pendingRoomMaxPlayers = 0; // オリジナルルーム作成時の最大人数を保持
+    bool isCreatingCustomRoom = false; // ルーム作成中かどうかのフラグ
+
+    void Awake()
+    {
+        PhotonNetwork.AutomaticallySyncScene = true;
+        // タイトルシーンが Build Settings に登録されているか事前検証（再発防止）
+        if (!Application.CanStreamedLevelBeLoaded(titleSceneName))
+        {
+            Debug.LogWarning($"[NetworkManager] タイトルシーン '{titleSceneName}' が Build Settings に存在しません。File -> Build Settings で追加してください。");
+        }
+        else
+        {
+            Debug.Log($"[NetworkManager] Title scene configured: '{titleSceneName}'");
+        }
+        if (startGameButton != null && PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        {
+            startGameButton.SetVisible(true);
+        }
+    }
 
     void Start()
     {
+        PhotonNetwork.GameVersion = "1";
+        if (PhotonNetwork.InRoom)
+        {
+            Log($"Already in room: {PhotonNetwork.CurrentRoom.Name}");
+            return;
+        }
+
         // If user provided an AppId in the inspector, override the project's PhotonServerSettings at runtime.
         if (!string.IsNullOrEmpty(appId))
         {
@@ -43,13 +92,66 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             }
         }
 
-        PhotonNetwork.AutomaticallySyncScene = true;
-
         if (autoConnectOnStart && !PhotonNetwork.IsConnected)
         {
             Log("Connecting to Photon...");
             PhotonNetwork.ConnectUsingSettings();
         }
+
+        PhotonNetwork.SendRate = 60;
+        PhotonNetwork.SerializationRate = 30;
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded_Wipe;
+        try
+        {
+            PhotonNetwork.AddCallbackTarget(this);
+        }
+        catch { }
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded_Wipe;
+        try
+        {
+            PhotonNetwork.RemoveCallbackTarget(this);
+        }
+        catch { }
+    }
+
+    private void OnSceneLoaded_Wipe(Scene scene, LoadSceneMode mode)
+    {
+        // When a scene finishes loading, if we have a global ScreenCircleWipe manager, reverse the wipe
+        try
+        {
+            var sw = ScreenCircleWipe.Instance;
+            if (sw != null)
+            {
+                sw.ReversePlay();
+            }
+        }
+        catch { }
+    }
+
+    public void QuickMatch2Players()
+    {
+        maxPlayers = 2;
+        QuickMatch();
+    }
+
+    public void QuickMatch4Players()
+    {
+        maxPlayers = 4;
+        QuickMatch();
+    }
+
+    public void QuickMatch6Players()
+    {
+        maxPlayers = 6;
+        QuickMatch();
     }
 
     // Quick match entry point (call from UI)
@@ -66,8 +168,82 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        Log("Joining random room...");
-        PhotonNetwork.JoinRandomRoom();
+        // extra diagnostic logs
+        try
+        {
+            Log($"Joining random room... Photon.IsConnected={PhotonNetwork.IsConnected}, IsConnectedAndReady={PhotonNetwork.IsConnectedAndReady}");
+            // NetworkClientState property may not exist in older PUN versions, guard it
+            try { Log($"Photon NetworkClientState: {PhotonNetwork.NetworkClientState}"); } catch { }
+        }
+        catch { }
+
+        PhotonNetwork.JoinRandomRoom(null, maxPlayers);
+    }
+
+    /// <summary>
+    /// オリジナルルームを作成（UI の InputField から呼ぶ）
+    /// オリジナルルームを作成（UI の InputField から呼ぶ）
+    /// </summary>
+    /// <param name="roomName">作成するルーム名（英数字推奨）</param>
+    /// <param name="maxPlayersForRoom">最大人数（2, 4, 6 など）</param>
+    public void CreateCustomRoom(string roomName, byte maxPlayersForRoom)
+    {
+        if (string.IsNullOrEmpty(roomName))
+        {
+            Debug.LogError("CreateCustomRoom: Room name cannot be empty!");
+            Log("エラー: ルーム名を入力してください");
+            return;
+        }
+
+        pendingRoomName = roomName;
+        pendingRoomMaxPlayers = maxPlayersForRoom;
+        isCreatingCustomRoom = true;
+
+        if (!PhotonNetwork.IsConnected || !PhotonNetwork.IsConnectedAndReady)
+        {
+            joinAfterConnect = true;
+            Log($"接続中... ルーム '{roomName}' を作成します（{maxPlayersForRoom}人部屋）");
+            PhotonNetwork.ConnectUsingSettings();
+            return;
+        }
+
+        Log($"オリジナルルーム '{roomName}' を作成中...（{maxPlayersForRoom}人部屋）");
+        RoomOptions roomOptions = new RoomOptions
+        {
+            MaxPlayers = maxPlayersForRoom,
+            IsVisible = false, // ★ ロビーに表示しない（ルーム名を知っている人のみ参加可能）
+            IsOpen = true
+        };
+        PhotonNetwork.CreateRoom(roomName, roomOptions);
+    }
+
+    /// <summary>
+    /// オリジナルルームに参加
+    /// </summary>
+    /// <param name="roomName">参加するルーム名</param>
+    public void JoinCustomRoom(string roomName)
+    {
+        if (string.IsNullOrEmpty(roomName))
+        {
+            Debug.LogError("JoinCustomRoom: Room name cannot be empty!");
+            Log("エラー: ルーム名を入力してください");
+            return;
+        }
+
+        pendingRoomName = roomName;
+        pendingRoomMaxPlayers = 0;
+        isCreatingCustomRoom = false;
+
+        if (!PhotonNetwork.IsConnected || !PhotonNetwork.IsConnectedAndReady)
+        {
+            joinAfterConnect = true;
+            Log($"接続中... ルーム '{roomName}' に参加します");
+            PhotonNetwork.ConnectUsingSettings();
+            return;
+        }
+
+        Log($"オリジナルルーム '{roomName}' に参加中...");
+        PhotonNetwork.JoinRoom(roomName);
     }
 
     // Photon callbacks
@@ -88,57 +264,128 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CreateRoom(null, opt);
     }
 
+    public override void OnJoinRoomFailed(short returnCode, string message)
+    {
+        Log($"オリジナルルームへの参加失敗 ({returnCode}): {message}");
+        Debug.LogError($"ルーム '{pendingRoomName}' に参加できませんでした。ルーム名が間違っているか、ルームが存在しません。");
+        pendingRoomName = null;
+    }
+
+    public override void OnCreateRoomFailed(short returnCode, string message)
+    {
+        Log($"オリジナルルームの作成失敗 ({returnCode}): {message}");
+        Debug.LogError($"ルーム '{pendingRoomName}' を作成できませんでした。同じ名前のルームが既に存在する可能性があります。");
+        pendingRoomName = null;
+    }
+
     public override void OnCreatedRoom()
     {
-        Log("Room created.");
+        Log($"Room created: {PhotonNetwork.CurrentRoom.Name} ({PhotonNetwork.CurrentRoom.MaxPlayers} max players)");
+        pendingRoomName = null;
+        pendingRoomMaxPlayers = 0;
+
+        // ルームタイプを設定
+        if (TeamManager.Instance != null)
+        {
+            TeamManager.Instance.SetRoomType("quick");
+        }
     }
 
     public override void OnJoinedRoom()
     {
-        Log($"Joined room. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
-        // Auto-instantiate player prefab (requires a "Player" prefab under Assets/Resources)
-        if (PhotonNetwork.IsConnected && PhotonNetwork.InRoom)
-        {
-            // Before instantiating, ensure the Player prefab exists under Resources (required by DefaultPool)
-            var prefab = Resources.Load<GameObject>("Player");
-            if (prefab == null)
-            {
-                Debug.LogError("Player prefab not found in Resources. Ensure 'Assets/Resources/Player.prefab' exists (name must be exactly 'Player'). Skipping instantiate.");
-                return;
-            }
+        Log($"Joined room: {PhotonNetwork.CurrentRoom.Name}. Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
+        pendingRoomName = null;
+        pendingRoomMaxPlayers = 0;
 
-            // extra diagnostics: log what's in the prefab to aid debugging (Photon DefaultPool errors often stem from prefab internals)
+        // チーム自動割り当て
+        if (TeamManager.Instance != null)
+        {
+            TeamManager.Instance.AssignTeamOnJoinRoom();
+        }
+
+        // マスタークライアントのみがシーン遷移を実行（AutomaticallySyncScene = true により全クライアントが同期）
+        if (PhotonNetwork.IsMasterClient)
+        {
+            Log($"MasterClient loading scene '{matchingSceneName}' (current: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
             try
             {
-                var comps = prefab.GetComponents<Component>();
-                string compList = string.Join(", ", comps.Select(c => c == null ? "<null>" : c.GetType().Name));
-                var hasPV = prefab.GetComponent<PhotonView>() != null;
-                Debug.Log($"Player prefab info: components=[{compList}] PhotonView={(hasPV ? "yes" : "no")}");
-
-                // simple spawn: random nearby position to avoid exact overlap
-                var spawn = new Vector3(UnityEngine.Random.Range(-2f, 2f), 1f, UnityEngine.Random.Range(-2f, 2f));
-                Log($"Instantiating Player at {spawn}");
-
-                // wrap instantiate to capture any exceptions coming from Photon/DefaultPool or prefab Awake/Start
+                // Play wipe locally before invoking Photon network load so clients see a fill animation
                 try
                 {
-                    PhotonNetwork.Instantiate("Player", spawn, Quaternion.identity);
+                    var sw = ScreenCircleWipe.Instance;
+                    if (sw != null)
+                    {
+                        // Use PlayWithCallback to ensure callback registration and clearer behavior
+                        try
+                        {
+                            sw.PlayWithCallback(() =>
+                            {
+                                try { Debug.Log("[NetworkManager] Wipe complete - scheduling PhotonNetwork.LoadLevel(" + matchingSceneName + ")"); } catch { }
+                                try { StartCoroutine(DelayedPhotonLoad(matchingSceneName)); } catch (Exception e) { Debug.LogError($"Failed to start delayed load coroutine: {e}"); }
+                            });
+                        }
+                        catch
+                        {
+                            PhotonNetwork.LoadLevel(matchingSceneName);
+                        }
+                    }
+                    else
+                    {
+                        PhotonNetwork.LoadLevel(matchingSceneName);
+                    }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Debug.LogError($"PhotonNetwork.Instantiate threw exception: {ex}\nPrefab path: Assets/Resources/Player.prefab\nCheck Console for earlier errors from prefab Awake/Start.");
+                    PhotonNetwork.LoadLevel(matchingSceneName);
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Error while inspecting Player prefab: {ex}");
+                Debug.LogError($"Failed to LoadLevel('{matchingSceneName}'): {ex}");
             }
+        }
+
+    }
+
+    private System.Collections.IEnumerator DelayedPhotonLoad(string sceneName)
+    {
+        float wait = 0.5f;
+        try
+        {
+            var sw = ScreenCircleWipe.Instance;
+            if (sw != null)
+            {
+                wait = Mathf.Max(0f, sw.minLoadDelay);
+            }
+        }
+        catch { }
+
+        float elapsed = 0f;
+        while (elapsed < wait)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        try
+        {
+            PhotonNetwork.LoadLevel(sceneName);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"DelayedPhotonLoad: Failed to LoadLevel('{sceneName}'): {e}");
         }
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         Log($"Player entered: {newPlayer.NickName} ({PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers})");
+
+        if (PhotonNetwork.CurrentRoom.PlayerCount == PhotonNetwork.CurrentRoom.MaxPlayers && PhotonNetwork.IsMasterClient)
+        {
+            startGameButton.SetVisible(true);
+            Log("Room is now full. Master client can start the game.");
+        }
     }
 
     public override void OnDisconnected(DisconnectCause cause)
@@ -146,9 +393,118 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Log($"Disconnected from Photon: {cause}");
     }
 
+    public void StartGame()
+    {
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            Debug.LogWarning("StartGame can only be called by the Master Client.");
+            return;
+        }
+
+        if (PhotonNetwork.CurrentRoom.PlayerCount < PhotonNetwork.CurrentRoom.MaxPlayers)
+        {
+            Debug.LogWarning("Cannot start game - room is not full yet.");
+            return;
+        }
+
+        // ルームを閉じて新規参加を防止
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+        PhotonNetwork.CurrentRoom.IsVisible = false;
+        Log("Room closed - game starting");
+
+        try
+        {
+            Log($"Master starting game... Loading '{gameSceneName}'");
+            
+            // ゲーム開始ボタン押下時に、マスタークライアントの操作をロックする（ユーザー要望）
+            var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+            foreach (var p in players)
+            {
+                if (p.photonView.IsMine)
+                {
+                    p.SetInputEnabled(false);
+                    Debug.Log("[NetworkManager] Locked local player input on StartGame.");
+                    break;
+                }
+            }
+
+            // スコアとタイマーをリセット（マッチング中の加算や前回の結果をクリア）
+            var props = new ExitGames.Client.Photon.Hashtable 
+            { 
+                { "gameStarted", true },
+                { "ScoreA", 0 },
+                { "ScoreB", 0 },
+                { "StartTime", null }, // タイマーリセット
+                { "Duration", null }   // タイマーリセット
+            };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+
+            // Play wipe locally before invoking Photon network load — wait for completion
+            try
+            {
+                var sw = ScreenCircleWipe.Instance;
+                if (sw != null)
+                {
+                    try
+                    {
+                        sw.PlayWithCallback(() =>
+                        {
+                            try { Debug.Log("[NetworkManager] Wipe complete - scheduling PhotonNetwork.LoadLevel(" + gameSceneName + ")"); } catch { }
+                            try { StartCoroutine(DelayedPhotonLoad(gameSceneName)); } catch (Exception e) { Debug.LogError($"Failed to start delayed load coroutine: {e}"); }
+                        });
+                    }
+                    catch
+                    {
+                        PhotonNetwork.LoadLevel(gameSceneName);
+                    }
+                }
+                else
+                {
+                    PhotonNetwork.LoadLevel(gameSceneName);
+                }
+            }
+            catch
+            {
+                PhotonNetwork.LoadLevel(gameSceneName);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to LoadLevel('{gameSceneName}'): {ex}");
+        }
+    }
+
+    // タイトルへ戻る公開API（ボタンから呼ぶ）
+    public void ReturnToTitleAndDisconnect()
+    {
+        // 以後自動再接続を防ぐ
+        joinAfterConnect = false;
+
+        // ルームにいるなら、まずは退出処理だけを行う
+        if (PhotonNetwork.InRoom)
+        {
+            Log("Leaving room... Waiting for OnLeftRoom callback.");
+            PhotonNetwork.LeaveRoom();
+            // ※ここではまだシーン遷移しません。「退出完了」の合図を待ちます。
+        }
+        else
+        {
+            // 既に部屋にいない（または未接続）なら、即座にタイトルへ
+            Log("Not in room. Wipe->Loading title scene: " + titleSceneName);
+            try { ScreenCircleWipe.LoadSceneWithWipe(titleSceneName); } catch { }
+        }
+    }
+
+    // Photonが「退出完了した」タイミングで自動的に呼ばれる
+    public override void OnLeftRoom()
+    {
+        Log("OnLeftRoom callback received. Wipe->Loading title scene: " + titleSceneName);
+        try { ScreenCircleWipe.LoadSceneWithWipe(titleSceneName); } catch { }
+    }
+
     void Log(string text)
     {
         Debug.Log("[NetworkManager] " + text);
-        if (statusText != null) statusText.text = text;
+        if (statusDisplay != null) statusDisplay.UpdateStatus(text);
     }
 }

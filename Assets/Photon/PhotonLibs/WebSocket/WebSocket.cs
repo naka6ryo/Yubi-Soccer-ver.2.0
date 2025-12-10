@@ -258,7 +258,20 @@ namespace ExitGames.Client.Photon
         [MonoPInvokeCallback(typeof(Action<int, IntPtr, int>))]
         public static void RecvCallbackStatic(int instance, IntPtr p, int len)
         {
-            instances[instance].RecvCallbackInstance(p, len);
+            if (!instances.TryGetValue(instance, out var sock))
+            {
+                UnityEngine.Debug.LogWarning($"[WebSocket] RecvCallbackStatic: unknown instance {instance}");
+                return;
+            }
+            try
+            {
+                sock.RecvCallbackInstance(p, len);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+                // swallow to avoid halting WebGL main loop
+            }
         }
 
         private byte[] receiveBuffer;
@@ -271,7 +284,14 @@ namespace ExitGames.Client.Photon
             }
             Marshal.Copy(p, this.receiveBuffer, 0, len);
 
-            this.recvCallback(this.receiveBuffer, len);
+            try
+            {
+                this.recvCallback?.Invoke(this.receiveBuffer, len);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
 
 
@@ -279,13 +299,32 @@ namespace ExitGames.Client.Photon
         [MonoPInvokeCallback(typeof(Action<int>))]
         public static void OpenCallbackStatic(int instance)
         {
-            instances[instance].OpenCallbackInstance();
+            if (!instances.TryGetValue(instance, out var sock))
+            {
+                UnityEngine.Debug.LogWarning($"[WebSocket] OpenCallbackStatic: unknown instance {instance}");
+                return;
+            }
+            try
+            {
+                sock.OpenCallbackInstance();
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
 
         public void OpenCallbackInstance()
         {
             this.Connected = true;
-            this.openCallback();
+            try
+            {
+                this.openCallback?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
 
 
@@ -296,36 +335,41 @@ namespace ExitGames.Client.Photon
             string msg;
             switch (code)
             {
-                case 1001:
-                    msg = "Endpoint going away.";
-                    break;
-                case 1002:
-                    msg = "Protocol error.";
-                    break;
-                case 1003:
-                    msg = "Unsupported message.";
-                    break;
-                case 1005:
-                    msg = "No status.";
-                    break;
-                case 1006:
-                    msg = "Abnormal disconnection.";
-                    break;
-                case 1009:
-                    msg = "Data frame too large.";
-                    break;
-                default:
-                    msg = "Error " + code;
-                    break;
+                case 1001: msg = "Endpoint going away."; break;
+                case 1002: msg = "Protocol error."; break;
+                case 1003: msg = "Unsupported message."; break;
+                case 1005: msg = "No status."; break;
+                case 1006: msg = "Abnormal disconnection."; break;
+                case 1009: msg = "Data frame too large."; break;
+                default: msg = "Error " + code; break;
             }
 
-            instances[instance].ErrorCallbackInstance(code, msg);
+            if (!instances.TryGetValue(instance, out var sock))
+            {
+                UnityEngine.Debug.LogWarning($"[WebSocket] ErrorCallbackStatic: unknown instance {instance} code={code} msg={msg}");
+                return;
+            }
+            try
+            {
+                sock.ErrorCallbackInstance(code, msg);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
 
         public void ErrorCallbackInstance(int code, string msg)
         {
             this.Connected = false;
-            this.errorCallback(code, msg);
+            try
+            {
+                this.errorCallback?.Invoke(code, msg);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
 
 
@@ -333,13 +377,32 @@ namespace ExitGames.Client.Photon
         public static void CloseCallbackStatic(int instance, int code)
         {
             string msg = "n/a from jslib";
-            instances[instance].CloseCallbackInstance(code, msg);
+            if (!instances.TryGetValue(instance, out var sock))
+            {
+                UnityEngine.Debug.LogWarning($"[WebSocket] CloseCallbackStatic: unknown instance {instance} code={code}");
+                return;
+            }
+            try
+            {
+                sock.CloseCallbackInstance(code, msg);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
 
         public void CloseCallbackInstance(int code, string msg)
         {
             this.Connected = false;
-            this.closeCallback(code, msg);
+            try
+            {
+                this.closeCallback?.Invoke(code, msg);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogException(ex);
+            }
         }
         #endif
     }

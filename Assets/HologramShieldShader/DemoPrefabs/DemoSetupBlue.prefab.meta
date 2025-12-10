@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2ccdb6b0174f43e4ba1c7a2f0ce340d6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/DemoPrefabs/DemoSetupBlue.prefab
+  uploadId: 745700

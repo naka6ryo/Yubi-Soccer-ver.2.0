@@ -1,0 +1,41 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Cashew_nut2\\Projects\\Unity\\Yubi-Soccer-ver.2.0\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{99020B7B-37D2-8519-2A3C-FE673911FEC0}|Assembly-CSharp.csproj|c:\\users\\cashew_nut2\\projects\\unity\\yubi-soccer-ver.2.0\\assets\\scripts\\ui\\countdownui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{99020B7B-37D2-8519-2A3C-FE673911FEC0}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\ui\\countdownui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "CountdownUI.cs",
+              "DocumentMoniker": "C:\\Users\\Cashew_nut2\\Projects\\Unity\\Yubi-Soccer-ver.2.0\\Assets\\Scripts\\UI\\CountdownUI.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\UI\\CountdownUI.cs",
+              "ToolTip": "C:\\Users\\Cashew_nut2\\Projects\\Unity\\Yubi-Soccer-ver.2.0\\Assets\\Scripts\\UI\\CountdownUI.cs",
+              "RelativeToolTip": "Assets\\Scripts\\UI\\CountdownUI.cs",
+              "ViewState": "AgIAADoAAAAAAAAAAAAcwFcAAABIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-06T11:21:59.265Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

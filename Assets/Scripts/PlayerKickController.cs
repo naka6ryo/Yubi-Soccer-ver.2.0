@@ -1,0 +1,847 @@
+using System.Collections.Generic;
+using System.Collections;
+using UnityEngine;
+using YubiSoccer.VFX;
+using Photon.Pun;
+using YubiSoccer.Network;
+// ↓ これを追加（Unity の Debug を明示）
+using Debug = UnityEngine.Debug;
+
+namespace YubiSoccer.Player
+{
+    /// <summary>
+    /// スペースキー入力でプレイヤーのキック判定(トリガー)を急拡大し、ボールへインパルスを与える。
+    /// 将来の長押し(チャージ)拡張に対応できるよう、簡易ステートとチャージ係数を用意。
+    /// 【修正点】
+    /// - ルートの PhotonView 所有者が自分(IsMine)のときだけ、入力処理/外部制御/インパルス送出を実行
+    /// - 速度決定と反動開始の重複を解消
+    /// - 強/普通キックSEの条件を是正
+    /// - SoundManager を null 安全に
+    /// </summary>
+    [DisallowMultipleComponent]
+    public class PlayerKickController : MonoBehaviour
+    {
+        private enum KickState { Idle, Charging, Expanding, Shrinking }
+
+        [Header("Mode")]
+        [Tooltip("true: AddForce/Lift を使わず、コライダー拡大のみ(非トリガー物理衝突)でボールを飛ばす。false: 旧方式(AddForce/Lift)を使用")]
+        [SerializeField] private bool physicsPushOnly = true;
+
+        [Header("Kick Zone (SphereCollider)")]
+        [SerializeField] private SphereCollider kickCollider; // Triggerを想定
+        [SerializeField] private bool createColliderIfMissing = true;
+        [Tooltip("キック判定(トリガー)のローカル中心")]
+        [SerializeField]
+        private Vector3 localCenter = new Vector3(0f, 0.5f, 0.4f);
+        [Tooltip("待機時の最小半径")][SerializeField] private float baseRadius = 0.2f;
+        [Tooltip("拡大時の最大半径")][SerializeField] private float maxRadius = 1.6f;
+        [Tooltip("拡大速度(半径/秒)")][SerializeField] private float expandSpeed = 12f;
+        [Tooltip("縮小速度(半径/秒)")][SerializeField] private float shrinkSpeed = 16f;
+
+        [Header("Kick Force (旧方式: AddForce)")]
+        [Tooltip("基礎キック力(インパルス)")]
+        [SerializeField]
+        private float kickForce = 10f;
+        [Tooltip("キック方向の基準(未設定ならプレイヤー→ボール方向)")]
+        [SerializeField]
+        private Transform forceDirectionReference;
+        [Tooltip("影響を与えるレイヤー(ボールなど)")]
+        [SerializeField]
+        private LayerMask affectLayers = ~0;
+        [Tooltip("タグが設定されている場合のみキックする(空なら無視)")]
+        [SerializeField]
+        private string requiredTag = ""; // 例: "Ball"
+
+        [Header("Input")]
+        [SerializeField] private KeyCode kickKey = KeyCode.Space;
+
+        [Header("Charge (future ready)")]
+        [Tooltip("長押しチャージを有効化(将来の拡張向け)。無効時はタップ即発動")]
+        [SerializeField] private bool enableCharge = true;
+        [Tooltip("最大チャージ時間(秒)")][SerializeField] private float maxChargeTime = 1.0f;
+        [Tooltip("チャージ率→出力倍率のカーブ(0..1)")]
+        [SerializeField]
+        private AnimationCurve chargeToForce = AnimationCurve.Linear(0, 1, 1, 1);
+
+        [Header("Hitbox scaling by charge")]
+        [Tooltip("チャージ量に応じて拡大到達半径をスケールする")]
+        [SerializeField] private bool scaleHitboxWithCharge = true;
+        [Tooltip("ゼロチャージ(タップ)時の到達半径")]
+        [SerializeField] private float zeroChargeMaxRadius = 1.6f;
+        [Tooltip("チャージ率→半径スケール(0..1)。0でゼロチャージ半径、1でmaxRadiusへ")]
+        [SerializeField] private AnimationCurve chargeToRadius = AnimationCurve.Linear(0, 0, 1, 1);
+
+        [Header("Lift (旧方式: 上方向インパルス)")]
+        [Tooltip("キック時の上方向インパルスの基礎値")]
+        [SerializeField]
+        private float liftImpulseBase = 0.5f;
+        [Tooltip("チャージ1.0時に上乗せされる上方向インパルス")]
+        [SerializeField]
+        private float liftImpulsePerCharge = 1.0f;
+
+        [Header("Speed scaling by charge")]
+        [Tooltip("チャージに応じて拡大/縮小速度をスケールする")]
+        [SerializeField] private bool scaleSpeedWithCharge = true;
+        [Tooltip("チャージ率→速度倍率(0..1)。0=等倍, 1=最大倍率へ")]
+        [SerializeField] private AnimationCurve chargeToSpeed = AnimationCurve.Linear(0, 0, 1, 1);
+        [Tooltip("拡大速度の最大倍率(1以上を推奨)")]
+        [SerializeField] private float expandSpeedChargeMultiplier = 2f;
+        [Tooltip("縮小速度の最大倍率(1以上を推奨)")]
+        [SerializeField] private float shrinkSpeedChargeMultiplier = 2f;
+
+        [Header("Recoil (visual tilt)")]
+        [Tooltip("キック発動時に見た目の反動で少し後ろへ倒す")]
+        [SerializeField] private bool enableRecoil = true;
+        [Tooltip("反動で傾ける対象(未設定なら自身のTransform)")]
+        [SerializeField] private Transform recoilTransform;
+        [Tooltip("反動の角度(度)。正の値で後ろへ倒れる(ローカルX軸-方向)")]
+        [SerializeField] private float recoilAngleDeg = 12f;
+        [Tooltip("反動(行き)の時間(秒)")]
+        [SerializeField] private float recoilDuration = 0.08f;
+        [Tooltip("反動(戻り)の時間(秒)")]
+        [SerializeField] private float recoveryDuration = 0.15f;
+        [Tooltip("行きのカーブ(0→1)")]
+        [SerializeField] private AnimationCurve recoilCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+        [Tooltip("戻りのカーブ(0→1)。1に近づくほど元の角度へ戻る")]
+        [SerializeField] private AnimationCurve recoveryCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+        [Tooltip("チャージ量に応じて反動角度をスケールする")]
+        [SerializeField] private bool scaleRecoilWithCharge = true;
+        [Tooltip("チャージ1.0時の反動角度倍率")]
+        [SerializeField] private float recoilAngleChargeMultiplier = 1.4f;
+
+        [Header("Ground Circle Indicator")]
+        [Tooltip("チャージ中に地面上の円を表示する")]
+        [SerializeField] private bool showIndicatorWhileCharging = true;
+        [Tooltip("キック発動時に円を自動非表示にする")]
+        [SerializeField] private bool hideIndicatorOnKick = true;
+        [Tooltip("地面サークルの参照(任意)。未設定なら子から自動取得を試みる")]
+        [SerializeField] private KickRadiusIndicator radiusIndicator;
+
+        [Header("Indicator width by charge")]
+        [Tooltip("チャージ率に応じて地面サークルの線幅を太くする")]
+        [SerializeField] private bool scaleIndicatorWidthWithCharge = true;
+        [Tooltip("ゼロチャージ時の線幅(LineRenderer.widthMultiplier)")]
+        [SerializeField] private float indicatorWidthAtZeroCharge = 0.05f;
+        [Tooltip("フルチャージ時の線幅(LineRenderer.widthMultiplier)")]
+        [SerializeField] private float indicatorWidthAtFullCharge = 0.12f;
+        [Tooltip("チャージ率→線幅補間用カーブ(0..1)。0でゼロ幅、1でフル幅への重み")]
+        [SerializeField] private AnimationCurve chargeToIndicatorWidth = AnimationCurve.Linear(0, 0, 1, 1);
+
+        [Header("Indicator color by charge")]
+        [Tooltip("チャージ率に応じて地面サークルの色を寒色→暖色に補間する")]
+        [SerializeField] private bool colorIndicatorWithCharge = true;
+        [Tooltip("色の補間に Gradient を使用。オンのときは chargeToIndicatorColor で補正した t を Gradient.Evaluate に渡す")]
+        [SerializeField] private bool useIndicatorGradient = false;
+        [Tooltip("チャージ率(0→1)に対する色のグラデーション。useIndicatorGradient がオンの時に使用")]
+        [SerializeField] private Gradient indicatorColorGradient;
+        [Tooltip("ゼロチャージ時の色(寒色)")]
+        [SerializeField] private Color indicatorColorAtZeroCharge = new Color(0.2f, 0.8f, 1f, 0.9f);
+        [Tooltip("フルチャージ時の色(暖色)")]
+        [SerializeField] private Color indicatorColorAtFullCharge = new Color(1f, 0.5f, 0.2f, 0.9f);
+        [Tooltip("チャージ率→色補間重みのカーブ(0..1)")]
+        [SerializeField] private AnimationCurve chargeToIndicatorColor = AnimationCurve.Linear(0, 0, 1, 1);
+
+        [Header("Impact VFX")]
+        [Tooltip("キックが対象に当たった瞬間に★リップルを生成する")]
+        [SerializeField] private bool spawnImpactStarRipple = true;
+        [SerializeField] private float impactRippleMaxRadius = 0.35f;
+        [SerializeField] private float impactRippleDuration = 0.3f;
+        [SerializeField, Min(3)] private int impactRippleSpikes = 5;
+        [SerializeField, Range(0.1f, 0.99f)] private float impactRippleInnerRatio = 0.45f;
+        [SerializeField] private float impactRippleLineWidth = 0.035f;
+
+        private enum OwnerState { Unknown, Mine, NotMine }
+        private OwnerState ownerState = OwnerState.Unknown;
+
+        private KickState state = KickState.Idle;
+        private float currentRadius;
+        private float chargeTime;
+        private float lastKickPowerMultiplier = 1f;
+        private float lastCharge01 = 0f;
+        // Public network-exposed charge value (read-only for external callers)
+        // NOTE: For network visuals we send 0 once a kick has started (state != Charging)
+        public float NetworkCharge01 => (enableCharge && state == KickState.Charging) ? Mathf.Clamp01(chargeTime / maxChargeTime) : 0f;
+
+        /// <summary>
+        /// Compute the indicator color for a given charge value (0..1) mirroring local visual logic.
+        /// </summary>
+        public Color ComputeIndicatorColor(float charge01)
+        {
+            float t = Mathf.Clamp01(charge01);
+            float eval = 0f;
+            try { eval = Mathf.Clamp01(chargeToIndicatorColor != null ? chargeToIndicatorColor.Evaluate(t) : t); } catch { eval = t; }
+            if (colorIndicatorWithCharge)
+            {
+                if (useIndicatorGradient && indicatorColorGradient != null)
+                {
+                    return indicatorColorGradient.Evaluate(eval);
+                }
+                else
+                {
+                    return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, eval);
+                }
+            }
+            return indicatorColorAtZeroCharge;
+        }
+
+        /// <summary>
+        /// Compute the indicator radius corresponding to a given charge (0..1).
+        /// Mirrors the logic used when scaling hitbox with charge.
+        /// </summary>
+        /// <param name="charge01"></param>
+        /// <returns></returns>
+        public float ComputeRadiusForCharge(float charge01)
+        {
+            float t = Mathf.Clamp01(charge01);
+            if (scaleHitboxWithCharge)
+            {
+                float eval = 0f;
+                try { eval = Mathf.Clamp01(chargeToRadius != null ? chargeToRadius.Evaluate(t) : t); } catch { eval = t; }
+                float r = Mathf.Lerp(zeroChargeMaxRadius, maxRadius, eval);
+                return Mathf.Clamp(r, baseRadius, maxRadius);
+            }
+            return maxRadius;
+        }
+
+        private float activeMaxRadius; // 今回キック時に到達する半径
+        private float activeExpandSpeed; // 今回キックの拡大速度
+        private float activeShrinkSpeed; // 今回キックの縮小速度
+        private Quaternion recoilBaseLocalRotation;
+        private Quaternion recoilInitialLocalRotation;
+        private Coroutine recoilRoutine;
+        private readonly HashSet<Rigidbody> kickedThisActivation = new HashSet<Rigidbody>();
+
+        // サウンド用変数
+        private SoundManager soundManager;
+        private PlayerAudioController playerAudio;
+        [SerializeField] private float strongKickWall = 0.7f; // 強いキックの閾値
+
+        // --- 所有者ガード用 ---
+        private PhotonView ownerView;
+        private bool IsMine => ownerState == OwnerState.Mine;
+        private int OwnerViewID => ownerView ? ownerView.ViewID : -1;
+
+        private void Awake()
+        {
+            ownerView = GetComponentInParent<PhotonView>();
+            if (ownerView == null)
+            {
+                Debug.unityLogger.LogWarning("[PlayerKickController]", "No PhotonView found in parent. Ownership guard disabled.");
+                ownerState = OwnerState.Unknown;
+            }
+            else
+            {
+                ownerState = ownerView.IsMine ? OwnerState.Mine : OwnerState.NotMine;
+            }
+
+            EnsureCollider();
+            DeactivateKickZone();
+            if (recoilTransform == null) recoilTransform = transform;
+            recoilInitialLocalRotation = recoilTransform.localRotation; // 累積しない基準姿勢
+
+            if (radiusIndicator == null)
+                radiusIndicator = GetComponentInChildren<KickRadiusIndicator>(true);
+            if (radiusIndicator != null)
+                radiusIndicator.SetCenter(transform);
+            playerAudio = GetComponentInChildren<PlayerAudioController>(true);
+        }
+
+        void Start()
+        {
+            soundManager = SoundManager.Instance;
+        }
+
+        private void OnValidate()
+        {
+            if (kickCollider == null)
+                kickCollider = GetComponent<SphereCollider>();
+
+            if (kickCollider != null)
+            {
+                kickCollider.isTrigger = !physicsPushOnly; // 物理衝突で押し出す場合は非トリガー
+                kickCollider.center = localCenter;
+                kickCollider.radius = Mathf.Max(0.001f, baseRadius);
+            }
+
+            baseRadius = Mathf.Max(0.001f, baseRadius);
+            maxRadius = Mathf.Max(baseRadius, maxRadius);
+            expandSpeed = Mathf.Max(0.001f, expandSpeed);
+            shrinkSpeed = Mathf.Max(0.001f, shrinkSpeed);
+            maxChargeTime = Mathf.Max(0.001f, maxChargeTime);
+            kickForce = Mathf.Max(0f, kickForce);
+
+            // 半径の整合性
+            zeroChargeMaxRadius = Mathf.Clamp(zeroChargeMaxRadius, baseRadius, maxRadius);
+
+            // 速度倍率の整合性
+            expandSpeedChargeMultiplier = Mathf.Max(0.01f, expandSpeedChargeMultiplier);
+            shrinkSpeedChargeMultiplier = Mathf.Max(0.01f, shrinkSpeedChargeMultiplier);
+
+            if (recoilTransform == null)
+                recoilTransform = transform;
+            recoilAngleDeg = Mathf.Max(0f, recoilAngleDeg);
+            recoilDuration = Mathf.Max(0f, recoilDuration);
+            recoveryDuration = Mathf.Max(0f, recoveryDuration);
+            recoilAngleChargeMultiplier = Mathf.Max(0.01f, recoilAngleChargeMultiplier);
+
+            // インジケータ線幅の整合性
+            indicatorWidthAtZeroCharge = Mathf.Max(0.001f, indicatorWidthAtZeroCharge);
+            indicatorWidthAtFullCharge = Mathf.Max(0.001f, indicatorWidthAtFullCharge);
+        }
+
+        private void EnsureCollider()
+        {
+            if (kickCollider == null)
+                kickCollider = GetComponent<SphereCollider>();
+
+            if (kickCollider == null && createColliderIfMissing)
+            {
+                kickCollider = gameObject.AddComponent<SphereCollider>();
+            }
+
+            if (kickCollider != null)
+            {
+                kickCollider.isTrigger = !physicsPushOnly;
+                kickCollider.center = localCenter;
+                kickCollider.radius = Mathf.Max(0.001f, baseRadius);
+            }
+        }
+
+        private void Update()
+        {
+            // ローカル所有者のみ入力を処理（外部制御は呼び出し側がガードするが、念のため本体でも二重に防御）
+            if (IsMine)
+            {
+                HandleInput();
+            }
+            UpdateKickState(Time.deltaTime);
+        }
+
+        private void HandleInput()
+        {
+            if (!IsMine) return; // 念のため
+
+            if (enableCharge)
+            {
+                switch (state)
+                {
+                    case KickState.Idle:
+                        if (Input.GetKeyDown(kickKey))
+                        {
+                            state = KickState.Charging;
+                            if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
+                            chargeTime = 0f;
+                            UpdateChargingVisuals(0f, 0f);
+                        }
+                        break;
+                    case KickState.Charging:
+                        if (Input.GetKey(kickKey))
+                        {
+                            chargeTime += Time.deltaTime;
+                            chargeTime = Mathf.Min(chargeTime, maxChargeTime);
+                            float c01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+                            UpdateChargingVisuals(c01, Time.deltaTime);
+                        }
+                        if (Input.GetKeyUp(kickKey))
+                        {
+                            float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+                            lastCharge01 = charge01;
+                            lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+                            if (playerAudio != null) playerAudio.StopChargingLocal(); else soundManager?.StopSE();
+                            BeginKick();
+                        }
+                        break;
+                }
+            }
+            else
+            {
+                if (state == KickState.Idle && Input.GetKeyDown(kickKey))
+                {
+                    lastKickPowerMultiplier = 1f; // タップは等倍
+                    lastCharge01 = 0f; // 非チャージ時は基礎リフトのみ
+                    BeginKick();
+                }
+            }
+        }
+
+        private void BeginKick()
+        {
+            try
+            {
+                if (!IsMine) return; // 所有者のみ発動
+                if (kickCollider == null)
+                {
+                    Debug.LogError("[PlayerKickController] BeginKick: kickCollider is null!");
+                    return;
+                }
+
+                // 今回の拡大/縮小速度を決定（※重複計算を解消）
+                if (scaleSpeedWithCharge)
+                {
+                    float s = Mathf.Clamp01(chargeToSpeed.Evaluate(Mathf.Clamp01(lastCharge01)));
+                    float expandMul = Mathf.Lerp(1f, expandSpeedChargeMultiplier, s);
+                    float shrinkMul = Mathf.Lerp(1f, shrinkSpeedChargeMultiplier, s);
+                    activeExpandSpeed = expandSpeed * expandMul;
+                    activeShrinkSpeed = shrinkSpeed * shrinkMul;
+                }
+                else
+                {
+                    activeExpandSpeed = expandSpeed;
+                    activeShrinkSpeed = shrinkSpeed;
+                }
+
+                // キックの強さで音を切り替えて再生
+                if (lastCharge01 >= strongKickWall)
+                {
+                    if (playerAudio != null) playerAudio.PlayKickLocal(true); else soundManager?.PlaySE("強いキック");
+                }
+                else
+                {
+                    if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
+                }
+
+                // 所有者は自身のキックを他クライアントにも通知して、他クライアントで位置付きに鳴らす
+                try
+                {
+                    if (ownerView != null && ownerView.IsMine)
+                    {
+                        Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+                        ownerView.RPC("RPC_OtherPlayerKick", Photon.Pun.RpcTarget.Others, kickWorldCenter, lastCharge01 >= strongKickWall, lastCharge01);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[PlayerKickController] RPC_OtherPlayerKick send failed: {ex.Message}");
+                }
+
+                // 視覚的反動を開始（1回のみ）
+                // StartRecoil();
+
+                // 発動準備
+                kickedThisActivation.Clear();
+                currentRadius = baseRadius;
+                kickCollider.radius = currentRadius;
+
+                // 今回の到達半径を決定
+                if (scaleHitboxWithCharge)
+                {
+                    float t = Mathf.Clamp01(chargeToRadius.Evaluate(Mathf.Clamp01(lastCharge01)));
+                    activeMaxRadius = Mathf.Lerp(zeroChargeMaxRadius, maxRadius, t);
+                }
+                else
+                {
+                    activeMaxRadius = maxRadius;
+                }
+                activeMaxRadius = Mathf.Max(baseRadius, Mathf.Min(activeMaxRadius, maxRadius));
+
+                // 発動時に円を隠す
+                if (hideIndicatorOnKick && radiusIndicator != null)
+                    radiusIndicator.Hide();
+
+                ActivateKickZone();
+                state = KickState.Expanding;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PlayerKickController] BeginKick error: {ex.Message}\n{ex.StackTrace}");
+                state = KickState.Idle;
+            }
+        }
+
+        private void UpdateKickState(float dt)
+        {
+            switch (state)
+            {
+                case KickState.Expanding:
+                    currentRadius += activeExpandSpeed * dt;
+                    if (currentRadius >= activeMaxRadius)
+                    {
+                        currentRadius = activeMaxRadius;
+                        state = KickState.Shrinking; // ピーク到達後は縮小
+                    }
+                    if (kickCollider != null) kickCollider.radius = currentRadius;
+                    break;
+
+                case KickState.Shrinking:
+                    currentRadius = Mathf.MoveTowards(currentRadius, baseRadius, activeShrinkSpeed * dt);
+                    if (kickCollider != null) kickCollider.radius = currentRadius;
+                    if (Mathf.Approximately(currentRadius, baseRadius))
+                    {
+                        DeactivateKickZone();
+                        state = KickState.Idle;
+                    }
+                    break;
+            }
+        }
+
+        private void ActivateKickZone()
+        {
+            if (kickCollider != null)
+            {
+                kickCollider.enabled = true;
+            }
+        }
+
+        private void DeactivateKickZone()
+        {
+            if (kickCollider != null)
+            {
+                // enabledは維持、半径を最小に保つ方式（誤検出を避けたいなら false にしてもOK）
+                kickCollider.enabled = true;
+                kickCollider.radius = baseRadius;
+            }
+            kickedThisActivation.Clear();
+            if (radiusIndicator != null)
+                radiusIndicator.Hide();
+        }
+
+        private void OnDisable()
+        {
+            // 無効化時は反動をクリアして姿勢を戻す
+            bool wasRecoilRunning = recoilRoutine != null;
+            if (recoilRoutine != null)
+            {
+                StopCoroutine(recoilRoutine);
+                recoilRoutine = null;
+            }
+            if (recoilTransform != null && wasRecoilRunning)
+            {
+                // 反動途中で無効化された場合のみ、反動前の基準(開始時の向き)へ戻す
+                recoilTransform.localRotation = recoilBaseLocalRotation;
+            }
+        }
+
+        [Header("External Control")]
+        [Tooltip("外部(ハンドステート等)からの制御を許可。キーボードと共存可能")]
+        [SerializeField] private bool allowExternalControl = true;
+
+        public void ExternalKickTap()
+        {
+            try
+            {
+                if (!allowExternalControl) { Debug.LogWarning("[PlayerKickController] ExternalKickTap: allowExternalControl is false"); return; }
+                if (!IsMine) { Debug.LogWarning($"[PlayerKickController] ExternalKickTap ignored (owner IsMine=false, ownerViewID={OwnerViewID})"); return; }
+                if (state != KickState.Idle)
+                {
+                    Debug.LogWarning($"[PlayerKickController] ExternalKickTap: state is not Idle (current={state})");
+                    return;
+                }
+                lastKickPowerMultiplier = 1f;
+                lastCharge01 = 0f;
+                if (playerAudio != null) playerAudio.PlayKickLocal(false); else soundManager?.PlaySE("普通のキック");
+                BeginKick();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PlayerKickController] ExternalKickTap error: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        public bool ExternalChargeStart()
+        {
+            if (!allowExternalControl) return false;
+            if (!IsMine) return false;
+            if (state != KickState.Idle) return false;
+            state = KickState.Charging;
+            chargeTime = 0f;
+            if (playerAudio != null) playerAudio.StartChargingLocal(); else soundManager?.PlaySE("チャージ");
+            Debug.Log($"[PlayerKickController] Playing SE: チャージ (ownerViewID={OwnerViewID})");
+            UpdateChargingVisuals(0f, 0f);
+            return true;
+        }
+
+        public void ExternalChargeUpdate(float dt)
+        {
+            if (!allowExternalControl) return;
+            if (!IsMine) return;
+            if (state != KickState.Charging) return;
+            chargeTime += Mathf.Max(0f, dt);
+            chargeTime = Mathf.Min(chargeTime, maxChargeTime);
+            float c01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+            UpdateChargingVisuals(c01, dt);
+        }
+
+        public void ExternalChargeRelease()
+        {
+            try
+            {
+                if (!allowExternalControl) { Debug.LogWarning("[PlayerKickController] ExternalChargeRelease: allowExternalControl is false"); return; }
+                if (!IsMine) { Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease ignored (owner IsMine=false, ownerViewID={OwnerViewID})"); return; }
+                if (state != KickState.Charging)
+                {
+                    Debug.LogWarning($"[PlayerKickController] ExternalChargeRelease: state is not Charging (current={state})");
+                    return;
+                }
+                float charge01 = Mathf.Clamp01(chargeTime / maxChargeTime);
+                lastCharge01 = charge01;
+                lastKickPowerMultiplier = Mathf.Max(0f, chargeToForce.Evaluate(charge01));
+                if (playerAudio != null) playerAudio.StopChargingLocal(); else soundManager?.StopSE();
+                BeginKick();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PlayerKickController] ExternalChargeRelease error: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// 外部から現在チャージ中かどうかを問い合わせる（読み取り専用）
+        /// </summary>
+        public bool IsCurrentlyCharging()
+        {
+            return state == KickState.Charging;
+        }
+
+        /// <summary>
+        /// 外部からチャージ開始可能かを問い合わせる
+        /// </summary>
+        public bool CanStartCharge()
+        {
+            return state == KickState.Idle;
+        }
+
+        private void UpdateChargingVisuals(float c01, float dt)
+        {
+            if (!(showIndicatorWhileCharging && radiusIndicator != null)) return;
+
+            float t = Mathf.Clamp01(chargeToRadius.Evaluate(c01));
+            float previewRadius = scaleHitboxWithCharge
+                ? Mathf.Lerp(zeroChargeMaxRadius, maxRadius, t)
+                : maxRadius;
+            radiusIndicator.Show();
+            radiusIndicator.SetRadius(previewRadius);
+
+            if (scaleIndicatorWidthWithCharge)
+            {
+                float wt = Mathf.Clamp01(chargeToIndicatorWidth.Evaluate(c01));
+                float w = Mathf.Lerp(indicatorWidthAtZeroCharge, indicatorWidthAtFullCharge, wt);
+                radiusIndicator.SetWidth(w);
+            }
+
+            Color currentColor = radiusIndicator.GetCurrentColor();
+            if (colorIndicatorWithCharge)
+            {
+                float ct = Mathf.Clamp01(chargeToIndicatorColor.Evaluate(c01));
+                Color col = (useIndicatorGradient && indicatorColorGradient != null)
+                    ? indicatorColorGradient.Evaluate(ct)
+                    : Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
+                radiusIndicator.SetColor(col);
+                currentColor = col;
+            }
+
+            radiusIndicator.UpdatePulseEffect(previewRadius, currentColor, c01, Mathf.Max(0f, dt));
+        }
+
+        private void StartRecoil()
+        {
+            if (!enableRecoil) return;
+            if (recoilTransform == null) recoilTransform = transform;
+
+            if (recoilRoutine != null)
+            {
+                StopCoroutine(recoilRoutine);
+                recoilRoutine = null;
+            }
+
+            recoilBaseLocalRotation = recoilTransform.localRotation;
+
+            float angle = recoilAngleDeg;
+            if (scaleRecoilWithCharge)
+            {
+                float mul = Mathf.Lerp(1f, recoilAngleChargeMultiplier, Mathf.Clamp01(lastCharge01));
+                angle *= mul;
+            }
+
+            recoilRoutine = StartCoroutine(CoRecoil(angle));
+        }
+
+        private IEnumerator CoRecoil(float angleDeg)
+        {
+            if (recoilTransform == null) yield break;
+
+            float t = 0f;
+            while (t < recoilDuration)
+            {
+                float u = (recoilDuration > 0f) ? (t / recoilDuration) : 1f;
+                float f = Mathf.Clamp01(recoilCurve.Evaluate(u));
+                ApplyTilt(angleDeg * f);
+                t += Time.deltaTime;
+                yield return null;
+            }
+            ApplyTilt(angleDeg);
+
+            recoilRoutine = null;
+        }
+
+        private void ApplyTilt(float angleDeg)
+        {
+            if (recoilTransform == null) return;
+            Quaternion q = Quaternion.Euler(-angleDeg, 0f, 0f);
+            recoilTransform.localRotation = recoilBaseLocalRotation * q;
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (!IsMine) return;
+            if (physicsPushOnly) return;
+            if (kickCollider == null) return;
+            if (other == null || other == kickCollider) return;
+            if (!(state == KickState.Expanding)) return;
+
+            int layerMask = 1 << other.gameObject.layer;
+            if ((affectLayers.value & layerMask) == 0) return;
+            if (!string.IsNullOrEmpty(requiredTag) && !other.CompareTag(requiredTag)) return;
+
+            Rigidbody rb = other.attachedRigidbody;
+            if (rb == null) return;
+            if (kickedThisActivation.Contains(rb)) return;
+
+            PhotonView ballPv = null;
+            rb.TryGetComponent<PhotonView>(out ballPv);
+
+            Vector3 kickWorldCenter = transform.TransformPoint(localCenter);
+            Vector3 hitPoint = other.ClosestPoint(kickWorldCenter);
+            Vector3 dir = forceDirectionReference != null
+                ? forceDirectionReference.forward
+                : ((hitPoint - kickWorldCenter).sqrMagnitude > 0.000001f
+                    ? (hitPoint - kickWorldCenter).normalized
+                    : (rb.worldCenterOfMass - transform.position).normalized);
+
+            float forceMag = kickForce * Mathf.Max(0f, lastKickPowerMultiplier);
+            float lift = Mathf.Max(0f, liftImpulseBase + liftImpulsePerCharge * Mathf.Clamp01(lastCharge01));
+            Vector3 impulse = dir * forceMag;
+
+            if (ballPv != null)
+            {
+                if (IsMine)
+                {
+                    // ローカルで即座に力を加える (遅延ゼロ)
+                    if (impulse != Vector3.zero) rb.AddForce(impulse, ForceMode.Impulse);
+                    if (lift > 0f) rb.AddForce(Vector3.up * lift, ForceMode.Impulse);
+
+                    Vector3 contact = hitPoint;
+                    // 他人だけに送る (Broadcaster側で ReceiverGroup.Others に変更済み)
+                    BallImpulseBroadcaster.RaiseImpulse(ballPv.ViewID, impulse, lift, contact);
+                }
+            }
+            else
+            {
+                if (impulse != Vector3.zero) rb.AddForce(impulse, ForceMode.Impulse);
+                if (lift > 0f) rb.AddForce(Vector3.up * lift, ForceMode.Impulse);
+            }
+
+            kickedThisActivation.Add(rb);
+
+            if (spawnImpactStarRipple)
+            {
+                Vector3 center = other.bounds.center;
+                Vector3 hitPos;
+                Vector3 normal;
+
+                var sphere = other as SphereCollider;
+                if (sphere != null)
+                {
+                    Vector3 sphereCenter = sphere.transform.TransformPoint(sphere.center);
+                    float worldR = sphere.radius * Mathf.Max(sphere.transform.lossyScale.x, Mathf.Max(sphere.transform.lossyScale.y, sphere.transform.lossyScale.z));
+                    Vector3 towardKick = (kickWorldCenter - sphereCenter).sqrMagnitude > 0.000001f
+                        ? (kickWorldCenter - sphereCenter).normalized
+                        : (center - transform.position).normalized;
+                    hitPos = sphereCenter + towardKick * worldR;
+                    normal = towardKick;
+                }
+                else
+                {
+                    hitPos = other.ClosestPoint(kickWorldCenter);
+                    if ((hitPos - kickWorldCenter).sqrMagnitude < 0.000001f)
+                    {
+                        hitPos = other.ClosestPoint(transform.position);
+                    }
+                    normal = (hitPos - center).sqrMagnitude > 0.000001f ? (hitPos - center).normalized : (center - transform.position).normalized;
+                }
+
+                Color rippleColor = GetChargeColor(lastCharge01);
+                ImpactStarRipple.Spawn(hitPos, normal, rippleColor, impactRippleMaxRadius, impactRippleDuration, impactRippleSpikes, impactRippleInnerRatio, impactRippleLineWidth);
+            }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (!IsMine) return;
+            if (!physicsPushOnly) return;
+            if (kickCollider == null) return;
+            if (!(state == KickState.Expanding)) return;
+
+            var other = collision.collider;
+            if (other == null || other == kickCollider) return;
+
+            int layerMask = 1 << other.gameObject.layer;
+            if ((affectLayers.value & layerMask) == 0) return;
+            if (!string.IsNullOrEmpty(requiredTag) && !other.CompareTag(requiredTag)) return;
+
+            var rb = collision.rigidbody ?? other.attachedRigidbody;
+            if (rb == null) return;
+            if (kickedThisActivation.Contains(rb)) return;
+
+            ContactPoint cp = collision.contacts != null && collision.contactCount > 0 ? collision.contacts[0] : default;
+            Vector3 hitPos = cp.point != default ? cp.point : other.bounds.ClosestPoint(transform.TransformPoint(localCenter));
+            Vector3 normal = cp.normal != default ? cp.normal : (hitPos - other.bounds.center).normalized;
+
+            if (spawnImpactStarRipple)
+            {
+                Color rippleColor = GetChargeColor(lastCharge01);
+                ImpactStarRipple.Spawn(hitPos, normal, rippleColor, impactRippleMaxRadius, impactRippleDuration, impactRippleSpikes, impactRippleInnerRatio, impactRippleLineWidth);
+            }
+
+            kickedThisActivation.Add(rb);
+        }
+
+        private Color GetChargeColor(float charge01)
+        {
+            float ct = Mathf.Clamp01(chargeToIndicatorColor != null ? chargeToIndicatorColor.Evaluate(Mathf.Clamp01(charge01)) : Mathf.Clamp01(charge01));
+            if (useIndicatorGradient && indicatorColorGradient != null)
+                return indicatorColorGradient.Evaluate(ct);
+            return Color.Lerp(indicatorColorAtZeroCharge, indicatorColorAtFullCharge, ct);
+        }
+
+        // RPC: 他クライアントのキックを受け取って、そのクライアント上で位置付きに再生する
+        [Photon.Pun.PunRPC]
+        private void RPC_OtherPlayerKick(Vector3 worldPos, bool strong, float charge01)
+        {
+            // このメソッドは "RpcTarget.Others" に送信されるため、受信側では ownerState が NotMine のはず
+            try
+            {
+                if (playerAudio != null)
+                {
+                    // チャージループを明示的に停止してから、ローカルの挙動と同様に PlayOneShot で鳴らす
+                    playerAudio.StopRemoteCharge();
+                    playerAudio.PlayKickRemote(strong);
+                }
+                else
+                {
+                    // フォールバック: SoundManager に位置付き再生機能がない場合は無視
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[PlayerKickController] RPC_OtherPlayerKick failed to play audio: {ex.Message}");
+            }
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            if (kickCollider != null)
+            {
+                Gizmos.color = new Color(1f, 0.6f, 0.1f, 0.3f);
+                Matrix4x4 m = Matrix4x4.TRS(transform.TransformPoint(kickCollider.center), Quaternion.identity, Vector3.one);
+                Gizmos.matrix = m;
+                Gizmos.DrawWireSphere(Vector3.zero, kickCollider.radius);
+            }
+            else
+            {
+                Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.3f);
+                Gizmos.matrix = transform.localToWorldMatrix;
+                Gizmos.DrawWireSphere(localCenter, baseRadius);
+            }
+        }
+    }
+}

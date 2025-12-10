@@ -1,0 +1,119 @@
+using System.Collections.Generic;
+using Photon.Pun;
+using Photon.Realtime;
+using UnityEngine;
+using ExitGames.Client.Photon;
+
+namespace YubiSoccer.Network
+{
+    /// <summary>
+    /// ボール側に取り付け、受信したインパルスを次の FixedUpdate で適用する。
+    /// 依存: 同じゲームオブジェクトに PhotonView と Rigidbody が必要。
+    /// </summary>
+    [RequireComponent(typeof(Rigidbody))]
+    [RequireComponent(typeof(PhotonView))]
+    public class BallImpulseReceiver : MonoBehaviour, IOnEventCallback
+    {
+        struct QueuedImpulse
+        {
+            public Vector3 impulse;
+            public float lift;
+            public int seq;
+            public double serverTime;
+            public double lag; // 追加: 受信時のラグ(秒)
+            public string uniqueKey; // ActorNumber_Seq
+        }
+
+        Rigidbody _rb;
+        PhotonView _pv;
+        readonly Queue<QueuedImpulse> _queue = new Queue<QueuedImpulse>();
+        // 修正: int (seqのみ) だと再接続時に seq=0 に戻ったプレイヤーの入力を無視してしまうため、
+        // "{ActorNumber}_{seq}" の文字列で管理する。
+        readonly HashSet<string> _appliedSeq = new HashSet<string>();
+
+        void Awake()
+        {
+            _rb = GetComponent<Rigidbody>();
+            _pv = GetComponent<PhotonView>();
+        }
+
+        void OnEnable()
+        {
+            PhotonNetwork.AddCallbackTarget(this);
+        }
+
+        void OnDisable()
+        {
+            PhotonNetwork.RemoveCallbackTarget(this);
+        }
+
+        public void OnEvent(EventData photonEvent)
+        {
+            if (photonEvent.Code != BallImpulseBroadcaster.EventCode) return;
+
+            var data = photonEvent.CustomData as object[];
+            if (data == null || data.Length < 11) return;
+
+            int viewId = (int)data[0];
+            if (_pv == null || _pv.ViewID != viewId) return; // 自分宛てでない
+
+            var impulse = new Vector3((float)data[1], (float)data[2], (float)data[3]);
+            float lift = (float)data[4];
+            // contact: x,y,z は data[5..7]（今は未使用）
+            int seq = (int)data[8];
+            int senderActor = (int)data[9];
+            double serverTime = (double)data[10];
+
+            // 修正: ユニークキーで判定
+            string uniqueKey = $"{senderActor}_{seq}";
+
+            if (_appliedSeq.Contains(uniqueKey)) return;
+
+            // ラグ計算 (現在時刻 - 送信時刻)
+            double lag = PhotonNetwork.Time - serverTime;
+
+            _queue.Enqueue(new QueuedImpulse
+            {
+                impulse = impulse,
+                lift = lift,
+                seq = seq,
+                serverTime = serverTime,
+                lag = lag,
+                uniqueKey = uniqueKey
+            });
+        }
+
+        void FixedUpdate()
+        {
+            if (_rb == null) return;
+
+            while (_queue.Count > 0)
+            {
+                var qi = _queue.Dequeue();
+                if (_appliedSeq.Contains(qi.uniqueKey)) continue;
+
+                if (qi.impulse != Vector3.zero)
+                {
+                    _rb.AddForce(qi.impulse, ForceMode.Impulse);
+                }
+                if (qi.lift > 0f)
+                {
+                    _rb.AddForce(Vector3.up * qi.lift, ForceMode.Impulse);
+                }
+
+                // ラグ補正 (Fast-Forward)
+                // 物理演算を厳密に進めるのは重いため、簡易的に「速度 * 時間」だけ位置を進める近似を行う
+                if (qi.lag > 0)
+                {
+                    // AddForce直後なので velocity は更新されているはずだが、
+                    // ForceMode.Impulse は即座に velocity を変更する。
+                    // 位置補正: P' = P + V * lag
+                    // ※重力の影響などは無視する簡易近似
+                    _rb.position += _rb.linearVelocity * (float)qi.lag;
+                }
+
+                _appliedSeq.Add(qi.uniqueKey);
+            }
+        }
+    }
+}

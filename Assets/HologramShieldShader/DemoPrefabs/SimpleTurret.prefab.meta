@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 442a419a959fc024eaced93c6fddfd5d
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/DemoPrefabs/SimpleTurret.prefab
+  uploadId: 745700

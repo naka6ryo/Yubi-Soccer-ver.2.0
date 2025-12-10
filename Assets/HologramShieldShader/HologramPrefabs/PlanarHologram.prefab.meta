@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 14ffc5bf5a6bb064cab5d48c41b7e841
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 316000
+  packageName: Reactive Hologram Shield
+  packageVersion: 1.0
+  assetPath: Assets/LuminaryLabs/HologramShieldShader/HologramPrefabs/PlanarHologram.prefab
+  uploadId: 745700

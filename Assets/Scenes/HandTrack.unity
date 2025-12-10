@@ -332,6 +332,8 @@ MonoBehaviour:
   tmpProText: {fileID: 0}
   uiText: {fileID: 1835725877}
   createWorldTextFallback: 1
+  currentState: NONE
+  currentConfidence: 0
 --- !u!4 &1248268395
 Transform:
   m_ObjectHideFlags: 0

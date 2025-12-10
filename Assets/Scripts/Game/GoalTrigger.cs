@@ -1,0 +1,120 @@
+using System.Diagnostics;
+using UnityEngine;
+using YubiSoccer.Game;
+using Photon.Pun;
+
+namespace YubiSoccer.Field
+{
+    /// <summary>
+    /// ゴール領域のトリガーに付与し、ボール侵入でスコアを加算します。
+    /// このゴールに入った時に「どちらのチームに加点するか」を Inspector で指定してください。
+    /// 例: TeamB のゴールに付与し、awardToTeam=TeamA とする。
+    /// </summary>
+    [RequireComponent(typeof(Collider))]
+    public class GoalTrigger : MonoBehaviour
+    {
+        public static System.Action<YubiSoccer.Game.Team> OnGoalScored; // ゴール通知(加点先チーム)
+        [Header("Scoring")]
+        [Tooltip("このゴールに入ったとき加点されるチーム")]
+        [SerializeField] private Team awardToTeam = Team.TeamA;
+        [Tooltip("ボール判定に使うタグ名")]
+        [SerializeField] private string ballTag = "Ball";
+        [Tooltip("同一侵入での多重カウント防止のための再武装ディレイ(秒)")]
+        [SerializeField, Min(0f)] private float rearmDelay = 1.0f;
+
+        private Collider col;
+        private bool armed = true;
+
+        private SoundManager soundManager;
+        public Team AwardToTeam => awardToTeam;
+
+        private void Reset()
+        {
+            col = GetComponent<Collider>();
+            if (col != null)
+            {
+                col.isTrigger = true;
+            }
+        }
+
+        private void Awake()
+        {
+            col = GetComponent<Collider>();
+            if (col != null && !col.isTrigger)
+            {
+                UnityEngine.Debug.LogWarning($"[GoalTrigger] {name}: Collider.isTrigger を true に設定します。");
+                col.isTrigger = true;
+            }
+        }
+
+        void Start()
+        {
+            soundManager = SoundManager.Instance;
+        }
+
+        // Updateメソッド（キー入力監視）は削除しました。
+        // デバッグ機能が必要な場合は、単一の GameManager 等で管理してください。
+
+        private void OnTriggerEnter(Collider other)
+        {
+            // ゴール判定はマスタークライアントのみが行う（二重加点防止）
+            if (!PhotonNetwork.IsMasterClient) return;
+
+            if (!armed) return;
+
+            // ボール判定
+            bool isBall = !string.IsNullOrEmpty(ballTag) && other.CompareTag(ballTag);
+            if (!isBall)
+            {
+                // タグ未設定のケースのフォールバック: 名称に Ball を含む場合
+                var rb = other.attachedRigidbody;
+                if (rb != null && rb.gameObject.name.ToLowerInvariant().Contains("ball"))
+                {
+                    isBall = true;
+                }
+            }
+            if (!isBall) return;
+
+            // ゴールイベント通知（スコア加算前に通知して、UIアニメーションを先に開始）
+            OnGoalScored?.Invoke(awardToTeam);
+
+            // SE再生は ScoreManager 側で全員に対して行われるため、ここでは削除
+            // soundManager.PlaySE("ゴール");
+            // soundManager.SetSEVolume(10.0f);
+            // soundManager.PlaySE("歓声01");
+            // soundManager.PlaySE("歓声02");
+            // soundManager.SetSEVolume(1.0f);
+
+            if (soundManager != null)
+            {
+                // UnityEngine.Debug.Log("[GoalTrigger] Played SE: ゴール"); // ログも抑制
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning("[GoalTrigger] soundManager が見つかりません。");
+            }
+
+            // スコア加算
+            if (ScoreManager.Instance != null)
+            {
+                ScoreManager.Instance.AddScore(awardToTeam, 1);
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning("[GoalTrigger] ScoreManager.Instance が見つかりません。シーンに ScoreManager を配置してください。");
+            }
+
+            // 再武装までのディレイ
+            if (rearmDelay > 0f)
+            {
+                armed = false;
+                Invoke(nameof(Rearm), rearmDelay);
+            }
+        }
+
+        private void Rearm()
+        {
+            armed = true;
+        }
+    }
+}
